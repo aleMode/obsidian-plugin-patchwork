@@ -1,0 +1,16 @@
+# dependencies
+node_modules/
+
+# build output
+main.js
+*.js.map
+
+# Obsidian
+data.json
+test-vault/.obsidian/plugins/patchwork/
+test-vault/.obsidian/workspace*.json
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
