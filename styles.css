@@ -242,6 +242,40 @@
 	border-color: #aaa;
 }
 
+.pw-selection {
+	position: absolute;
+	left: var(--pw-x);
+	top: var(--pw-y);
+	width: var(--pw-w);
+	height: var(--pw-h);
+	pointer-events: none;
+	z-index: 10;
+}
+
+.pw-selection.is-hidden {
+	display: none;
+}
+
+.pw-handle {
+	position: absolute;
+	width: calc(9px / var(--pw-zoom));
+	height: calc(9px / var(--pw-zoom));
+	margin: calc(-4.5px / var(--pw-zoom));
+	background: var(--background-primary);
+	border: calc(1.5px / var(--pw-zoom)) solid var(--interactive-accent);
+	border-radius: calc(2px / var(--pw-zoom));
+	pointer-events: auto;
+}
+
+.pw-handle-nw { left: 0; top: 0; cursor: nwse-resize; }
+.pw-handle-n { left: 50%; top: 0; cursor: ns-resize; }
+.pw-handle-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.pw-handle-e { left: 100%; top: 50%; cursor: ew-resize; }
+.pw-handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.pw-handle-s { left: 50%; top: 100%; cursor: ns-resize; }
+.pw-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
+.pw-handle-w { left: 0; top: 50%; cursor: ew-resize; }
+
 .pw-skeletons {
 	position: absolute;
 	inset: 0;

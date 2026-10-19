@@ -1,18 +1,18 @@
 import { Menu, Notice, setIcon, TFile } from 'obsidian';
 import { exportBoardPdf } from '../export/exportPdf';
 import { allIds } from '../model/defaults';
-import { bounds, inset, intersects, type Point } from '../model/geometry';
+import { bounds, type Handle, inset, intersects, type Point, type Rect, resizeRect } from '../model/geometry';
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, NoteModule, Page, PdfModule } from '../model/schema';
-import { snapPoint } from '../model/snapping';
+import { snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import type { BitmapCache } from '../render/bitmapCache';
 import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
-import { addModule, addPage, defaultModuleRect, mapPage, moveModule, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, PdfPageModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
 import { type Camera, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
@@ -29,7 +29,12 @@ type Selection = { pageId: string; moduleId?: string } | null;
 type Drag =
 	| { kind: 'pan'; last: Point }
 	| { kind: 'page'; id: string; startPointer: Point; startPos: Point }
-	| { kind: 'module'; pageId: string; id: string; startPointer: Point; startPos: Point };
+	| { kind: 'module'; pageId: string; id: string; startPointer: Point; startPos: Point }
+	| { kind: 'resize'; target: NonNullable<Selection>; handle: Handle; startPointer: Point; start: Rect };
+
+const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+/** Smallest page or module a resize can produce, in mm. */
+const MIN_SIZE_MM = 5;
 
 /** Pages within this fraction of a viewport outside the visible area count as visible (pre-mount). */
 const CULL_MARGIN = 0.5;
@@ -44,6 +49,7 @@ const ZOOM_SETTLE_MS = 150;
 export class BoardViewport implements BoardSurface {
 	private root: HTMLElement;
 	private layer: HTMLElement;
+	private selectionBox: HTMLElement;
 	private zoomLabel!: HTMLElement;
 	private pages = new Map<string, PageElement>();
 	private modules: ModuleHost;
@@ -61,6 +67,9 @@ export class BoardViewport implements BoardSurface {
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
+		// Above the pages so handles are never clipped by a page edge.
+		this.selectionBox = this.layer.createDiv({ cls: 'pw-selection' });
+		for (const h of HANDLES) this.selectionBox.createDiv({ cls: `pw-handle pw-handle-${h}`, attr: { 'data-handle': h } });
 		this.modules = new ModuleHost({
 			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, resolution: () => this.resolution() },
 			store,
@@ -72,6 +81,11 @@ export class BoardViewport implements BoardSurface {
 		this.buildToolbar(container);
 		this.cleanups.push(store.subscribe(() => this.render()));
 		this.bindInput();
+		const dup = view.scope?.register(['Mod'], 'd', () => {
+			this.duplicateSelection();
+			return false;
+		});
+		this.cleanups.push(() => dup && view.scope?.unregister(dup));
 		const ro = new ResizeObserver(() => this.onResize());
 		ro.observe(this.root);
 		this.cleanups.push(() => ro.disconnect());
@@ -109,9 +123,28 @@ export class BoardViewport implements BoardSurface {
 		// A selection pointing at something deleted (e.g. by undo) is dropped.
 		if (this.selection && !this.findSelected()) this.selection = null;
 		this.modules.selectedModule = this.selection?.moduleId ?? null;
+		this.renderSelectionBox();
 		this.renderGrid();
 		this.updateVisibility();
 		this.modules.sync();
+	}
+
+	/** The selection's rect on the board (mm), and whether it can be resized. */
+	private selectedRect(): { rect: Rect; locked: boolean } | null {
+		const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
+		if (!page) return null;
+		if (!this.selection?.moduleId) return { rect: page, locked: false };
+		const m = page.modules.find((x) => x.id === this.selection?.moduleId);
+		return m ? { rect: { x: page.x + m.x, y: page.y + m.y, w: m.w, h: m.h }, locked: !!m.locked } : null;
+	}
+
+	private renderSelectionBox() {
+		const sel = this.selectedRect();
+		const show = !!sel && !sel.locked && !this.store.readOnly;
+		this.selectionBox.toggleClass('is-hidden', !show);
+		if (!show) return;
+		const { x, y, w, h } = sel.rect;
+		this.selectionBox.setCssProps({ '--pw-x': `${x}mm`, '--pw-y': `${y}mm`, '--pw-w': `${w}mm`, '--pw-h': `${h}mm` });
 	}
 
 	private findSelected(): Page | AnyModule | undefined {
@@ -339,6 +372,7 @@ export class BoardViewport implements BoardSurface {
 		on('keydown', (e) => this.onKey(e, true));
 		on('keyup', (e) => this.onKey(e, false));
 		on('contextmenu', (e) => this.onContextMenu(e));
+		on('dblclick', (e) => this.onDoubleClick(e));
 	}
 
 	private local(e: MouseEvent): Point {
@@ -366,6 +400,18 @@ export class BoardViewport implements BoardSurface {
 
 	private onPointerDown(e: PointerEvent) {
 		this.root.focus();
+		const handle = (e.target as HTMLElement).closest<HTMLElement>('.pw-handle')?.dataset.handle as Handle | undefined;
+		if (handle && e.button === 0 && this.selection) {
+			const sel = this.selectedRect();
+			const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
+			if (!sel || !page) return;
+			// Modules resize in page coordinates, pages in board coordinates.
+			const start = this.selection.moduleId ? { ...sel.rect, x: sel.rect.x - page.x, y: sel.rect.y - page.y } : sel.rect;
+			this.drag = { kind: 'resize', target: this.selection, handle, startPointer: screenToBoard(this.camera, this.local(e)), start };
+			this.root.setPointerCapture(e.pointerId);
+			this.root.addClass('is-dragging');
+			return;
+		}
 		const hit = this.hit(e);
 		if (e.button === 1 || (e.button === 0 && (this.spaceHeld || !hit))) {
 			if (!hit && e.button === 0) this.select(null);
@@ -397,12 +443,27 @@ export class BoardViewport implements BoardSurface {
 			return;
 		}
 		const p = screenToBoard(this.camera, this.local(e));
-		const raw = { x: d.startPos.x + p.x - d.startPointer.x, y: d.startPos.y + p.y - d.startPointer.y };
 		const grid = this.store.file.board.grid;
+		if (d.kind === 'resize') return this.resizeTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
+		const raw = { x: d.startPos.x + p.x - d.startPointer.x, y: d.startPos.y + p.y - d.startPointer.y };
 		// Alt bypasses snapping (SPEC 5.1).
 		const pos = grid.snap && !e.altKey ? snapPoint(raw, grid.size) : raw;
 		if (d.kind === 'page') this.store.update((f) => movePage(f, d.id, pos.x, pos.y), { coalesce: `move-page:${d.id}` });
 		else this.store.update((f) => moveModule(f, d.pageId, d.id, pos.x, pos.y), { coalesce: `move-module:${d.id}` });
+	}
+
+	private resizeTo(d: Extract<Drag, { kind: 'resize' }>, p: Point, grid: number, keepAspect: boolean) {
+		const r = resizeRect(d.start, d.handle, p.x - d.startPointer.x, p.y - d.startPointer.y, {
+			min: MIN_SIZE_MM,
+			keepAspect,
+			snap: (v) => snapValue(v, grid),
+		});
+		const { pageId, moduleId } = d.target;
+		const apply = <T extends Rect>(o: T): T => (o.x === r.x && o.y === r.y && o.w === r.w && o.h === r.h ? o : { ...o, ...r });
+		this.store.update(
+			(f) => (moduleId ? mapModule(f, pageId, moduleId, apply) : mapPage(f, pageId, apply)),
+			{ coalesce: `resize:${moduleId ?? pageId}` },
+		);
 	}
 
 	private onPointerUp(e: PointerEvent) {
@@ -427,8 +488,42 @@ export class BoardViewport implements BoardSurface {
 			else this.store.undo();
 		} else if (mod && e.key.toLowerCase() === 'y') this.store.redo();
 		else if ((e.key === 'Delete' || e.key === 'Backspace') && this.selection) this.deleteSelection();
+		else if (e.key.startsWith('Arrow') && this.selection) this.nudge(e.key, e.shiftKey ? 10 : 1);
 		else return;
 		e.preventDefault();
+	}
+
+	private duplicateSelection() {
+		const sel = this.selection;
+		if (!sel || this.store.readOnly) return;
+		const taken = allIds(this.store.file);
+		const ids = () => {
+			const id = newId(taken);
+			taken.add(id);
+			return id;
+		};
+		if (sel.moduleId) {
+			const id = ids();
+			this.store.update((f) => duplicateModule(f, sel.pageId, sel.moduleId!, id));
+			this.select({ pageId: sel.pageId, moduleId: id });
+		} else {
+			this.store.update((f) => duplicatePage(f, sel.pageId, ids));
+			const added = this.store.file.pages[this.store.file.pages.length - 1];
+			if (added) this.select({ pageId: added.id });
+		}
+	}
+
+	/** Arrow keys move the selection by 1 mm (Shift: 10 mm). Consecutive presses undo as one step. */
+	private nudge(key: string, step: number) {
+		const sel = this.selection;
+		if (!sel || this.store.readOnly) return;
+		const dx = key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0;
+		const dy = key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0;
+		const shift = <T extends Point>(o: T): T => ({ ...o, x: o.x + dx, y: o.y + dy });
+		this.store.update(
+			(f) => (sel.moduleId ? mapModule(f, sel.pageId, sel.moduleId, (m) => (m.locked ? m : shift(m))) : mapPage(f, sel.pageId, shift)),
+			{ coalesce: `nudge:${sel.moduleId ?? sel.pageId}` },
+		);
 	}
 
 	private deleteSelection() {
@@ -440,6 +535,15 @@ export class BoardViewport implements BoardSurface {
 		this.select(null);
 	}
 
+	/** Double-click a note module: open its source at that section in a split (SPEC 5.6). */
+	private onDoubleClick(e: MouseEvent) {
+		const hit = this.hit(e);
+		const m = hit?.moduleId ? this.store.file.pages.find((p) => p.id === hit.pageId)?.modules.find((x) => x.id === hit.moduleId) : undefined;
+		if (m?.type !== 'note') return;
+		const note = m as NoteModule;
+		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
+	}
+
 	private onContextMenu(e: MouseEvent) {
 		const hit = this.hit(e);
 		if (!hit || this.store.readOnly) return;
@@ -448,10 +552,19 @@ export class BoardViewport implements BoardSurface {
 		const menu = new Menu();
 		const { pageId, moduleId } = hit;
 		if (moduleId) {
+			const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+			menu.addItem((i) => i.setTitle('Duplicate').setIcon('copy').onClick(() => this.duplicateSelection()));
+			menu.addItem((i) =>
+				i
+					.setTitle(m?.locked ? 'Unlock' : 'Lock')
+					.setIcon(m?.locked ? 'unlock' : 'lock')
+					.onClick(() => this.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, locked: x.locked ? undefined : true })))),
+			);
 			menu.addItem((i) => i.setTitle('Bring to front').setIcon('bring-to-front').onClick(() => this.store.update((f) => restack(f, pageId, moduleId, 'front'))));
 			menu.addItem((i) => i.setTitle('Send to back').setIcon('send-to-back').onClick(() => this.store.update((f) => restack(f, pageId, moduleId, 'back'))));
 			menu.addItem((i) => i.setTitle('Delete module').setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
 		} else {
+			menu.addItem((i) => i.setTitle('Duplicate page').setIcon('copy').onClick(() => this.duplicateSelection()));
 			menu.addItem((i) => i.setTitle('Swap orientation').setIcon('rotate-cw').onClick(() => this.store.update((f) => mapPage(f, pageId, (p) => swapOrientation(p)))));
 			menu.addItem((i) => i.setTitle('Delete page').setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
 		}

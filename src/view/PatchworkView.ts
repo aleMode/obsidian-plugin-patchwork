@@ -1,4 +1,4 @@
-import { Modal, Notice, TextFileView, TFile, WorkspaceLeaf } from 'obsidian';
+import { Modal, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from 'obsidian';
 import { serializeBoard } from '../model/serialize';
 import { parseBoard } from '../model/validate';
 import { BoardStore } from '../store/BoardStore';
@@ -26,6 +26,8 @@ export class PatchworkView extends TextFileView {
 
 	constructor(leaf: WorkspaceLeaf, private makeSurface: SurfaceFactory) {
 		super(leaf);
+		// Board shortcuts (e.g. Mod+D) must win over Obsidian's global hotkeys while the board is active.
+		this.scope = new Scope(this.app.scope);
 	}
 
 	getViewType() {

@@ -73,6 +73,24 @@ export function restack(file: PatchworkFile, pageId: string, moduleId: string, t
 	});
 }
 
+/** Copy of a module with a new ID, nudged so it doesn't sit exactly on the original. */
+export function duplicateModule(file: PatchworkFile, pageId: string, moduleId: string, newId: string, offset = 5): PatchworkFile {
+	return mapPage(file, pageId, (p) => {
+		const m = p.modules.find((x) => x.id === moduleId);
+		return m ? { ...p, modules: [...p.modules, { ...structuredClone(m), id: newId, x: m.x + offset, y: m.y + offset, locked: undefined }] } : p;
+	});
+}
+
+/** Copy of a page and its modules (all with new IDs), placed to the right of everything. */
+export function duplicatePage(file: PatchworkFile, pageId: string, ids: () => string): PatchworkFile {
+	const p = file.pages.find((x) => x.id === pageId);
+	if (!p) return file;
+	const right = Math.max(...file.pages.map((x) => x.x + x.w));
+	const copy = { ...structuredClone(p), id: ids(), x: right + 20, name: p.name ? `${p.name} copy` : undefined };
+	copy.modules = copy.modules.map((m) => ({ ...m, id: ids() }));
+	return { ...file, pages: [...file.pages, copy] };
+}
+
 /** Where a new module goes: inside a 10 mm margin, cascading so new modules don't hide each other. */
 export function defaultModuleRect(page: Page, size?: { w: number; h: number }): { x: number; y: number; w: number; h: number } {
 	const margin = 10;

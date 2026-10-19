@@ -62,3 +62,32 @@ export function fitRect(aspect: number, box: Rect, fit: Fit): Rect {
 }
 
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+export type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+/**
+ * Resize `start` by dragging `handle` by (dx, dy). Edges not on the handle stay put. The rect never
+ * gets smaller than `min`; with `keepAspect` the original proportions are kept (corner handles).
+ * `snap` rounds the moved edges, so snapping never shifts the fixed ones.
+ */
+export function resizeRect(start: Rect, handle: Handle, dx: number, dy: number, opts: { min: number; keepAspect?: boolean; snap?: (v: number) => number }): Rect {
+	const snap = opts.snap ?? ((v: number) => v);
+	let x0 = start.x, y0 = start.y, x1 = right(start), y1 = bottom(start);
+	if (handle.includes('w')) x0 = Math.min(snap(x0 + dx), x1 - opts.min);
+	if (handle.includes('e')) x1 = Math.max(snap(x1 + dx), x0 + opts.min);
+	if (handle.includes('n')) y0 = Math.min(snap(y0 + dy), y1 - opts.min);
+	if (handle.includes('s')) y1 = Math.max(snap(y1 + dy), y0 + opts.min);
+	let r = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+	if (opts.keepAspect && handle.length === 2) r = keepAspect(start, r, handle);
+	return r;
+}
+
+/** Grow the dragged rect to the start's aspect ratio, anchored at the corner opposite the handle. */
+function keepAspect(start: Rect, r: Rect, handle: Handle): Rect {
+	const aspect = start.w / start.h;
+	const w = Math.max(r.w, r.h * aspect);
+	const h = w / aspect;
+	const x = handle.includes('w') ? right(r) - w : r.x;
+	const y = handle.includes('n') ? bottom(r) - h : r.y;
+	return { x, y, w, h };
+}
