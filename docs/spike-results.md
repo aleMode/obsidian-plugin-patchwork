@@ -88,7 +88,27 @@ Dataview 0.5.68 was installed into the test vault for S2 (downloaded from its Gi
 - Pass Obsidian's own PDF.js asset URLs to `getDocument` (`cMapUrl`, `standardFontDataUrl`, `wasmUrl`, `iccUrl` under `/lib/pdfjs/`), as its viewer does. Standard fonts rendered fine without them (system fonts), but CJK CMaps, JPEG 2000 and ICC profiles need them. These paths are app assets, not API, so keep them in `sources/pdfSource.ts` with a comment.
 - Avoid Electron's `process.getProcessMemoryInfo()` for measuring: it stalled for **15 s** after `doc.destroy()`. Use `process.memoryUsage()`.
 
-**Caveat:** the fixture PDF is trivial (vector boxes and text). Render time and memory on a real, image-heavy rulebook are **not yet measured**. See "Needs your input".
+### S3 on a real rulebook (`spikes/src/s3Real.ts`)
+
+Measured on a 63.7 MB, 159-page (Letter), image-heavy adventure PDF with a 47-entry outline. The file is kept locally and never committed (`.gitignore`).
+
+| Measurement | Result |
+|---|---|
+| Open document | ~130 ms (both `data` and `url` loading) |
+| Memory after open + first thumbnail | +200–250 MB renderer RSS (`url` slightly lower); most of it released after `doc.destroy()` |
+| Full page at 2× (1224 × 1584 px), first render | 190–550 ms |
+| Crop at 2× on a **cold** page | 120–215 ms. Cropping saves **memory**, not time: decoding the page's images dominates. |
+| Re-render of an already-rendered page at another scale | 2–5 ms (PDF.js keeps decoded images on the page object) |
+| Main-thread blocking per cold render | at most one long task of ~60 ms; often none (parsing and decoding run in the worker) |
+| Thumbnails at 0.2× | ~180 ms per page (20 pages in 3.6 s) |
+| Cancel a 4× render after 30 ms | ✅ `RenderingCancelledException` |
+| Text extraction per page | 2–8 ms |
+
+**Implications for the design:**
+- Keep `PDFPageProxy` objects for visible modules alive (LRU), so zoom changes re-render in milliseconds; cache output bitmaps per (file, page, crop, scale).
+- Limit PDF render concurrency to 1–2 and show a placeholder or low-res bitmap while rendering (LOD).
+- A page picker must render thumbnails lazily and cache them: eagerly thumbnailing 159 pages would take ~30 s. The outline picker (M3) is the faster route.
+- The "visible pages paint in under 1 s" target holds for a page with a couple of crops from this book.
 
 ## S4 — Canvas limits
 
@@ -161,5 +181,4 @@ Also: `setViewData(…, clear=false)` on an external change should rebuild the m
 
 ## Needs your input
 
-- **A real rulebook PDF for performance:** S3's timings come from a tiny vector fixture. To measure a real, image-heavy rulebook, copy one into `test-vault/_private/` (git-ignored, never committed) or tell me its path.
 - **2× display scaling** wasn't tested (this machine runs at 1×).

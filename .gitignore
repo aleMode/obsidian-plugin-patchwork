@@ -12,6 +12,9 @@ test-vault/.obsidian/*
 !test-vault/.obsidian/community-plugins.json
 # private test material (e.g. real rulebooks for perf checks); never committed
 test-vault/_private/
+# only the generated fixture PDF is committed; real rulebooks dropped in PDFs/ stay local
+test-vault/PDFs/*.pdf
+!test-vault/PDFs/Sample rulebook.pdf
 
 # editors / OS
 .vscode/

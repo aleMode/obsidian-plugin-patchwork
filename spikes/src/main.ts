@@ -4,6 +4,7 @@ import { makeContext, Spike } from './context';
 import { s1Print } from './s1Print';
 import { s2Markdown } from './s2Markdown';
 import { s3Pdf } from './s3Pdf';
+import { s3Real } from './s3Real';
 import { s4Canvas } from './s4Canvas';
 import { s5MixedPages } from './s5MixedPages';
 import { registerS6View, s6FileView } from './s6FileView';
@@ -13,6 +14,7 @@ const SPIKES: Record<string, Spike> = {
 	s1: s1Print,
 	s2: s2Markdown,
 	s3: s3Pdf,
+	s3real: s3Real,
 	s4: s4Canvas,
 	s5: s5MixedPages,
 	s6: s6FileView,
