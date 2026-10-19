@@ -8,6 +8,8 @@ export interface ModuleContext {
 	pdfDocs: PdfDocCache;
 	/** Parent for per-render child components (MarkdownRenderer cleanup, events). */
 	component: Component;
+	/** Canvas pixels per mm the current zoom needs on screen. Absent when rendering for export. */
+	resolution?: () => number;
 }
 
 /** Draws one module's content into its element. Created when the page becomes visible. */

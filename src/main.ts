@@ -2,6 +2,8 @@ import { Notice, Plugin, TFile, TFolder } from 'obsidian';
 import { newBoardFile } from './model/defaults';
 import { presetById } from './model/presets';
 import { serializeBoard } from './model/serialize';
+import { generateStressBoard, type StressSources } from './model/stress';
+import { StressBoardModal } from './ui/StressBoardModal';
 import { PdfDocCache } from './sources/pdfSource';
 import { BoardViewport } from './view/BoardViewport';
 import { refreshPaperScope, removePaperScope } from './view/paperScope';
@@ -29,6 +31,12 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('add-pdf', 'Add PDF to page', (v) => v.pickPdf(), true);
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
 		this.addBoardCommand('export', 'Export…', (v) => v.showExport());
+
+		this.addCommand({
+			id: 'generate-stress-board',
+			name: 'Generate stress board',
+			callback: () => new StressBoardModal(this.app, (pages, modulesPerPage) => void this.createStressBoard(pages, modulesPerPage)).open(),
+		});
 
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {
@@ -63,17 +71,37 @@ export default class PatchworkPlugin extends Plugin {
 		});
 	}
 
-	async createBoard(folder: TFolder): Promise<TFile | null> {
-		const path = this.availablePath(folder, 'Untitled board');
-		const file = newBoardFile({ created: new Date().toISOString().slice(0, 10), firstPage: presetById('A4') });
+	async createBoard(folder: TFolder, content = newBoardFile({ created: new Date().toISOString().slice(0, 10), firstPage: presetById('A4') }), base = 'Untitled board'): Promise<TFile | null> {
+		const path = this.availablePath(folder, base);
 		try {
-			const created = await this.app.vault.create(path, serializeBoard(file));
+			const created = await this.app.vault.create(path, serializeBoard(content));
 			await this.app.workspace.getLeaf(true).openFile(created);
 			return created;
 		} catch (e) {
 			new Notice(`Patchwork: could not create the board: ${e instanceof Error ? e.message : String(e)}`);
 			return null;
 		}
+	}
+
+	/** A board of N pages × M modules built from files in the vault, for profiling (SPEC 8.9). */
+	async createStressBoard(pages: number, modulesPerPage: number): Promise<TFile | null> {
+		const files = this.app.vault.getFiles();
+		const sources: StressSources = {
+			notes: files.filter((f) => f.extension === 'md').slice(0, 200).map((f) => f.path),
+			images: files.filter((f) => /^(png|jpe?g|webp|gif)$/i.test(f.extension)).slice(0, 50).map((f) => f.path),
+			pdfs: [],
+		};
+		for (const f of files.filter((x) => x.extension.toLowerCase() === 'pdf').slice(0, 10)) {
+			try {
+				const doc = await this.pdfDocs.acquire(f.path);
+				sources.pdfs.push({ path: f.path, pages: doc.numPages });
+				this.pdfDocs.release(f.path);
+			} catch {
+				// Unreadable PDFs are simply not used.
+			}
+		}
+		const board = generateStressBoard(sources, { pages, modulesPerPage, seed: 1 });
+		return this.createBoard(this.app.vault.getRoot(), board, `Stress board ${pages}x${modulesPerPage}`);
 	}
 
 	/** "Untitled board.patchwork", then "Untitled board 1.patchwork", … in the given folder. */

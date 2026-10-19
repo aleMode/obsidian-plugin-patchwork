@@ -5,11 +5,6 @@ import { PX_PER_MM } from '../model/units';
 import type { PdfDocument, PdfPage } from '../sources/pdfSource';
 import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
 
-/**
- * Canvas pixels per CSS pixel. Fixed for M0 (sharp up to ~200% zoom on a 1× screen);
- * zoom-dependent re-rendering (LOD) comes with the render scheduler.
- */
-const DENSITY = 2;
 /** Never allocate a canvas side beyond this, whatever the module size (memory, spike S4). */
 const MAX_CANVAS_SIDE = 4096;
 
@@ -20,8 +15,9 @@ export class PdfModuleRenderer implements ModuleRenderer {
 	private generation = 0;
 	private deps = new Set<string>();
 	private done: Promise<void> = Promise.resolve();
+	private renderedPxPerMm = 0;
 
-	/** `pxPerMm`: canvas resolution. Defaults to screen density; export passes its DPI. */
+	/** `pxPerMm`: fixed canvas resolution (export passes its DPI). Otherwise follows the zoom. */
 	constructor(private el: HTMLElement, private ctx: ModuleContext, private pxPerMm?: number) {}
 
 	dependencies(): ReadonlySet<string> {
@@ -32,12 +28,18 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		return this.done;
 	}
 
+	/** True when the current canvas is too blurry or needlessly large for `pxPerMm`. */
+	wantsResolution(pxPerMm: number): boolean {
+		if (this.pxPerMm !== undefined || this.renderedPxPerMm === 0) return false;
+		return this.renderedPxPerMm < pxPerMm * 0.7 || this.renderedPxPerMm > pxPerMm * 2.5;
+	}
+
 	render(m: AnyModule) {
 		const mod = m as PdfModule;
 		this.cancel();
 		const gen = ++this.generation;
 		this.deps = new Set([mod.file]);
-		this.done = this.draw(mod, gen).catch((e: unknown) => {
+		this.done = this.ctx.pdfDocs.schedule(() => this.draw(mod, gen)).catch((e: unknown) => {
 			if (gen !== this.generation) return;
 			const name = (e as Error)?.name;
 			if (name === 'RenderingCancelledException') return;
@@ -51,7 +53,16 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		if (m.page > doc.numPages) return placeholder(this.el, `${m.file} has only ${doc.numPages} pages (module wants page ${m.page})`);
 		const page: PdfPage = await doc.getPage(m.page);
 		if (gen !== this.generation) return;
+		try {
+			await this.drawPage(page, m, gen);
+		} finally {
+			// PDF.js keeps a page's decoded images until cleanup(); on an illustrated rulebook that is
+			// tens of MB per page (perf probe: 5 GB for 100 pages without this).
+			page.cleanup();
+		}
+	}
 
+	private async drawPage(page: PdfPage, m: PdfModule, gen: number) {
 		const crop = m.crop ?? FULL_PAGE;
 		const vp1 = page.getViewport({ scale: 1 });
 		const rot = normalizeRotation(m.rotation ?? 0);
@@ -61,7 +72,7 @@ export class PdfModuleRenderer implements ModuleRenderer {
 
 		// Canvas holds the crop before the module's rotation.
 		const unrotated = rot % 180 ? { w: placed.h, h: placed.w } : { w: placed.w, h: placed.h };
-		const pxPerMm = this.pxPerMm ?? PX_PER_MM * DENSITY * window.devicePixelRatio;
+		const pxPerMm = this.pxPerMm ?? this.ctx.resolution?.() ?? PX_PER_MM * window.devicePixelRatio;
 		const pxW = Math.min(MAX_CANVAS_SIDE, Math.ceil(unrotated.w * pxPerMm));
 		const scale = pxW / ((crop[2] - crop[0]) * vp1.width);
 		const vp = page.getViewport({ scale });
@@ -85,8 +96,15 @@ export class PdfModuleRenderer implements ModuleRenderer {
 			'--pw-h': `${unrotated.h}mm`,
 			'--pw-rotate': `${rot}deg`,
 		});
-		this.el.empty();
+		this.releaseCanvases();
 		this.el.appendChild(canvas);
+		this.renderedPxPerMm = pxPerMm;
+	}
+
+	/** Free canvas backing stores now rather than at garbage collection. */
+	private releaseCanvases() {
+		this.el.querySelectorAll('canvas').forEach((c) => (c.width = c.height = 0));
+		this.el.empty();
 	}
 
 	private document(path: string): Promise<PdfDocument> {
@@ -116,8 +134,6 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		this.generation++;
 		this.cancel();
 		this.releaseDoc();
-		// Free the canvas backing store now rather than at garbage collection.
-		this.el.querySelectorAll('canvas').forEach((c) => (c.width = c.height = 0));
-		this.el.empty();
+		this.releaseCanvases();
 	}
 }

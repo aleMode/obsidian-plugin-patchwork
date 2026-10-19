@@ -57,3 +57,7 @@ Questions raised while building, each with the recommended answer we are proceed
 ### Q12. Minimum Obsidian version
 - `minAppVersion` is raised only when an API needs it (SPEC 13); the `obsidianmd/no-unsupported-api` lint rule enforces this. Currently **1.6.6** (`FileManager.trashFile`).
 - All behaviour is verified on **1.14.4** only. Some findings may be version-dependent (native embed rendering in `MarkdownRenderer`, the Mermaid guard). **Recommendation:** before the first release, either test on the oldest claimed version or raise `minAppVersion` to the oldest version actually tested.
+
+### Q13. "Visible pages paint in under 1 s" with heavy PDF art
+- Measured in M0 (`docs/perf.md`): a page with two crops of full-page rulebook illustrations takes 1.2–1.5 s the first time, bound by PDF.js decoding (one page at a time per document). Everything else meets the target.
+- **Recommendation:** keep the target for warm content and for opening a board; for cold PDF pages, aim for "first crop within ~0.6 s, page complete within ~1.5 s" and make revisits instant with the M1 bitmap cache. Revisit after M1.

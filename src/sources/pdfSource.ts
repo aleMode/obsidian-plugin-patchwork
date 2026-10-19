@@ -42,6 +42,11 @@ const PDF_DOC_PARAMS = {
 
 /** Keep an unused document briefly, so scrolling a page off and back doesn't reparse a 60 MB file. */
 const RELEASE_DELAY_MS = 15_000;
+/**
+ * PDF renders allowed at once. Each render has a main-thread part (~50 ms on a heavy page, spike S3);
+ * running dozens together freezes the UI, so the rest wait their turn.
+ */
+const MAX_CONCURRENT_RENDERS = 2;
 
 interface Entry {
 	promise: Promise<PdfDocument>;
@@ -52,6 +57,8 @@ interface Entry {
 export class PdfDocCache {
 	private entries = new Map<string, Entry>();
 	private listeners = new Set<(path: string) => void>();
+	private running = 0;
+	private waiting: (() => void)[] = [];
 
 	constructor(private app: App) {}
 
@@ -75,6 +82,18 @@ export class PdfDocCache {
 		const e = this.entries.get(path);
 		if (!e || --e.refs > 0) return;
 		e.timer = window.setTimeout(() => this.drop(path), RELEASE_DELAY_MS);
+	}
+
+	/** Run a render when a slot is free. */
+	async schedule<T>(fn: () => Promise<T>): Promise<T> {
+		if (this.running >= MAX_CONCURRENT_RENDERS) await new Promise<void>((r) => this.waiting.push(r));
+		this.running++;
+		try {
+			return await fn();
+		} finally {
+			this.running--;
+			this.waiting.shift()?.();
+		}
 	}
 
 	/** The file changed or went away: drop the parsed document and tell modules to re-render. */

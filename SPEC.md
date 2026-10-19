@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.4 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.5 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -388,6 +388,9 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Saves check for external changes and never silently overwrite them.
   - Raster export canvases are capped at 8192 × 8192 px and verified with a pixel probe.
   - Print pipeline (section 9.1) not yet changed: a two-stage Chromium + `pdf-lib` pipeline is under discussion.
+- **v0.5 · 2026-10-19** (M0)
+  - A first level of detail lands in M0 rather than M3: below 25 % zoom, pages show module outlines instead of content, and PDF canvas resolution follows the zoom (re-rendered when it settles). At most 2 PDF renders run at once. The stress probe required these (`docs/perf.md`).
+  - `minAppVersion` is 1.6.6 (`FileManager.trashFile`), see `docs/open-questions.md` Q12.
 - **v0.4 · 2026-10-19** (after spike S8)
   - Export is two-stage: Chromium prints the HTML layer at native page sizes; `@cantoo/pdf-lib` places vector PDF modules, builds sheets and tiles (vector), and adds bookmarks, page labels and metadata. PNG = rasterized final PDF.
   - New `PdfModule.render: "auto" | "vector" | "raster"` (auto = vector unless something is stacked above) and `ExportDefaults.quality: "best" | "small"` (default best).

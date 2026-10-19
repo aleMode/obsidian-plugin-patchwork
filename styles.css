@@ -47,8 +47,6 @@
 .pw-board.has-grid {
 	background-image: linear-gradient(to right, var(--pw-grid-color) 1px, transparent 1px),
 		linear-gradient(to bottom, var(--pw-grid-color) 1px, transparent 1px);
-	background-size: var(--pw-grid-step) var(--pw-grid-step);
-	background-position: var(--pw-grid-x) var(--pw-grid-y);
 }
 
 .pw-board.is-panning,
@@ -67,7 +65,6 @@
 	top: 0;
 	width: 0;
 	height: 0;
-	transform: translate(var(--pw-tx, 0), var(--pw-ty, 0)) scale(var(--pw-zoom));
 	transform-origin: 0 0;
 	will-change: transform;
 }
@@ -239,6 +236,31 @@
 	color: #555;
 	background: #f2f2f2;
 	border-color: #aaa;
+}
+
+.pw-skeletons {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+/* Module outlines shown when zoomed far out (level of detail). */
+.pw-module-skeleton {
+	position: absolute;
+	left: var(--pw-x);
+	top: var(--pw-y);
+	width: var(--pw-w);
+	height: var(--pw-h);
+	background: #e8e8e8;
+	border: 1mm solid #fff;
+}
+
+.pw-skeleton-pdf {
+	background: #d9e3ef;
+}
+
+.pw-skeleton-image {
+	background: #e6dfd0;
 }
 
 .pw-suggest-detail {

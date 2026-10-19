@@ -42,7 +42,11 @@ export interface ModuleHostOptions {
  */
 export class ModuleHost {
 	private mounted = new Map<string, Mounted>();
-	private visible: ReadonlySet<string> = new Set();
+	/** Visible page IDs, most important first: renders queue in this order. */
+	private visible: readonly string[] = [];
+	/** Level of detail: when false (zoomed far out), pages show module outlines instead of content. */
+	private detail = false;
+	private skeletons = new Map<string, { el: HTMLElement; key: string }>();
 	private component = new Component();
 	private ctx: ModuleContext;
 	selectedModule: string | null = null;
@@ -58,20 +62,58 @@ export class ModuleHost {
 		this.component.register(o.ctx.pdfDocs.onInvalidate((path) => this.sourceChanged(path)));
 	}
 
-	setVisible(visible: ReadonlySet<string>) {
+	setVisible(visible: readonly string[]) {
 		this.visible = visible;
 		this.sync();
 	}
 
+	setDetail(detail: boolean) {
+		if (detail === this.detail) return;
+		this.detail = detail;
+		this.sync();
+	}
+
+	/** After a zoom settles: re-render PDF modules whose canvas no longer matches the zoom. */
+	resolutionChanged(pxPerMm: number) {
+		for (const m of this.mounted.values()) {
+			if (m.renderer instanceof PdfModuleRenderer && m.renderer.wantsResolution(pxPerMm)) this.renderContent(m);
+		}
+	}
+
 	sync() {
 		const live = new Set<string>();
-		for (const page of this.o.store.file.pages) {
-			if (!this.visible.has(page.id)) continue;
+		const outlined = new Set<string>();
+		const byId = new Map(this.o.store.file.pages.map((p) => [p.id, p]));
+		for (const id of this.visible) {
+			const page = byId.get(id);
+			if (!page) continue;
 			const paper = this.o.paperOf(page.id);
 			if (!paper) continue;
-			this.syncPage(page, paper, live);
+			if (this.detail) this.syncPage(page, paper, live);
+			else {
+				this.syncSkeleton(page, paper);
+				outlined.add(page.id);
+			}
 		}
 		for (const [id, m] of this.mounted) if (!live.has(id)) this.unmount(id, m);
+		for (const [id, s] of this.skeletons) {
+			if (outlined.has(id)) continue;
+			s.el.remove();
+			this.skeletons.delete(id);
+		}
+	}
+
+	/** Cheap stand-ins for modules when zoomed far out: one box each, no rendering. */
+	private syncSkeleton(page: Page, paper: HTMLElement) {
+		const key = JSON.stringify(page.modules.map((m) => [m.type, m.x, m.y, m.w, m.h]));
+		const existing = this.skeletons.get(page.id);
+		if (existing?.key === key && existing.el.parentElement === paper) return;
+		existing?.el.remove();
+		const el = paper.createDiv({ cls: 'pw-skeletons' });
+		for (const m of page.modules) {
+			el.createDiv({ cls: `pw-module-skeleton pw-skeleton-${m.type}` }).setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm` });
+		}
+		this.skeletons.set(page.id, { el, key });
 	}
 
 	private syncPage(page: Page, paper: HTMLElement, live: Set<string>) {
@@ -157,6 +199,8 @@ export class ModuleHost {
 
 	destroy() {
 		for (const [id, m] of this.mounted) this.unmount(id, m);
+		for (const s of this.skeletons.values()) s.el.remove();
+		this.skeletons.clear();
 		this.o.parent.removeChild(this.component);
 	}
 }

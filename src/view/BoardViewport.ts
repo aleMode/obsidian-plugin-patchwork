@@ -31,6 +31,13 @@ type Drag =
 
 /** Pages within this fraction of a viewport outside the visible area count as visible (pre-mount). */
 const CULL_MARGIN = 0.5;
+/**
+ * Below this zoom an A4 page is under ~200 px wide and text is unreadable, so pages show module
+ * outlines instead of content (SPEC 8.3). Keeps "zoom to fit" on a 100-page board instant.
+ */
+const DETAIL_ZOOM = 0.25;
+/** Wait this long after the last zoom step before re-rendering for the new zoom (SPEC 8.3). */
+const ZOOM_SETTLE_MS = 150;
 
 export class BoardViewport implements BoardSurface {
 	private root: HTMLElement;
@@ -45,13 +52,15 @@ export class BoardViewport implements BoardSurface {
 	private frame = 0;
 	private fitted = false;
 	private visible = new Set<string>();
+	private settledZoom = 0;
+	private zoomTimer: number | null = null;
 	private cleanups: (() => void)[] = [];
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
 		this.modules = new ModuleHost({
-			ctx: { app: view.app, pdfDocs: services.pdfDocs },
+			ctx: { app: view.app, pdfDocs: services.pdfDocs, resolution: () => this.resolution() },
 			store,
 			paperOf: (id) => this.pages.get(id)?.paper,
 			boardPath: () => view.file?.path ?? '',
@@ -69,6 +78,7 @@ export class BoardViewport implements BoardSurface {
 
 	destroy() {
 		this.root.win.cancelAnimationFrame(this.frame);
+		if (this.zoomTimer !== null) this.root.win.clearTimeout(this.zoomTimer);
 		this.cleanups.forEach((c) => c());
 		this.root.remove();
 	}
@@ -226,13 +236,37 @@ export class BoardViewport implements BoardSurface {
 		if (!this.frame) this.frame = this.root.win.requestAnimationFrame(() => this.applyCamera());
 	}
 
+	/**
+	 * Only the layer's own transform changes per frame. Custom properties would be inherited by every
+	 * rendered note below and restyle the whole board each frame (perf probe: 76 ms frames), so
+	 * `--pw-zoom` (label and outline sizes) is only updated once zooming settles.
+	 */
 	private applyCamera() {
 		this.frame = 0;
 		const { tx, ty, zoom } = this.camera;
-		this.layer.setCssProps({ '--pw-tx': `${tx}px`, '--pw-ty': `${ty}px`, '--pw-zoom': String(zoom) });
+		this.layer.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
 		this.zoomLabel.setText(`${Math.round(zoom * 100)}%`);
 		this.renderGrid();
+		// Switch level of detail right away, so zooming out never mounts content it won't show.
+		this.modules.setDetail(zoom >= DETAIL_ZOOM);
 		this.updateVisibility();
+		if (zoom !== this.settledZoom) {
+			if (this.zoomTimer !== null) this.root.win.clearTimeout(this.zoomTimer);
+			this.zoomTimer = this.root.win.setTimeout(() => this.zoomSettled(), ZOOM_SETTLE_MS);
+		}
+	}
+
+	private zoomSettled() {
+		this.zoomTimer = null;
+		this.settledZoom = this.camera.zoom;
+		this.layer.setCssProps({ '--pw-zoom': String(this.settledZoom) });
+		this.modules.resolutionChanged(this.resolution());
+	}
+
+	/** Canvas pixels per mm needed at the current zoom (clamped; MAX_CANVAS_SIDE caps it too). */
+	private resolution(): number {
+		const dpr = this.root.win.devicePixelRatio || 1;
+		return Math.min(PX_PER_MM * 8, Math.max(PX_PER_MM * 0.25, PX_PER_MM * this.camera.zoom * dpr));
 	}
 
 	zoomToFit() {
@@ -263,7 +297,9 @@ export class BoardViewport implements BoardSurface {
 		let step = grid.size * PX_PER_MM * this.camera.zoom;
 		// Coarsen the grid when zoomed out, so lines never get denser than every 8 px.
 		while (step > 0 && step < 8) step *= 5;
-		this.root.setCssProps({ '--pw-grid-step': `${step}px`, '--pw-grid-x': `${this.camera.tx}px`, '--pw-grid-y': `${this.camera.ty}px` });
+		// Plain properties, not custom ones: those would be inherited by the whole board (see applyCamera).
+		this.root.style.backgroundSize = `${step}px ${step}px`;
+		this.root.style.backgroundPosition = `${this.camera.tx}px ${this.camera.ty}px`;
 	}
 
 	/** Virtualization (hard rule 9): only pages near the viewport get their modules mounted. */
@@ -272,11 +308,14 @@ export class BoardViewport implements BoardSurface {
 		if (vp.w === 0) return;
 		const area = visibleRect(this.camera, vp);
 		const zone = inset(area, Math.max(area.w, area.h) * CULL_MARGIN);
-		const next = new Set(this.store.file.pages.filter((p) => intersects(p, zone)).map((p) => p.id));
-		const changed = next.size !== this.visible.size || [...next].some((id) => !this.visible.has(id));
+		// On-screen pages first, then the pre-mount margin: content renders in this order.
+		const inZone = this.store.file.pages.filter((p) => intersects(p, zone));
+		const ordered = [...inZone.filter((p) => intersects(p, area)), ...inZone.filter((p) => !intersects(p, area))].map((p) => p.id);
+		const next = new Set(ordered);
+		const changed = next.size !== this.visible.size || ordered.some((id) => !this.visible.has(id));
 		this.visible = next;
 		for (const [id, el] of this.pages) el.el.toggleClass('is-culled', !next.has(id));
-		if (changed) this.modules.setVisible(next);
+		if (changed) this.modules.setVisible(ordered);
 	}
 
 	get visiblePages(): ReadonlySet<string> {

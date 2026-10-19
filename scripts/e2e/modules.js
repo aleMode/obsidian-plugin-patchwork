@@ -76,8 +76,16 @@ try {
 	await editNote('Spells/Fireball.md', (t) => t.replace('8d6 fire damage', '8d6 E2E-EMBED-EDIT damage'));
 	check('editing an embedded note updates the module', await until(() => text('list').includes('E2E-EMBED-EDIT')), text('list').slice(0, 300));
 
-	// Virtualization: modules unmount when their page is far off screen, and come back.
+	// Level of detail: zoomed far out, pages show outlines instead of content.
 	const s = view.surface;
+	s.setCamera({ ...s.camera, zoom: 0.1 });
+	await sleep(150);
+	const lod = { modules: view.contentEl.querySelectorAll('.pw-module').length, outlines: view.contentEl.querySelectorAll('.pw-module-skeleton').length };
+	check('zoomed out: outlines instead of content', lod.modules === 0 && lod.outlines === 8, lod);
+	s.zoomToFit();
+	check('zoomed back in: content again', await until(() => text('note1').includes('You can only crawl') && view.contentEl.querySelectorAll('.pw-module-skeleton').length === 0));
+
+	// Virtualization: modules unmount when their page is far off screen, and come back.
 	s.setCamera({ tx: -1e6, ty: -1e6, zoom: 1 });
 	await sleep(150);
 	check('modules unmount when the page is off screen', view.contentEl.querySelectorAll('.pw-module').length === 0);
