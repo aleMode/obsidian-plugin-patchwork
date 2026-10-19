@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, ~01:00)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 108 checks across 7 suites, all passing; `npm test`: 121 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 94 checks across 7 suites, all passing; `npm test`: 121 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -20,8 +20,15 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - **Arrow keys** move the selection 1 mm; **Shift+arrow** 10 mm. A burst of presses undoes as one step.
 - Right-click a module → **Lock**: no handles, can't be dragged or nudged. **Unlock** restores.
 
-### 3. Double-click a note module
-- Opens the note at that section in a split pane.
+### 3. Double-click actions
+- **Note module:** opens the note at that section in a split pane.
+- **PDF module:** opens the **crop editor** (also: right-click → *Edit crop…*).
+
+### 3b. Crop editor (new)
+- Toolbar → *Add PDF* → pick a PDF: the crop editor opens on page 1 instead of asking for a page number. Use *Previous / Next* to find the page.
+- Drag on the page to draw a crop; drag inside it to move; drag a corner to resize; *Full page* clears it.
+- "Resize module to the crop shape" (on by default) sets the module's height so the crop fills it without bars.
+- *Apply* is one undo step. Try it on the big rulebook and on the rotated page 3 of `Sample rulebook.pdf`.
 
 ### 4. Renames follow
 - With a board open that shows a note, rename the note (or its folder) in the file explorer: the module keeps working, and the board file is updated.
@@ -42,7 +49,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ## Known gaps (not bugs, not built yet)
 
-- No inspector or outline panel yet; no crop editor (crops can only be set by editing the `.patchwork` JSON, e.g. `"crop": [0.1, 0.2, 0.6, 0.7]`).
+- No inspector or outline panel yet (positions, sizes and options are set by dragging, the crop editor, or editing the `.patchwork` JSON).
 - No rulers, multi-select, align/distribute, smart guides, or drag-from-explorer yet.
 - Note overflow is always "clip"; `fit` / `grow` are next.
 - Modules can't move to another page by dragging yet (they stay on their page).

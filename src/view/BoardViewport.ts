@@ -13,8 +13,9 @@ import type { BitmapCache } from '../render/bitmapCache';
 import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { CropModal, type CropResult } from '../ui/CropModal';
 import { ExportModal, writeBinary } from '../ui/ExportModal';
-import { FilePickerModal, PdfPageModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
+import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
 import { type Camera, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
@@ -203,17 +204,32 @@ export class BoardViewport implements BoardSurface {
 		const app = this.view.app;
 		const { pdfDocs } = this.services;
 		const pdfs = app.vault.getFiles().filter((f) => f.extension.toLowerCase() === 'pdf');
-		new FilePickerModal(app, pdfs, 'PDF to add', (file: TFile) => {
-			pdfDocs
-				.acquire(file.path)
-				.then((doc: { numPages: number }) => {
-					pdfDocs.release(file.path);
-					new PdfPageModal(app, file.basename, doc.numPages, (pageNo) =>
-						this.placeModule((page, id): PdfModule => ({ id, type: 'pdf', ...defaultModuleRect(page), file: file.path, page: pageNo })),
-					).open();
-				})
-				.catch((e: Error) => new Notice(`Could not open ${file.path}: ${e.message}`));
-		}).open();
+		new FilePickerModal(app, pdfs, 'PDF to add', (file: TFile) =>
+			new CropModal(app, pdfDocs, file.path, { page: 1 }, (r) =>
+				this.placeModule((page, id): PdfModule => {
+					const rect = defaultModuleRect(page);
+					return { id, type: 'pdf', ...rect, ...(r.resizeModule ? fitHeight(rect, r.aspect, page.h) : {}), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}) };
+				}),
+			).open(),
+		).open();
+	}
+
+	/** Open the crop editor for a PDF module and apply the result as one undoable change. */
+	editCrop(pageId: string, moduleId: string) {
+		const page = this.store.file.pages.find((p) => p.id === pageId);
+		const m = page?.modules.find((x) => x.id === moduleId);
+		if (!page || m?.type !== 'pdf' || this.store.readOnly) return;
+		const pdf = m as PdfModule;
+		new CropModal(this.view.app, this.services.pdfDocs, pdf.file, { page: pdf.page, crop: pdf.crop }, (r: CropResult) =>
+			this.store.update((f) =>
+				mapModule(f, pageId, moduleId, (x) => {
+					const next: PdfModule = { ...(x as PdfModule), page: r.page, ...(r.resizeModule ? fitHeight(x, r.aspect, page.h - x.y) : {}) };
+					if (r.crop) next.crop = r.crop;
+					else delete next.crop;
+					return next;
+				}),
+			),
+		).open();
 	}
 
 	// ---------- export ----------
@@ -535,10 +551,11 @@ export class BoardViewport implements BoardSurface {
 		this.select(null);
 	}
 
-	/** Double-click a note module: open its source at that section in a split (SPEC 5.6). */
+	/** Double-click: a note module opens its source at that section; a PDF module opens the crop editor (SPEC 5.6). */
 	private onDoubleClick(e: MouseEvent) {
 		const hit = this.hit(e);
 		const m = hit?.moduleId ? this.store.file.pages.find((p) => p.id === hit.pageId)?.modules.find((x) => x.id === hit.moduleId) : undefined;
+		if (hit?.moduleId && m?.type === 'pdf') return this.editCrop(hit.pageId, hit.moduleId);
 		if (m?.type !== 'note') return;
 		const note = m as NoteModule;
 		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
@@ -553,6 +570,7 @@ export class BoardViewport implements BoardSurface {
 		const { pageId, moduleId } = hit;
 		if (moduleId) {
 			const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+			if (m?.type === 'pdf') menu.addItem((i) => i.setTitle('Edit crop…').setIcon('crop').onClick(() => this.editCrop(pageId, moduleId)));
 			menu.addItem((i) => i.setTitle('Duplicate').setIcon('copy').onClick(() => this.duplicateSelection()));
 			menu.addItem((i) =>
 				i
@@ -613,4 +631,9 @@ export class BoardViewport implements BoardSurface {
 			menu.showAtPosition({ x: r.left + 40, y: r.top + 40 });
 		}
 	}
+}
+
+/** Height that gives `rect` the content's aspect ratio at its current width, kept within `maxH`. */
+function fitHeight(rect: { w: number }, aspect: number, maxH: number): { h: number } {
+	return { h: Math.max(5, Math.min(maxH, Number((rect.w / aspect).toFixed(3)))) };
 }

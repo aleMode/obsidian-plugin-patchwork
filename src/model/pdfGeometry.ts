@@ -84,3 +84,25 @@ export function drawPlacement(src: { w: number; h: number }, rotation: number, t
 			return { x: x + w, y, xScale: sx, yScale: sy, rotate: -270 };
 	}
 }
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+
+/** Crop spanning two points (normalized, any order), clamped to the page; null if too small. */
+export function cropFromPoints(a: { x: number; y: number }, b: { x: number; y: number }, min = 0.01): Crop | null {
+	const x0 = clamp01(Math.min(a.x, b.x)), x1 = clamp01(Math.max(a.x, b.x));
+	const y0 = clamp01(Math.min(a.y, b.y)), y1 = clamp01(Math.max(a.y, b.y));
+	return x1 - x0 < min || y1 - y0 < min ? null : [x0, y0, x1, y1];
+}
+
+/** Move a crop by (dx, dy), keeping its size and staying inside the page. */
+export function moveCrop(c: Crop, dx: number, dy: number): Crop {
+	const w = c[2] - c[0], h = c[3] - c[1];
+	const x0 = Math.min(1 - w, Math.max(0, c[0] + dx));
+	const y0 = Math.min(1 - h, Math.max(0, c[1] + dy));
+	return [x0, y0, x0 + w, y0 + h];
+}
+
+/** Round to 5 decimals: far below a pixel on any real page, and keeps the JSON readable. */
+export function tidyCrop(c: Crop): Crop {
+	return c.map((v) => Number(v.toFixed(5))) as Crop;
+}

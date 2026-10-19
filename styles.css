@@ -276,6 +276,67 @@
 .pw-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
 .pw-handle-w { left: 0; top: 50%; cursor: ew-resize; }
 
+.pw-crop-modal {
+	width: min(820px, 95vw);
+}
+
+.pw-crop-nav {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-2);
+	margin-bottom: var(--size-4-2);
+}
+
+.pw-crop-page {
+	min-width: 8em;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+.pw-crop-stage {
+	position: relative;
+	width: var(--pw-crop-w, 600px);
+	height: var(--pw-crop-h, 400px);
+	margin: 0 auto;
+	cursor: crosshair;
+	touch-action: none;
+	user-select: none;
+	background: #fff;
+}
+
+.pw-crop-canvas {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.pw-crop-box {
+	position: absolute;
+	left: var(--pw-x);
+	top: var(--pw-y);
+	width: var(--pw-w);
+	height: var(--pw-h);
+	border: 2px solid var(--interactive-accent);
+	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+	cursor: move;
+}
+
+.pw-crop-handle {
+	position: absolute;
+	width: 12px;
+	height: 12px;
+	margin: -6px;
+	background: var(--background-primary);
+	border: 2px solid var(--interactive-accent);
+	border-radius: 2px;
+}
+
+.pw-crop-handle.pw-handle-nw { left: 0; top: 0; cursor: nwse-resize; }
+.pw-crop-handle.pw-handle-ne { left: 100%; top: 0; cursor: nesw-resize; }
+.pw-crop-handle.pw-handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
+.pw-crop-handle.pw-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
+
 .pw-skeletons {
 	position: absolute;
 	inset: 0;

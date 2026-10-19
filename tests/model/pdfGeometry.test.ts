@@ -84,3 +84,21 @@ describe('drawPlacement', () => {
 		expect(topLeft.y).toBeCloseTo(40);
 	});
 });
+
+describe('crop editing helpers', () => {
+	it('cropFromPoints orders, clamps and rejects tiny crops', async () => {
+		const { cropFromPoints } = await import('../../src/model/pdfGeometry');
+		expect(cropFromPoints({ x: 0.8, y: 0.9 }, { x: 0.2, y: -0.5 })).toEqual([0.2, 0, 0.8, 0.9]);
+		expect(cropFromPoints({ x: 0.5, y: 0.5 }, { x: 0.505, y: 0.9 })).toBeNull();
+	});
+
+	it('moveCrop keeps size and stays on the page', async () => {
+		const { moveCrop } = await import('../../src/model/pdfGeometry');
+		expect(moveCrop([0.1, 0.1, 0.5, 0.5], 0.7, -0.5)).toEqual([0.6, 0, 1, 0.4]);
+	});
+
+	it('tidyCrop rounds to 5 decimals', async () => {
+		const { tidyCrop } = await import('../../src/model/pdfGeometry');
+		expect(tidyCrop([0.123456789, 0, 1 / 3, 1])).toEqual([0.12346, 0, 0.33333, 1]);
+	});
+});
