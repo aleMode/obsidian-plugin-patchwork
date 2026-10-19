@@ -53,6 +53,7 @@ try {
 } finally {
 	await cdp
 		.evaluate(`document.querySelectorAll('.modal-close-button').forEach((b) => b.click()); app.workspace.getLeavesOfType('patchwork-board').forEach((l) => l.detach());
+	await new Promise((r) => setTimeout(r, 400)); // let pending saves finish before deleting their files
 		const d = app.vault.getAbstractFileByPath('_e2e'); if (d) await app.vault.delete(d, true);`)
 		.catch(() => {});
 	cdp.close();

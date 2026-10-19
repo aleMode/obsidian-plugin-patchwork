@@ -119,11 +119,43 @@
 	content-visibility: hidden;
 }
 
+.pw-ruler {
+	position: absolute;
+	z-index: 2;
+	pointer-events: none;
+}
+
+.pw-ruler-top {
+	left: 20px;
+	top: 0;
+	width: calc(100% - 20px);
+	height: 20px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pw-ruler-left {
+	left: 0;
+	top: 20px;
+	width: 20px;
+	height: calc(100% - 20px);
+	border-right: 1px solid var(--background-modifier-border);
+}
+
+.pw-ruler-corner {
+	position: absolute;
+	z-index: 2;
+	left: 0;
+	top: 0;
+	width: 20px;
+	height: 20px;
+	background: var(--background-secondary);
+}
+
 .pw-toolbar {
 	position: absolute;
 	z-index: 2;
-	top: var(--size-4-2);
-	left: var(--size-4-2);
+	top: calc(20px + var(--size-4-2));
+	left: calc(20px + var(--size-4-2));
 	display: flex;
 	align-items: center;
 	gap: var(--size-2-1);

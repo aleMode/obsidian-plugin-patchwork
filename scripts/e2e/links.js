@@ -52,6 +52,7 @@ try {
 	check('no exception', false, String(e?.stack ?? e));
 } finally {
 	app.workspace.getLeavesOfType('patchwork-board').forEach((l) => l.detach());
+	await new Promise((r) => setTimeout(r, 400)); // let pending saves finish before deleting their files
 	const dir = vault.getAbstractFileByPath(DIR);
 	if (dir) await vault.delete(dir, true);
 }

@@ -7,6 +7,7 @@ import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
 import { snapToGuides } from '../model/guides';
+import { rulerTicks } from '../model/rulers';
 import { snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
@@ -56,6 +57,7 @@ export class BoardViewport implements BoardSurface {
 	private layer: HTMLElement;
 	private selectionBox: HTMLElement;
 	private guideLayer: HTMLElement;
+	private rulers: { top: HTMLCanvasElement; left: HTMLCanvasElement };
 	private zoomLabel!: HTMLElement;
 	private pages = new Map<string, PageElement>();
 	private modules: ModuleHost;
@@ -85,6 +87,16 @@ export class BoardViewport implements BoardSurface {
 			parent: view,
 		});
 		this.cleanups.push(() => this.modules.destroy());
+		this.rulers = {
+			top: container.createEl('canvas', { cls: 'pw-ruler pw-ruler-top' }),
+			left: container.createEl('canvas', { cls: 'pw-ruler pw-ruler-left' }),
+		};
+		const corner = container.createDiv({ cls: 'pw-ruler-corner' });
+		this.cleanups.push(() => {
+			this.rulers.top.remove();
+			this.rulers.left.remove();
+			corner.remove();
+		});
 		this.buildToolbar(container);
 		this.cleanups.push(store.subscribe(() => this.render()));
 		this.bindInput();
@@ -132,6 +144,7 @@ export class BoardViewport implements BoardSurface {
 		this.modules.selectedModule = this.selection?.moduleId ?? null;
 		this.renderSelectionBox();
 		this.renderGrid();
+		this.renderRulers();
 		this.updateVisibility();
 		this.modules.sync();
 	}
@@ -304,6 +317,7 @@ export class BoardViewport implements BoardSurface {
 		this.layer.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
 		this.zoomLabel.setText(`${Math.round(zoom * 100)}%`);
 		this.renderGrid();
+		this.renderRulers();
 		// Switch level of detail right away, so zooming out never mounts content it won't show.
 		this.modules.setDetail(zoom >= DETAIL_ZOOM);
 		this.updateVisibility();
@@ -357,6 +371,63 @@ export class BoardViewport implements BoardSurface {
 		// Plain properties, not custom ones: those would be inherited by the whole board (see applyCamera).
 		this.root.style.backgroundSize = `${step}px ${step}px`;
 		this.root.style.backgroundPosition = `${this.camera.tx}px ${this.camera.ty}px`;
+	}
+
+	/** Rulers in the display unit, measured from the selected page's top-left corner (else the board origin). */
+	private renderRulers() {
+		const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
+		const origin = page ? { x: page.x, y: page.y } : { x: 0, y: 0 };
+		const unit = this.store.file.board.displayUnit;
+		const k = PX_PER_MM * this.camera.zoom;
+		const style = getComputedStyle(this.root);
+		const colors = { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted') };
+		const draw = (canvas: HTMLCanvasElement, horizontal: boolean) => {
+			const dpr = this.root.win.devicePixelRatio || 1;
+			const thick = 20;
+			// Rulers start `thick` px into the board (past the corner square).
+			const len = (horizontal ? this.root.clientWidth : this.root.clientHeight) - thick;
+			canvas.width = Math.max(1, Math.round((horizontal ? len : thick) * dpr));
+			canvas.height = Math.max(1, Math.round((horizontal ? thick : len) * dpr));
+			const c = canvas.getContext('2d');
+			if (!c) return;
+			c.scale(dpr, dpr);
+			c.fillStyle = colors.bg;
+			c.fillRect(0, 0, horizontal ? len : thick, horizontal ? thick : len);
+			const t = horizontal ? this.camera.tx : this.camera.ty;
+			const o = horizontal ? origin.x : origin.y;
+			const ticks = rulerTicks((thick - t) / k, (thick + len - t) / k, o, k, unit);
+			const at = (mm: number) => Math.round(mm * k + t - thick) + 0.5;
+			c.strokeStyle = colors.fg;
+			c.fillStyle = colors.fg;
+			c.lineWidth = 1;
+			c.font = '9px var(--font-interface, sans-serif)';
+			const tick = (p: number, size: number) => {
+				if (horizontal) {
+					c.moveTo(p, thick - size);
+					c.lineTo(p, thick);
+				} else {
+					c.moveTo(thick - size, p);
+					c.lineTo(thick, p);
+				}
+			};
+			c.beginPath();
+			for (const mm of ticks.minor) tick(at(mm), 4);
+			for (const { mm } of ticks.major) tick(at(mm), 10);
+			c.stroke();
+			for (const { mm, label } of ticks.major) {
+				const p = at(mm);
+				if (horizontal) c.fillText(label, p + 2, 9);
+				else {
+					c.save();
+					c.translate(9, p + 2);
+					c.rotate(Math.PI / 2);
+					c.fillText(label, 0, 0);
+					c.restore();
+				}
+			}
+		};
+		draw(this.rulers.top, true);
+		draw(this.rulers.left, false);
 	}
 
 	/** Virtualization (hard rule 9): only pages near the viewport get their modules mounted. */

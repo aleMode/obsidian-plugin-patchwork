@@ -14,6 +14,7 @@ async function cleanup() {
 }
 const viewOf = (file) => app.workspace.getLeavesOfType('patchwork-board').map((l) => l.view).find((v) => v.file === file);
 const closeAll = () => app.workspace.getLeavesOfType('patchwork-board').forEach((l) => l.detach());
+	await new Promise((r) => setTimeout(r, 400)); // let pending saves finish before deleting their files
 
 await cleanup();
 await vault.createFolder(DIR);

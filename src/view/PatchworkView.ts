@@ -93,7 +93,18 @@ export class PatchworkView extends TextFileView {
 			return;
 		}
 		const ours = this.getViewData();
-		const onDisk = await this.app.vault.read(file);
+		// The board was deleted (or moved away) while a save was pending: nothing to write to.
+		if (!(this.app.vault.getAbstractFileByPath(file.path) instanceof TFile)) {
+			if (clear) this.clear();
+			return;
+		}
+		let onDisk: string;
+		try {
+			onDisk = await this.app.vault.read(file);
+		} catch {
+			if (clear) this.clear();
+			return;
+		}
 		switch (decideSave(this.lastDisk, onDisk, this.dirty, ours)) {
 			case 'write':
 				await super.save(clear);
