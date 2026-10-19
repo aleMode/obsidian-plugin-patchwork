@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, ~01:00)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 94 checks across 7 suites, all passing; `npm test`: 121 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 100 checks across 8 suites, all passing; `npm test`: 124 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -30,6 +30,13 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - "Resize module to the crop shape" (on by default) sets the module's height so the crop fills it without bars.
 - *Apply* is one undo step. Try it on the big rulebook and on the rotated page 3 of `Sample rulebook.pdf`.
 
+### 3c. Note overflow (new)
+- Right-click a note module → *Overflow: clip / shrink to fit / grow*.
+- **Clip** (default): if the note doesn't fit, a red dashed marker appears along the module's bottom edge (screen only, never exported).
+- **Shrink to fit**: text shrinks (down to 50%) and re-wraps across the full width until it fits; still too long → clipped with the marker.
+- **Grow**: the module grows to the note's height on screen and in the export; the saved size doesn't change.
+- Edit the source note while watching: the fit/grow updates as the text changes.
+
 ### 4. Renames follow
 - With a board open that shows a note, rename the note (or its folder) in the file explorer: the module keeps working, and the board file is updated.
 - Close the board, rename again, reopen: still correct (closed boards are rewritten on disk).
@@ -51,7 +58,6 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 - No inspector or outline panel yet (positions, sizes and options are set by dragging, the crop editor, or editing the `.patchwork` JSON).
 - No rulers, multi-select, align/distribute, smart guides, or drag-from-explorer yet.
-- Note overflow is always "clip"; `fit` / `grow` are next.
 - Modules can't move to another page by dragging yet (they stay on their page).
 - Page numbers, headers/footers, tiled export, PNG export are M2.
 

@@ -154,6 +154,29 @@
 	cursor: move;
 }
 
+.pw-module.is-grow {
+	height: var(--pw-grow-h, var(--pw-h));
+}
+
+.pw-markdown.is-fit {
+	width: calc(100% / var(--pw-fit, 1));
+	transform: scale(var(--pw-fit, 1));
+	transform-origin: 0 0;
+}
+
+/* Content cut off: a marker along the bottom edge, on screen only (export uses its own host). */
+.pw-board .pw-module.is-overflowing::before {
+	content: '';
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	height: calc(4px / var(--pw-zoom));
+	background: repeating-linear-gradient(90deg, var(--color-red) 0 6px, transparent 6px 10px);
+	z-index: 1;
+	pointer-events: none;
+}
+
 .pw-module.is-pending {
 	background: #f3f3f3;
 }

@@ -1,8 +1,9 @@
 import { Component } from 'obsidian';
 import { drawOrder } from '../model/exportPlan';
-import { type AnyModule, isKnownModule, type Page } from '../model/schema';
+import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
 import { ImageModuleRenderer } from '../modules/imageModule';
 import { NoteModuleRenderer, TextModuleRenderer } from '../modules/noteModule';
+import { applyOverflow } from '../modules/overflow';
 import { PdfModuleRenderer } from '../modules/pdfModule';
 import { type ModuleContext, type ModuleRenderer, placeholder } from '../modules/types';
 import { printWindowToPdf } from './printAdapter';
@@ -88,6 +89,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	const host = doc.body.createDiv({ cls: 'pw-print-host print' });
 	doc.body.addClass('pw-printing');
 	const renderers: ModuleRenderer[] = [];
+	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule }[] = [];
 	try {
 		pages.forEach((page, i) => {
 			const el = host.createDiv({ cls: o.appTheme ? 'pw-sheet' : 'pw-sheet pw-paper theme-light', attr: { 'data-sheet': String(i) } });
@@ -99,11 +101,14 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 				const body = mod.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
 				const r = createRenderer(m, body, ctx, o);
 				if (!r) return;
+				if (m.type === 'note') notes.push({ el: mod, body, m: m as NoteModule });
 				r.render(m);
 				renderers.push(r);
 			});
 		});
 		const settled = await settle(host, renderers);
+		// Same overflow policy as on screen, applied to the final layout (no indicator in print).
+		for (const n of notes) applyOverflow(n.el, n.body, n.m.overflow ?? 'clip');
 		const problems = findProblems(host);
 		if (!settled) problems.push('Some content was still changing after 10 s and may be incomplete.');
 		return { bytes: await printWindowToPdf(), problems };

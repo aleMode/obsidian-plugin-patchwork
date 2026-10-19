@@ -571,6 +571,28 @@ export class BoardViewport implements BoardSurface {
 		if (moduleId) {
 			const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
 			if (m?.type === 'pdf') menu.addItem((i) => i.setTitle('Edit crop…').setIcon('crop').onClick(() => this.editCrop(pageId, moduleId)));
+			if (m?.type === 'note') {
+				const current = (m as NoteModule).overflow ?? 'clip';
+				const policies = [['clip', 'Overflow: clip'], ['fit', 'Overflow: shrink to fit'], ['grow', 'Overflow: grow']] as const;
+				for (const [policy, title] of policies) {
+					menu.addItem((i) =>
+						i
+							.setTitle(title)
+							.setChecked(current === policy)
+							.onClick(() =>
+								this.store.update((f) =>
+									mapModule(f, pageId, moduleId, (x) => {
+										const next = { ...x } as NoteModule;
+										if (policy === 'clip') delete next.overflow;
+										else next.overflow = policy;
+										return next;
+									}),
+								),
+							),
+					);
+				}
+				menu.addSeparator();
+			}
 			menu.addItem((i) => i.setTitle('Duplicate').setIcon('copy').onClick(() => this.duplicateSelection()));
 			menu.addItem((i) =>
 				i

@@ -1,14 +1,15 @@
 import { Component, TAbstractFile } from 'obsidian';
-import { type AnyModule, isKnownModule, type Page } from '../model/schema';
+import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
 import type { BoardStore } from '../store/BoardStore';
 import { ImageModuleRenderer } from './imageModule';
 import { NoteModuleRenderer, TextModuleRenderer } from './noteModule';
+import { applyOverflow } from './overflow';
 import { PdfModuleRenderer } from './pdfModule';
 import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
 
 /** Fields that change what a module shows. Anything else (position, label, …) is layout only. */
 const CONTENT_KEYS: Record<string, readonly string[]> = {
-	note: ['file', 'subpath', 'lines', 'includeHeading'],
+	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow'],
 	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'w', 'h'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
@@ -28,6 +29,8 @@ interface Mounted {
 	pageId: string;
 	el: HTMLElement;
 	body: HTMLElement;
+	/** Watches note content size, so overflow is re-applied when async content (embeds, Dataview) lands. */
+	sizeWatch?: ResizeObserver;
 	renderer: ModuleRenderer | null;
 	key: string;
 	module: AnyModule;
@@ -193,9 +196,11 @@ export class ModuleHost {
 	}
 
 	private layout(mounted: Mounted, m: AnyModule, rank: number) {
+		const resized = mounted.module.w !== m.w || mounted.module.h !== m.h;
 		mounted.el.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
 		mounted.el.toggleClass('is-selected', m.id === this.selectedModule);
 		mounted.el.toggleClass('is-locked', !!m.locked);
+		if (resized && m.type === 'note') this.updateOverflow({ ...mounted, module: m });
 	}
 
 	private renderContent(mounted: Mounted) {
@@ -204,6 +209,23 @@ export class ModuleHost {
 		} catch (e) {
 			placeholder(mounted.body, `Could not render module: ${e instanceof Error ? e.message : String(e)}`);
 		}
+		if (mounted.module.type === 'note') void mounted.renderer?.rendered().then(() => this.watchOverflow(mounted));
+	}
+
+	private watchOverflow(m: Mounted) {
+		if (this.mounted.get(m.module.id) !== m) return;
+		m.sizeWatch?.disconnect();
+		const update = () => this.updateOverflow(m);
+		m.sizeWatch = new ResizeObserver(update);
+		const content = m.body.querySelector(':scope > .pw-markdown');
+		if (content) m.sizeWatch.observe(content);
+		m.sizeWatch.observe(m.body);
+		update();
+	}
+
+	private updateOverflow(m: Mounted) {
+		const policy = (m.module as NoteModule).overflow ?? 'clip';
+		m.el.toggleClass('is-overflowing', applyOverflow(m.el, m.body, policy));
 	}
 
 	/**
@@ -221,6 +243,7 @@ export class ModuleHost {
 	}
 
 	private unmount(id: string, m: Mounted) {
+		m.sizeWatch?.disconnect();
 		m.renderer?.destroy();
 		m.el.remove();
 		this.mounted.delete(id);
