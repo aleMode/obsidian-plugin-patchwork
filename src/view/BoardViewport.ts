@@ -5,11 +5,12 @@ import { bounds, type Handle, inset, intersects, type Point, type Rect, resizeRe
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, NoteModule, Page, PdfModule } from '../model/schema';
+import type { AnyModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
 import { snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import type { BitmapCache } from '../render/bitmapCache';
+import { linkpathsFromDrop } from '../sources/dropLinks';
 import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, movePage, removeModule, removePage, restack } from '../store/pageOps';
@@ -389,6 +390,9 @@ export class BoardViewport implements BoardSurface {
 		on('keyup', (e) => this.onKey(e, false));
 		on('contextmenu', (e) => this.onContextMenu(e));
 		on('dblclick', (e) => this.onDoubleClick(e));
+		on('dragover', (e) => this.onDragOver(e));
+		on('dragleave', () => this.root.removeClass('is-drop-target'));
+		on('drop', (e) => this.onDrop(e));
 	}
 
 	private local(e: MouseEvent): Point {
@@ -549,6 +553,62 @@ export class BoardViewport implements BoardSurface {
 		if (moduleId) this.store.update((f) => removeModule(f, pageId, moduleId));
 		else this.store.update((f) => removePage(f, pageId));
 		this.select(null);
+	}
+
+	private onDragOver(e: DragEvent) {
+		if (this.store.readOnly || !e.dataTransfer?.types.some((t) => t === 'text/uri-list' || t === 'text/plain')) return;
+		e.preventDefault();
+		e.dataTransfer.dropEffect = 'copy';
+		this.root.addClass('is-drop-target');
+	}
+
+	/**
+	 * Drop files from the file explorer onto a page (SPEC 5.6): notes become note modules, PDFs open
+	 * the crop editor, images become image modules. Placed at the drop point, cascading.
+	 */
+	private onDrop(e: DragEvent) {
+		this.root.removeClass('is-drop-target');
+		const dt = e.dataTransfer;
+		if (!dt || this.store.readOnly) return;
+		const app = this.view.app;
+		const files = linkpathsFromDrop(dt.getData('text/uri-list'), dt.getData('text/plain'))
+			.map((l) => app.metadataCache.getFirstLinkpathDest(l, this.view.file?.path ?? ''))
+			.filter((f): f is TFile => !!f);
+		if (files.length === 0) return;
+		e.preventDefault();
+		const hit = this.hit(e);
+		const page = this.store.file.pages.find((p) => p.id === hit?.pageId);
+		if (!page) return void new Notice('Drop files onto a page.');
+		const at = screenToBoard(this.camera, this.local(e));
+		files.forEach((file, i) => this.dropFile(file, page, { x: at.x - page.x + i * 10, y: at.y - page.y + i * 10 }));
+	}
+
+	private dropFile(file: TFile, page: Page, at: Point) {
+		const ext = file.extension.toLowerCase();
+		const place = (w: number, h: number) => ({ x: Math.max(0, Math.min(at.x, page.w - w)), y: Math.max(0, Math.min(at.y, page.h - h)), w, h });
+		const add = (build: (id: string) => AnyModule) => {
+			const id = newId(allIds(this.store.file));
+			this.store.update((f) => addModule(f, page.id, build(id)));
+			this.select({ pageId: page.id, moduleId: id });
+		};
+		if (ext === 'md') return add((id): NoteModule => ({ id, type: 'note', ...place(90, 80), file: file.path }));
+		if (/^(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(ext)) {
+			const img = new Image();
+			img.onload = () => add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, (60 * img.naturalHeight) / img.naturalWidth)), file: file.path }));
+			img.onerror = () => add((id): ImageModule => ({ id, type: 'image', ...place(60, 45), file: file.path }));
+			img.src = this.view.app.vault.getResourcePath(file);
+			return;
+		}
+		if (ext === 'pdf') {
+			return new CropModal(this.view.app, this.services.pdfDocs, file.path, { page: 1 }, (r) =>
+				add((id): PdfModule => {
+					const w = 90;
+					const h = r.resizeModule ? fitHeight({ w }, r.aspect, page.h).h : 120;
+					return { id, type: 'pdf', ...place(w, h), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}) };
+				}),
+			).open();
+		}
+		new Notice(`Patchwork can't place .${ext} files yet.`);
 	}
 
 	/** Double-click: a note module opens its source at that section; a PDF module opens the crop editor (SPEC 5.6). */

@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, ~01:00)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 100 checks across 8 suites, all passing; `npm test`: 124 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 106 checks across 9 suites, all passing; `npm test`: 126 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -37,6 +37,12 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - **Grow**: the module grows to the note's height on screen and in the export; the saved size doesn't change.
 - Edit the source note while watching: the fit/grow updates as the text changes.
 
+### 3d. Drag from the file explorer (new)
+- Drag a note, PDF or image from the file explorer onto a page. The board gets an accent outline while you hover.
+- **Note** → note module at the drop point (90 × 80 mm). **Image** → image module 60 mm wide, keeping its proportions. **PDF** → the crop editor opens first; *Apply* places it.
+- Drag several files at once: they cascade.
+- Dropping outside any page shows "Drop files onto a page."
+
 ### 4. Renames follow
 - With a board open that shows a note, rename the note (or its folder) in the file explorer: the module keeps working, and the board file is updated.
 - Close the board, rename again, reopen: still correct (closed boards are rewritten on disk).
@@ -57,7 +63,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 ## Known gaps (not bugs, not built yet)
 
 - No inspector or outline panel yet (positions, sizes and options are set by dragging, the crop editor, or editing the `.patchwork` JSON).
-- No rulers, multi-select, align/distribute, smart guides, or drag-from-explorer yet.
+- No rulers, multi-select, align/distribute or smart guides yet.
 - Modules can't move to another page by dragging yet (they stay on their page).
 - Page numbers, headers/footers, tiled export, PNG export are M2.
 
