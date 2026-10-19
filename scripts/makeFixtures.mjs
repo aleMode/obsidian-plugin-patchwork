@@ -21,7 +21,8 @@ function page(w, h) {
 	return {
 		w, h, ops,
 		text(xmm, ymm, size, str, bold = false) {
-			ops.push(`BT /${bold ? 'F2' : 'F1'} ${size} Tf ${n(xmm * MM)} ${y(ymm * MM)} Td (${esc(str)}) Tj ET`);
+			// Reset fill to black: text uses the fill colour, which a preceding rect may have changed.
+			ops.push(`0 g BT /${bold ? 'F2' : 'F1'} ${size} Tf ${n(xmm * MM)} ${y(ymm * MM)} Td (${esc(str)}) Tj ET`);
 		},
 		rect(xmm, ymm, wmm, hmm, { fill, stroke } = {}) {
 			const args = `${n(xmm * MM)} ${y((ymm + hmm) * MM)} ${n(wmm * MM)} ${n(hmm * MM)} re`;
