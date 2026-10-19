@@ -5,10 +5,11 @@ node_modules/
 main.js
 *.js.map
 
-# Obsidian
+# Obsidian: commit only the test vault's base config; everything else is runtime state
 data.json
-test-vault/.obsidian/plugins/patchwork/
-test-vault/.obsidian/workspace*.json
+test-vault/.obsidian/*
+!test-vault/.obsidian/app.json
+!test-vault/.obsidian/community-plugins.json
 
 # editors / OS
 .vscode/
