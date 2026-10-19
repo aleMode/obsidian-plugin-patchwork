@@ -21,7 +21,7 @@ export class PatchworkView extends TextFileView {
 	private dirty = false;
 	/** Set when the file failed to parse: the view must never write to it (hard rule 2). */
 	private broken = false;
-	private surface: BoardSurface | null = null;
+	surface: BoardSurface | null = null;
 	private unsubscribe: (() => void) | null = null;
 
 	constructor(leaf: WorkspaceLeaf, private makeSurface: SurfaceFactory) {

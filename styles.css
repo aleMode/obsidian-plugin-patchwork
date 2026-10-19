@@ -1,1 +1,161 @@
-/* Patchwork styles. All classes are prefixed `pw-`. */
+/* Patchwork styles. All classes are prefixed `pw-`. UI chrome uses Obsidian variables; paper uses the light scope. */
+
+.pw-view {
+	padding: 0 !important;
+	position: relative;
+	overflow: hidden;
+}
+
+.pw-surface-host {
+	position: absolute;
+	inset: 0;
+}
+
+.pw-banner {
+	position: absolute;
+	z-index: 3;
+	top: var(--size-4-2);
+	right: var(--size-4-2);
+	max-width: 420px;
+	padding: var(--size-4-2) var(--size-4-3);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	font-size: var(--font-ui-small);
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-4-1);
+}
+
+.pw-banner-readonly {
+	border-color: var(--text-warning);
+}
+
+/* ---------- board ---------- */
+
+.pw-board {
+	--pw-grid-color: var(--background-modifier-border);
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background-color: var(--background-primary-alt);
+	cursor: default;
+	outline: none;
+	touch-action: none;
+}
+
+.pw-board.has-grid {
+	background-image: linear-gradient(to right, var(--pw-grid-color) 1px, transparent 1px),
+		linear-gradient(to bottom, var(--pw-grid-color) 1px, transparent 1px);
+	background-size: var(--pw-grid-step) var(--pw-grid-step);
+	background-position: var(--pw-grid-x) var(--pw-grid-y);
+}
+
+.pw-board.is-panning,
+.pw-board.is-panning .pw-page {
+	cursor: grab;
+}
+
+.pw-board.is-dragging {
+	cursor: grabbing;
+}
+
+.pw-board-layer {
+	--pw-zoom: 1;
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 0;
+	height: 0;
+	transform-origin: 0 0;
+	will-change: transform;
+}
+
+.pw-page {
+	position: absolute;
+	cursor: move;
+}
+
+.pw-page-paper {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	background-color: #fff;
+	box-shadow: 0 calc(2px / var(--pw-zoom)) calc(10px / var(--pw-zoom)) rgba(0, 0, 0, 0.35);
+	font-size: 10pt;
+}
+
+.pw-page.is-selected .pw-page-paper {
+	outline: calc(2px / var(--pw-zoom)) solid var(--interactive-accent);
+}
+
+/* Labels keep a constant on-screen size whatever the zoom. */
+.pw-page-label {
+	position: absolute;
+	left: 0;
+	bottom: 100%;
+	margin-bottom: calc(4px / var(--pw-zoom));
+	font-size: calc(var(--font-ui-smaller) / var(--pw-zoom));
+	color: var(--text-muted);
+	white-space: nowrap;
+	pointer-events: none;
+}
+
+.pw-page.is-culled .pw-page-paper {
+	content-visibility: hidden;
+}
+
+.pw-toolbar {
+	position: absolute;
+	z-index: 2;
+	top: var(--size-4-2);
+	left: var(--size-4-2);
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-1);
+	padding: var(--size-2-1);
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+}
+
+.pw-toolbar-sep {
+	width: 1px;
+	align-self: stretch;
+	margin: 0 var(--size-2-1);
+	background: var(--background-modifier-border);
+}
+
+.pw-zoom-label {
+	min-width: 3.5em;
+	text-align: center;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ---------- error view ---------- */
+
+.pw-error-view {
+	padding: var(--size-4-4);
+	max-width: 900px;
+}
+
+.pw-error-actions {
+	display: flex;
+	gap: var(--size-4-2);
+	margin: var(--size-4-3) 0;
+}
+
+.pw-error-raw {
+	max-height: 50vh;
+	overflow: auto;
+	padding: var(--size-4-2);
+	background: var(--background-secondary);
+	border-radius: var(--radius-s);
+	font-size: var(--font-ui-smaller);
+	white-space: pre-wrap;
+	word-break: break-all;
+	user-select: text;
+}

@@ -2,19 +2,25 @@ import { Notice, Plugin, TFile, TFolder } from 'obsidian';
 import { newBoardFile } from './model/defaults';
 import { presetById } from './model/presets';
 import { serializeBoard } from './model/serialize';
+import { BoardViewport, createBoardViewport } from './view/BoardViewport';
+import { refreshPaperScope, removePaperScope } from './view/paperScope';
 import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from './view/PatchworkView';
-import { createBoardSurface } from './view/BoardSurface';
 
 export default class PatchworkPlugin extends Plugin {
 	async onload() {
-		this.registerView(VIEW_TYPE_BOARD, (leaf) => new PatchworkView(leaf, createBoardSurface));
+		this.registerView(VIEW_TYPE_BOARD, (leaf) => new PatchworkView(leaf, createBoardViewport));
 		this.registerExtensions([BOARD_EXTENSION], VIEW_TYPE_BOARD);
+
+		refreshPaperScope();
+		this.registerEvent(this.app.workspace.on('css-change', () => refreshPaperScope()));
 
 		this.addCommand({
 			id: 'new-board',
 			name: 'New board',
 			callback: () => void this.createBoard(this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? '')),
 		});
+		this.addBoardCommand('add-page', 'Add page', (v) => v.showAddPageMenu(), true);
+		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
 
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {
@@ -29,7 +35,24 @@ export default class PatchworkPlugin extends Plugin {
 		);
 	}
 
-	onunload() {}
+	onunload() {
+		removePaperScope();
+	}
+
+	/** A command that only shows up while a board is the active view. */
+	private addBoardCommand(id: string, name: string, run: (v: BoardViewport) => void, needsWrite = false) {
+		this.addCommand({
+			id,
+			name,
+			checkCallback: (checking) => {
+				const view = this.app.workspace.getActiveViewOfType(PatchworkView);
+				const surface = view?.surface;
+				if (!(surface instanceof BoardViewport) || (needsWrite && view?.store?.readOnly)) return false;
+				if (!checking) run(surface);
+				return true;
+			},
+		});
+	}
 
 	async createBoard(folder: TFolder): Promise<TFile | null> {
 		const path = this.availablePath(folder, 'Untitled board');

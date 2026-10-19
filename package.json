@@ -9,6 +9,7 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"test": "vitest run",
 		"test:watch": "vitest",
+		"e2e": "node scripts/e2e/run.mjs",
 		"lint": "eslint .",
 		"fixtures": "node scripts/makeFixtures.mjs",
 		"spikes:build": "tsc -p spikes -noEmit && node spikes/esbuild.config.mjs",
