@@ -246,6 +246,58 @@
 	margin-left: var(--size-4-2);
 }
 
+/* ---------- export ---------- */
+
+.pw-print-host {
+	position: fixed;
+	left: -100000px;
+	top: 0;
+}
+
+.pw-sheet {
+	position: relative;
+	overflow: hidden;
+	width: var(--pw-w);
+	height: var(--pw-h);
+	background-color: #fff;
+	font-size: 10pt;
+	break-after: page;
+}
+
+.pw-sheet.has-background {
+	background: var(--pw-page-bg);
+}
+
+.pw-sheet:last-child {
+	break-after: auto;
+}
+
+@media print {
+	.pw-print-host {
+		position: static;
+	}
+
+	/* Only while Patchwork prints, so Obsidian's own PDF export is unaffected. Obsidian's print CSS
+	   leaves the body dark and clipping; sheets wider than the first page would be cut off. */
+	html:has(body.pw-printing),
+	body.pw-printing {
+		position: static !important;
+		height: auto !important;
+		overflow: visible !important;
+		background: #fff !important;
+	}
+
+	body.pw-printing {
+		display: block !important;
+	}
+}
+
+.pw-export-warning {
+	color: var(--text-warning);
+	font-size: var(--font-ui-small);
+	margin-bottom: var(--size-4-2);
+}
+
 /* ---------- error view ---------- */
 
 .pw-error-view {

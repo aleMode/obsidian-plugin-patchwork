@@ -16,6 +16,8 @@ export interface ModuleRenderer {
 	render(m: AnyModule): void;
 	/** Paths whose modification should trigger a re-render. */
 	dependencies(): ReadonlySet<string>;
+	/** Resolves when the latest render has finished (content or placeholder). Export waits on it. */
+	rendered(): Promise<void>;
 	destroy(): void;
 }
 

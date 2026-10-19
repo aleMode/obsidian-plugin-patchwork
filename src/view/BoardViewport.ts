@@ -1,4 +1,5 @@
 import { Menu, Notice, setIcon, TFile } from 'obsidian';
+import { exportBoardPdf } from '../export/exportPdf';
 import { allIds } from '../model/defaults';
 import { bounds, inset, intersects, type Point } from '../model/geometry';
 import { newId } from '../model/ids';
@@ -11,6 +12,7 @@ import { ModuleHost } from '../modules/ModuleHost';
 import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, mapPage, moveModule, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, PdfPageModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
 import { type Camera, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
 import { PageElement } from './pageElement';
@@ -167,6 +169,50 @@ export class BoardViewport implements BoardSurface {
 				})
 				.catch((e: Error) => new Notice(`Could not open ${file.path}: ${e.message}`));
 		}).open();
+	}
+
+	// ---------- export ----------
+
+	showExport() {
+		const file = this.view.file;
+		if (!file) return;
+		const board = this.store.file;
+		const initial = {
+			path: file.path.replace(/\.patchwork$/, '.pdf'),
+			quality: board.board.export.quality,
+			dpi: board.board.export.dpi,
+			open: true,
+		};
+		new ExportModal(this.view.app, initial, (choices) => void this.runExport(choices)).open();
+	}
+
+	private async runExport(choices: { path: string; quality: 'best' | 'small'; dpi: number; open: boolean }) {
+		const app = this.view.app;
+		// Remember the choices in the board, like other export defaults (SPEC 6).
+		this.store.update((f) =>
+			f.board.export.quality === choices.quality && f.board.export.dpi === choices.dpi
+				? f
+				: { ...f, board: { ...f.board, export: { ...f.board.export, quality: choices.quality, dpi: choices.dpi } } },
+		);
+		const notice = new Notice('Exporting…', 0);
+		try {
+			const result = await exportBoardPdf(
+				{ app, pdfDocs: this.services.pdfDocs, parent: this.view },
+				this.store.file,
+				this.view.file?.path ?? '',
+				{ quality: choices.quality, dpi: choices.dpi },
+				(msg) => notice.setMessage(msg),
+			);
+			const out = await writeBinary(app, choices.path, result.bytes);
+			notice.hide();
+			const kb = Math.round(result.bytes.length / 1024);
+			new Notice(`Exported ${result.pageCount} page(s) to ${out.path} (${kb} KB).`);
+			if (result.problems.length) new Notice(`Export finished with problems:\n• ${result.problems.join('\n• ')}`, 0);
+			if (choices.open) await app.workspace.getLeaf('tab').openFile(out);
+		} catch (e) {
+			notice.hide();
+			new Notice(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 0);
+		}
 	}
 
 	// ---------- camera ----------
@@ -387,6 +433,8 @@ export class BoardViewport implements BoardSurface {
 			button('book-open', 'Add PDF', () => this.pickPdf());
 			sep();
 		}
+		button('file-output', 'Export to PDF', () => this.showExport());
+		sep();
 		button('zoom-out', 'Zoom out', () => this.zoomBy(1 / 1.25));
 		this.zoomLabel = bar.createDiv({ cls: 'pw-zoom-label', text: '100%' });
 		button('zoom-in', 'Zoom in', () => this.zoomBy(1.25));

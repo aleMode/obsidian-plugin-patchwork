@@ -1,5 +1,5 @@
 import { Component, MarkdownRenderer, TFile } from 'obsidian';
-import { degrees, PDFDocument, PDFHexString, PDFName, PDFPage } from 'pdf-lib';
+import { degrees, PDFDocument, PDFHexString, PDFName, PDFPage } from '@cantoo/pdf-lib';
 import { canvasToPng, inspectPdf, PDF_DOC_PARAMS, pdfjs, Spike, SpikeContext } from './context';
 import { printSheets } from './printHost';
 

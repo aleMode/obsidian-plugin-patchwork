@@ -8,6 +8,7 @@ abstract class MarkdownModule implements ModuleRenderer {
 	private child: Component | null = null;
 	private generation = 0;
 	protected deps = new Set<string>();
+	protected done: Promise<void> = Promise.resolve();
 
 	constructor(protected el: HTMLElement, protected ctx: ModuleContext) {}
 
@@ -15,6 +16,10 @@ abstract class MarkdownModule implements ModuleRenderer {
 
 	dependencies(): ReadonlySet<string> {
 		return this.deps;
+	}
+
+	rendered(): Promise<void> {
+		return this.done;
 	}
 
 	/** Render markdown unless a newer render started meanwhile (renders are async). */
@@ -54,11 +59,15 @@ export class NoteModuleRenderer extends MarkdownModule {
 		const note = m as NoteModule;
 		const gen = this.nextGeneration();
 		this.deps = noteDependencies(this.ctx.app, note.file);
-		void loadNoteContent(this.ctx.app, note).then((content) => {
-			if (!this.isCurrent(gen)) return;
-			if (!content.ok) return placeholder(this.el, content.reason, content.missingFile ? 'missing' : 'error');
-			return this.show(content.markdown, content.file.path, gen);
-		});
+		this.done = loadNoteContent(this.ctx.app, note)
+			.then((content) => {
+				if (!this.isCurrent(gen)) return;
+				if (!content.ok) return placeholder(this.el, content.reason, content.missingFile ? 'missing' : 'error');
+				return this.show(content.markdown, content.file.path, gen);
+			})
+			.catch((e: unknown) => {
+				if (this.isCurrent(gen)) placeholder(this.el, `Could not render ${note.file}: ${e instanceof Error ? e.message : String(e)}`);
+			});
 	}
 }
 
@@ -68,6 +77,6 @@ export class TextModuleRenderer extends MarkdownModule {
 	}
 
 	render(m: AnyModule) {
-		void this.show((m as TextModule).markdown, this.boardPath(), this.nextGeneration());
+		this.done = this.show((m as TextModule).markdown, this.boardPath(), this.nextGeneration());
 	}
 }

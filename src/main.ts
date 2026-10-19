@@ -28,6 +28,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('add-note', 'Add note to page', (v) => v.pickNote(), true);
 		this.addBoardCommand('add-pdf', 'Add PDF to page', (v) => v.pickPdf(), true);
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
+		this.addBoardCommand('export', 'Export…', (v) => v.showExport());
 
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {

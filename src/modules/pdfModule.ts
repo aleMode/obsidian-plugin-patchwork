@@ -19,11 +19,17 @@ export class PdfModuleRenderer implements ModuleRenderer {
 	private task: { cancel(): void } | null = null;
 	private generation = 0;
 	private deps = new Set<string>();
+	private done: Promise<void> = Promise.resolve();
 
-	constructor(private el: HTMLElement, private ctx: ModuleContext) {}
+	/** `pxPerMm`: canvas resolution. Defaults to screen density; export passes its DPI. */
+	constructor(private el: HTMLElement, private ctx: ModuleContext, private pxPerMm?: number) {}
 
 	dependencies(): ReadonlySet<string> {
 		return this.deps;
+	}
+
+	rendered(): Promise<void> {
+		return this.done;
 	}
 
 	render(m: AnyModule) {
@@ -31,7 +37,7 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		this.cancel();
 		const gen = ++this.generation;
 		this.deps = new Set([mod.file]);
-		void this.draw(mod, gen).catch((e: unknown) => {
+		this.done = this.draw(mod, gen).catch((e: unknown) => {
 			if (gen !== this.generation) return;
 			const name = (e as Error)?.name;
 			if (name === 'RenderingCancelledException') return;
@@ -55,7 +61,8 @@ export class PdfModuleRenderer implements ModuleRenderer {
 
 		// Canvas holds the crop before the module's rotation.
 		const unrotated = rot % 180 ? { w: placed.h, h: placed.w } : { w: placed.w, h: placed.h };
-		const pxW = Math.min(MAX_CANVAS_SIDE, Math.ceil(unrotated.w * PX_PER_MM * DENSITY * window.devicePixelRatio));
+		const pxPerMm = this.pxPerMm ?? PX_PER_MM * DENSITY * window.devicePixelRatio;
+		const pxW = Math.min(MAX_CANVAS_SIDE, Math.ceil(unrotated.w * pxPerMm));
 		const scale = pxW / ((crop[2] - crop[0]) * vp1.width);
 		const vp = page.getViewport({ scale });
 		const canvas = createEl('canvas', { cls: 'pw-pdf-canvas' });
