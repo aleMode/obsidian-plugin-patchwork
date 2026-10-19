@@ -16,6 +16,7 @@ import { linkpathsFromDrop } from '../sources/dropLinks';
 import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
@@ -249,6 +250,11 @@ export class BoardViewport implements BoardSurface {
 				}),
 			),
 		).open();
+	}
+
+	showBoardSettings() {
+		if (this.store.readOnly) return;
+		new BoardSettingsModal(this.view.app, this.store.file.board, (board) => this.store.update((f) => ({ ...f, board: { ...f.board, ...board } }))).open();
 	}
 
 	// ---------- export ----------
@@ -832,6 +838,7 @@ export class BoardViewport implements BoardSurface {
 			sep();
 		}
 		button('file-output', 'Export to PDF', () => this.showExport());
+		if (!this.store.readOnly) button('settings-2', 'Board settings', () => this.showBoardSettings());
 		sep();
 		button('zoom-out', 'Zoom out', () => this.zoomBy(1 / 1.25));
 		this.zoomLabel = bar.createDiv({ cls: 'pw-zoom-label', text: '100%' });

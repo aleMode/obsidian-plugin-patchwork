@@ -1,4 +1,4 @@
-# Testing guide (state as of 2026-10-20, ~01:00)
+# Testing guide (state as of 2026-10-20, 00:45)
 
 What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 109 checks across 9 suites, all passing; `npm test`: 135 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
@@ -21,8 +21,13 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Right-click a module → **Lock**: no handles, can't be dragged or nudged. **Unlock** restores.
 
 ### 1b. Rulers (new)
-- Top and left rulers in the board's display unit (mm by default; set `"displayUnit": "cm"` or `"in"` in the board file to try others — a UI for it comes with the inspector).
+- Top and left rulers in the board's display unit (mm by default; change it in **Board settings**, below).
 - Zero is the **selected page's top-left corner** (or the board origin when nothing is selected), so you can read module positions directly. Zoom and pan: ticks stay readable (label spacing adapts).
+
+### 1c. Board settings (new)
+- Toolbar gear icon, or **Patchwork: Board settings…**: display unit (mm / cm / in), grid size (type "5", "0.5 cm", "0.25 in"), snap on/off, grid on/off, "use app theme for pages".
+- Page labels and rulers switch units; *Apply* is one undo step.
+- Try "use app theme" in dark mode: pages turn dark on screen *and in the export* (that's what the option means).
 
 ### 2a. Smart guides (new)
 - Drag a module near another module (or the page's edges / centre): when an edge or centre comes within ~6 px on screen, it snaps and a pink guide line appears. Guides win over the grid; **Alt** places freely.

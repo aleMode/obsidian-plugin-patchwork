@@ -42,6 +42,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('add-pdf', 'Add PDF to page', (v) => v.pickPdf(), true);
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
 		this.addBoardCommand('export', 'Export…', (v) => v.showExport());
+		this.addBoardCommand('board-settings', 'Board settings…', (v) => v.showBoardSettings(), true);
 
 		this.addCommand({
 			id: 'generate-stress-board',
