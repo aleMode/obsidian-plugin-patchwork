@@ -53,3 +53,7 @@ Questions raised while building, each with the recommended answer we are proceed
 - A sheet over 8192 px per side at the chosen DPI (e.g. 1 m wide at 300 dpi = 11 811 px) can't be one canvas tile.
 - Options: (a) write such sheets as multiple PNG files named by row/column (same labels as print tiling); (b) stream one large PNG ourselves, rendering one strip of rows at a time and compressing with Node's `zlib` (available in the renderer), so no giant canvas is ever needed; (c) cap DPI for oversized sheets.
 - **Recommendation:** (b) if it stays small (a PNG writer is ~100 lines), else (a). Decide in M2.
+
+### Q12. Minimum Obsidian version
+- `minAppVersion` is raised only when an API needs it (SPEC 13); the `obsidianmd/no-unsupported-api` lint rule enforces this. Currently **1.6.6** (`FileManager.trashFile`).
+- All behaviour is verified on **1.14.4** only. Some findings may be version-dependent (native embed rendering in `MarkdownRenderer`, the Mermaid guard). **Recommendation:** before the first release, either test on the oldest claimed version or raise `minAppVersion` to the oldest version actually tested.

@@ -159,6 +159,8 @@ Measured on a 63.7 MB, 159-page (Letter), image-heavy adventure PDF with a 47-en
 
 Also: `setViewData(…, clear=false)` on an external change should rebuild the model; the undo history becomes invalid then. Clear it (Q8).
 
+**Correction found in M0:** in a real view, Obsidian calls `setViewData(diskText, false)` on an outside change **even when edits are pending**, which silently drops them (the spike missed this because it wrote `TextFileView.data` directly). The guard therefore runs in two places: in `setViewData` (a reload arriving with unsaved edits) and in `save` (disk changed before our write). Covered by `scripts/e2e/fileView.js`.
+
 ## S7 — `.canvas` interop
 
 **Question:** does native Canvas open our generated `.canvas`, and do subpaths and `#page=N` work?
