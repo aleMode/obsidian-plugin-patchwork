@@ -91,6 +91,10 @@
 	font-size: 10pt;
 }
 
+.pw-page.is-drop-page .pw-page-paper {
+	outline: calc(3px / var(--pw-zoom)) dashed var(--interactive-accent);
+}
+
 .pw-page-paper.has-background {
 	background: var(--pw-page-bg);
 }

@@ -80,3 +80,17 @@ describe('module ops', () => {
 		expect(bottom.map((m) => [m.id, m.z ?? 0])).toEqual([['a', 0], ['b', 0], ['c', 2]]);
 	});
 });
+
+describe('moveModuleToPage', () => {
+	it('moves a module between pages, keeping its other fields', async () => {
+		const { moveModuleToPage } = await import('../../src/store/pageOps');
+		const a = addPage(newBoardFile(), A4);
+		const b = addPage(a.file, A4);
+		const mod = { id: 'm', type: 'text', markdown: 'x', x: 1, y: 2, w: 3, h: 4, label: 'keep' };
+		const file = { ...b.file, pages: b.file.pages.map((p, i) => (i === 0 ? { ...p, modules: [mod] } : p)) };
+		const out = moveModuleToPage(file, a.page.id, 'm', b.page.id, 50, 60);
+		expect(out.pages[0]!.modules).toEqual([]);
+		expect(out.pages[1]!.modules).toEqual([{ ...mod, x: 50, y: 60 }]);
+		expect(moveModuleToPage(file, a.page.id, 'm', 'nope', 0, 0)).toBe(file);
+	});
+});

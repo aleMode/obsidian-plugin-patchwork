@@ -65,6 +65,24 @@ try {
 	await cdp.key('ArrowRight', 'ArrowRight');
 	m = await inView("return view.store.file.pages[0].modules.find((x) => x.id === 'txt');");
 	check('locked module ignores nudges', m.x === 21, m);
+
+	// Drag a module onto another page: it moves there (re-parenting), in one undo step.
+	await inView(`view.store.update((f) => ({ ...f, pages: [
+		{ ...f.pages[0], modules: [{ id: 'mover', type: 'text', markdown: 'move me', x: 20, y: 20, w: 40, h: 20 }] },
+		{ id: 'p2', name: 'Two', x: 260, y: 0, w: 210, h: 297, modules: [] },
+	] })); s.zoomToFit(); await new Promise((r) => setTimeout(r, 300));`);
+	const z2 = await inView('return s.camera.zoom;');
+	const k = (96 / 25.4) * z2;
+	const mover = await rectOf('.pw-module[data-module-id="mover"]');
+	const from = { x: mover.x + 10, y: mover.y + 10 };
+	await cdp.drag(from, { x: from.x + 260 * k, y: from.y + 30 * k }, { steps: 12 });
+	await sleep(150);
+	const where = await inView("const p = view.store.file.pages.find((x) => x.modules.some((m) => m.id === 'mover')); const m = p.modules.find((x) => x.id === 'mover'); return { page: p.id, x: m.x, y: m.y };");
+	check('module dropped on another page moves to it', where.page === 'p2' && where.x === 20 && where.y === 50, where);
+	await cdp.key('z', 'KeyZ', MOD.ctrl);
+	await sleep(50);
+	const back = await inView("return view.store.file.pages[0].modules.some((m) => m.id === 'mover');");
+	check('one undo returns it to the original page', back);
 } catch (e) {
 	check('no exception', false, String(e.stack ?? e));
 } finally {

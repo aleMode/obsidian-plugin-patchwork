@@ -99,3 +99,11 @@ export function defaultModuleRect(page: Page, size?: { w: number; h: number }): 
 	const h = Math.min(size?.h ?? page.h - 2 * margin, page.h - 2 * margin - offset);
 	return { x: margin + offset, y: margin + offset, w: Math.max(10, w), h: Math.max(10, h) };
 }
+
+/** Move a module to another page, at the given position relative to that page (SPEC 5.2 re-parenting). */
+export function moveModuleToPage(file: PatchworkFile, fromPageId: string, moduleId: string, toPageId: string, x: number, y: number): PatchworkFile {
+	if (fromPageId === toPageId) return moveModule(file, fromPageId, moduleId, x, y);
+	const m = file.pages.find((p) => p.id === fromPageId)?.modules.find((x) => x.id === moduleId);
+	if (!m || !file.pages.some((p) => p.id === toPageId)) return file;
+	return addModule(removeModule(file, fromPageId, moduleId), toPageId, { ...m, x, y });
+}

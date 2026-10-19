@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, ~01:00)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 106 checks across 9 suites, all passing; `npm test`: 126 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 108 checks across 9 suites, all passing; `npm test`: 127 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -19,6 +19,10 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - **Ctrl+D** duplicates the selected module (offset 5 mm) or page (placed to the right, modules included). Also in the right-click menu.
 - **Arrow keys** move the selection 1 mm; **Shift+arrow** 10 mm. A burst of presses undoes as one step.
 - Right-click a module → **Lock**: no handles, can't be dragged or nudged. **Unlock** restores.
+
+### 2b. Move a module to another page (new)
+- Drag a module so its centre is over another page: that page gets a dashed outline, and on release the module moves onto it (same spot on the board, snapped to the grid). One Ctrl+Z undoes the whole move.
+- While dragging, the module stays clipped to its old page (you see it jump on release); tell me if that's confusing.
 
 ### 3. Double-click actions
 - **Note module:** opens the note at that section in a split pane.
@@ -64,7 +68,6 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 - No inspector or outline panel yet (positions, sizes and options are set by dragging, the crop editor, or editing the `.patchwork` JSON).
 - No rulers, multi-select, align/distribute or smart guides yet.
-- Modules can't move to another page by dragging yet (they stay on their page).
 - Page numbers, headers/footers, tiled export, PNG export are M2.
 
 ## If something breaks

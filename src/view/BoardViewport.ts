@@ -1,7 +1,7 @@
 import { Menu, Notice, setIcon, TFile } from 'obsidian';
 import { exportBoardPdf } from '../export/exportPdf';
 import { allIds } from '../model/defaults';
-import { bounds, type Handle, inset, intersects, type Point, type Rect, resizeRect } from '../model/geometry';
+import { bounds, containsPoint, type Handle, inset, intersects, type Point, type Rect, resizeRect } from '../model/geometry';
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
@@ -13,7 +13,7 @@ import type { BitmapCache } from '../render/bitmapCache';
 import { linkpathsFromDrop } from '../sources/dropLinks';
 import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
-import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
@@ -469,7 +469,37 @@ export class BoardViewport implements BoardSurface {
 		// Alt bypasses snapping (SPEC 5.1).
 		const pos = grid.snap && !e.altKey ? snapPoint(raw, grid.size) : raw;
 		if (d.kind === 'page') this.store.update((f) => movePage(f, d.id, pos.x, pos.y), { coalesce: `move-page:${d.id}` });
-		else this.store.update((f) => moveModule(f, d.pageId, d.id, pos.x, pos.y), { coalesce: `move-module:${d.id}` });
+		else {
+			this.store.update((f) => moveModule(f, d.pageId, d.id, pos.x, pos.y), { coalesce: `move-module:${d.id}` });
+			this.highlightDropPage(this.reparentTarget(d));
+		}
+	}
+
+	/** The other page a dragged module's centre is over, if any (SPEC 5.2: re-parent on drop). */
+	private reparentTarget(d: Extract<Drag, { kind: 'module' }>): Page | null {
+		const from = this.store.file.pages.find((p) => p.id === d.pageId);
+		const m = from?.modules.find((x) => x.id === d.id);
+		if (!from || !m) return null;
+		const c = { x: from.x + m.x + m.w / 2, y: from.y + m.y + m.h / 2 };
+		if (containsPoint(from, c)) return null;
+		return this.store.file.pages.find((p) => p.id !== from.id && containsPoint(p, c)) ?? null;
+	}
+
+	private highlightDropPage(page: Page | null) {
+		for (const [id, el] of this.pages) el.el.toggleClass('is-drop-page', id === page?.id);
+	}
+
+	/** Finish a module drag: move it to the page under its centre, in the same undo step as the drag. */
+	private reparent(d: Extract<Drag, { kind: 'module' }>) {
+		this.highlightDropPage(null);
+		const to = this.reparentTarget(d);
+		const from = this.store.file.pages.find((p) => p.id === d.pageId);
+		const m = from?.modules.find((x) => x.id === d.id);
+		if (!to || !from || !m) return;
+		const grid = this.store.file.board.grid;
+		const rel = snapPoint({ x: from.x + m.x - to.x, y: from.y + m.y - to.y }, grid.snap ? grid.size : 0);
+		this.store.update((f) => moveModuleToPage(f, from.id, m.id, to.id, rel.x, rel.y), { coalesce: `move-module:${d.id}` });
+		this.select({ pageId: to.id, moduleId: m.id });
 	}
 
 	private resizeTo(d: Extract<Drag, { kind: 'resize' }>, p: Point, grid: number, keepAspect: boolean) {
@@ -488,6 +518,7 @@ export class BoardViewport implements BoardSurface {
 
 	private onPointerUp(e: PointerEvent) {
 		if (!this.drag) return;
+		if (this.drag.kind === 'module') this.reparent(this.drag);
 		this.drag = null;
 		this.store.endCoalesce();
 		this.root.removeClass('is-dragging');
