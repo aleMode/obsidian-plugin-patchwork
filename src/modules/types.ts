@@ -1,11 +1,14 @@
 import type { App, Component } from 'obsidian';
 import type { AnyModule } from '../model/schema';
+import type { BitmapCache } from '../render/bitmapCache';
 import type { PdfDocCache } from '../sources/pdfSource';
 
 /** What module renderers need from the plugin. */
 export interface ModuleContext {
 	app: App;
 	pdfDocs: PdfDocCache;
+	/** Cache of rendered PDF crops for the screen. Absent when rendering for export. */
+	bitmaps?: BitmapCache;
 	/** Parent for per-render child components (MarkdownRenderer cleanup, events). */
 	component: Component;
 	/** Canvas pixels per mm the current zoom needs on screen. Absent when rendering for export. */

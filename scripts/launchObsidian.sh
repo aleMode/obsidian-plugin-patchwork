@@ -9,7 +9,9 @@ mkdir -p "$PROFILE"
 if [ ! -f "$PROFILE/obsidian.json" ]; then
 	printf '{"vaults":{"patchworktestvault":{"path":"%s/test-vault","ts":1,"open":true}}}\n' "$ROOT" > "$PROFILE/obsidian.json"
 fi
-CMD="flatpak run md.obsidian.Obsidian --user-data-dir=$PROFILE --remote-debugging-port=${CDP_PORT:-9222}"
+# The background flags keep rendering (requestAnimationFrame) running when the window is covered or on
+# another workspace, so automated runs don't stall while you use other windows.
+CMD="flatpak run md.obsidian.Obsidian --user-data-dir=$PROFILE --remote-debugging-port=${CDP_PORT:-9222} --disable-backgrounding-occluded-windows --disable-renderer-backgrounding --disable-background-timer-throttling"
 if command -v flatpak >/dev/null 2>&1; then
 	nohup $CMD > "$ROOT/.dev/obsidian.log" 2>&1 &
 else

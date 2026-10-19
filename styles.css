@@ -154,6 +154,10 @@
 	cursor: move;
 }
 
+.pw-module.is-pending {
+	background: #f3f3f3;
+}
+
 .pw-module.is-locked {
 	cursor: default;
 }

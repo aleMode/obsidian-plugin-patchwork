@@ -4,6 +4,8 @@ import { presetById } from './model/presets';
 import { serializeBoard } from './model/serialize';
 import { generateStressBoard, type StressSources } from './model/stress';
 import { StressBoardModal } from './ui/StressBoardModal';
+import { BitmapCache } from './render/bitmapCache';
+import { DEFAULT_SETTINGS, type PatchworkSettings, PatchworkSettingTab } from './settings';
 import { PdfDocCache } from './sources/pdfSource';
 import { BoardViewport } from './view/BoardViewport';
 import { refreshPaperScope, removePaperScope } from './view/paperScope';
@@ -11,10 +13,17 @@ import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from './view/Patchwor
 
 export default class PatchworkPlugin extends Plugin {
 	pdfDocs!: PdfDocCache;
+	bitmaps!: BitmapCache;
+	settings: PatchworkSettings = { ...DEFAULT_SETTINGS };
 
 	async onload() {
+		this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<PatchworkSettings> | null) };
 		this.pdfDocs = new PdfDocCache(this.app);
-		const services = { pdfDocs: this.pdfDocs };
+		this.bitmaps = new BitmapCache(this.settings.bitmapBudgetMB);
+		// A modified PDF must not show stale renders (keys include mtime; this frees the memory too).
+		this.registerEvent(this.app.vault.on('modify', (f) => this.bitmaps.invalidateFile(f.path)));
+		this.addSettingTab(new PatchworkSettingTab(this.app, this));
+		const services = { pdfDocs: this.pdfDocs, bitmaps: this.bitmaps };
 		this.registerView(VIEW_TYPE_BOARD, (leaf) => new PatchworkView(leaf, (el, store, view) => new BoardViewport(el, store, view, services)));
 		this.registerExtensions([BOARD_EXTENSION], VIEW_TYPE_BOARD);
 
@@ -54,6 +63,11 @@ export default class PatchworkPlugin extends Plugin {
 	onunload() {
 		removePaperScope();
 		this.pdfDocs.destroyAll();
+		this.bitmaps.clear();
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
 	}
 
 	/** A command that only shows up while a board is the active view. */

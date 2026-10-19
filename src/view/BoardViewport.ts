@@ -9,6 +9,7 @@ import type { AnyModule, NoteModule, Page, PdfModule } from '../model/schema';
 import { snapPoint } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
+import type { BitmapCache } from '../render/bitmapCache';
 import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, mapPage, moveModule, movePage, removeModule, removePage, restack } from '../store/pageOps';
@@ -20,6 +21,7 @@ import type { BoardSurface, PatchworkView } from './PatchworkView';
 
 export interface BoardServices {
 	pdfDocs: PdfDocCache;
+	bitmaps: BitmapCache;
 }
 
 type Selection = { pageId: string; moduleId?: string } | null;
@@ -60,7 +62,7 @@ export class BoardViewport implements BoardSurface {
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
 		this.modules = new ModuleHost({
-			ctx: { app: view.app, pdfDocs: services.pdfDocs, resolution: () => this.resolution() },
+			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, resolution: () => this.resolution() },
 			store,
 			paperOf: (id) => this.pages.get(id)?.paper,
 			boardPath: () => view.file?.path ?? '',

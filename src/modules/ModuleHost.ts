@@ -14,6 +14,12 @@ const CONTENT_KEYS: Record<string, readonly string[]> = {
 	image: ['file', 'fit'],
 };
 
+/**
+ * Main-thread time per frame for rendering newly mounted modules. Mounting a row of pages at once
+ * caused 50–100 ms hitches while panning (docs/perf.md); the rest waits for the next frame.
+ */
+const FRAME_BUDGET_MS = 8;
+
 function contentKey(m: AnyModule): string {
 	return JSON.stringify([m.type, ...(CONTENT_KEYS[m.type] ?? []).map((k) => m[k])]);
 }
@@ -47,6 +53,9 @@ export class ModuleHost {
 	/** Level of detail: when false (zoomed far out), pages show module outlines instead of content. */
 	private detail = false;
 	private skeletons = new Map<string, { el: HTMLElement; key: string }>();
+	/** Newly mounted modules waiting for their first render, most important first. */
+	private queue: Mounted[] = [];
+	private frame = 0;
 	private component = new Component();
 	private ctx: ModuleContext;
 	selectedModule: string | null = null;
@@ -126,16 +135,36 @@ export class ModuleHost {
 				this.unmount(m.id, mounted);
 				mounted = undefined;
 			}
+			const isNew = !mounted;
 			if (!mounted) mounted = this.mount(m, page.id, paper);
 			this.layout(mounted, m, rank);
 			const key = contentKey(m);
-			if (key !== mounted.key) {
-				mounted.key = key;
-				mounted.module = m;
-				this.renderContent(mounted);
-			}
 			mounted.module = m;
+			if (key === mounted.key) return;
+			mounted.key = key;
+			// Edits re-render at once; content for pages scrolling into view is spread over frames.
+			if (isNew) this.enqueue(mounted);
+			else this.renderContent(mounted);
 		});
+	}
+
+	private enqueue(m: Mounted) {
+		m.el.addClass('is-pending');
+		this.queue.push(m);
+		if (!this.frame) this.frame = window.requestAnimationFrame(() => this.drain());
+	}
+
+	private drain() {
+		this.frame = 0;
+		const start = performance.now();
+		while (this.queue.length && performance.now() - start < FRAME_BUDGET_MS) {
+			const m = this.queue.shift()!;
+			// Skip modules unmounted while they waited.
+			if (this.mounted.get(m.module.id) !== m) continue;
+			m.el.removeClass('is-pending');
+			this.renderContent(m);
+		}
+		if (this.queue.length) this.frame = window.requestAnimationFrame(() => this.drain());
 	}
 
 	private mount(m: AnyModule, pageId: string, paper: HTMLElement): Mounted {
@@ -198,6 +227,8 @@ export class ModuleHost {
 	}
 
 	destroy() {
+		if (this.frame) window.cancelAnimationFrame(this.frame);
+		this.queue = [];
 		for (const [id, m] of this.mounted) this.unmount(id, m);
 		for (const s of this.skeletons.values()) s.el.remove();
 		this.skeletons.clear();
