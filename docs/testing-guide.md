@@ -1,0 +1,54 @@
+# Testing guide (state as of 2026-10-20, ~01:00)
+
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 108 checks across 7 suites, all passing; `npm test`: 121 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+
+## Setup
+
+1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
+2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
+
+## New since M0 (please focus here)
+
+### 1. Resize handles
+- Click a module: 8 square handles appear. Drag a corner or an edge. Sizes snap to the 5 mm grid; **Alt** places freely; **Shift** on a corner keeps proportions.
+- Click a page (on empty paper): same handles resize the page. Modules keep their position relative to the page's top-left.
+- One **Ctrl+Z** undoes a whole resize drag.
+- Look for: handles readable at every zoom, never clipped at page edges, cursor shapes right.
+
+### 2. Duplicate, nudge, lock
+- **Ctrl+D** duplicates the selected module (offset 5 mm) or page (placed to the right, modules included). Also in the right-click menu.
+- **Arrow keys** move the selection 1 mm; **Shift+arrow** 10 mm. A burst of presses undoes as one step.
+- Right-click a module → **Lock**: no handles, can't be dragged or nudged. **Unlock** restores.
+
+### 3. Double-click a note module
+- Opens the note at that section in a split pane.
+
+### 4. Renames follow
+- With a board open that shows a note, rename the note (or its folder) in the file explorer: the module keeps working, and the board file is updated.
+- Close the board, rename again, reopen: still correct (closed boards are rewritten on disk).
+- Delete the note: the module shows a striped "Note not found" placeholder instead of vanishing. Undo the delete (or restore from trash) and it comes back.
+- Ctrl+Z on the board right after a rename reverts the reference (expected; mention if this feels wrong).
+
+### 5. PDF render cache and smoother panning
+- Open a board with crops from the big rulebook. Pan away several pages and come back: crops should reappear **instantly** (cached), not re-render.
+- While panning into new pages, modules first show a light-grey box, then fill in over a few frames, instead of the whole board stuttering.
+- **Settings → Patchwork → PDF render cache** (MB, default 512). Lowering it frees memory; very low values just mean more re-rendering.
+
+## Still worth checking from M0
+
+- Export a page with a note section and a rulebook crop; open in two PDF viewers; select text in both.
+- Zoom out below 25%: pages show outline boxes; zoom back in: content returns.
+- Dark theme, and a community theme: paper stays white with dark text.
+
+## Known gaps (not bugs, not built yet)
+
+- No inspector or outline panel yet; no crop editor (crops can only be set by editing the `.patchwork` JSON, e.g. `"crop": [0.1, 0.2, 0.6, 0.7]`).
+- No rulers, multi-select, align/distribute, smart guides, or drag-from-explorer yet.
+- Note overflow is always "clip"; `fit` / `grow` are next.
+- Modules can't move to another page by dragging yet (they stay on their page).
+- Page numbers, headers/footers, tiled export, PNG export are M2.
+
+## If something breaks
+
+- Tell me what you did and what you saw; a screenshot helps. If a board won't open, the error view shows the exact problem and **Copy file contents** — the file itself is never modified.
+- Your leftover test files from earlier (`test-vault/Untitled board.patchwork`, `Untitled board.pdf`, and the "penepene3" edit in `Spells/Spell index.md`) are untouched and uncommitted.
