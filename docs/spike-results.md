@@ -2,7 +2,7 @@
 
 Run on 2026-10-19 against **Obsidian 1.14.4** (Flatpak, Linux), Electron 43.7.7, Chrome 150, PDF.js 5.3.34, device pixel ratio 1, app in **dark** theme. Code is in `spikes/`; raw reports and artifacts go to `.dev/spike-output/` (not committed).
 
-All seven spikes pass. None needs its fallback. Three findings change the plan (marked **Plan change**); they are proposals until reviewed.
+All seven spikes pass (plus S8, added after review). None needs its fallback. Three findings change the plan (marked **Plan change**); they are proposals until reviewed.
 
 ## How the spikes were run
 
@@ -21,6 +21,7 @@ Dataview 0.5.68 was installed into the test vault for S2 (downloaded from its Gi
 | S5 mixed page sizes | **Pass.** CSS named pages give one PDF with different page sizes. | Named pages. **Plan change:** `pdf-lib` not needed for mixed sizes. |
 | S6 `.patchwork` view | **Pass**, with one data-loss risk found. | `registerExtensions` + `TextFileView`. **Plan change:** guard saves against external changes. |
 | S7 `.canvas` export | **Pass.** Heading, nested-heading and block subpaths work; PDF `#page=N` works. | Mapping in SPEC 9.3 confirmed as written. |
+| S8 two-stage export | **Pass.** Vector PDF crops, vector tiling, bookmarks, page labels. Costs: larger files, hidden text outside crops. | Chromium for HTML + `@cantoo/pdf-lib` for assembly; per-module vector/raster/auto. Proposed, pending review. |
 
 ---
 
@@ -168,6 +169,37 @@ Also: `setViewData(…, clear=false)` on an external change should rebuild the m
 - `group` node label shows as the page name. `text` node renders markdown. Image node shows the image.
 
 **Decision for SPEC 9.3:** keep the mapping as written. PDF modules export as `file` + `subpath: "#page=N"`; crop, rotation and style are dropped (listed in the export dialog).
+
+## S8 — Two-stage export: Chromium + pdf-lib (added after review)
+
+**Question:** can we keep Chromium for the HTML layer but place PDF modules as **vector** (sharp, selectable) and do document-level work (tiling, bookmarks, page labels, metadata) with `pdf-lib`? Run on an A4 board with a note module and four PDF crops: fixture stat block, fixture rotated page, and two crops from the real rulebook (a text column with a sidebar box, and a colour illustration). Code: `spikes/src/s8Hybrid.ts`.
+
+**Method:** Chromium prints the sheet with PDF module areas left empty. `pdf-lib` loads that PDF and each source PDF, `embedPage(page, cropBox)` turns each crop into a Form XObject clipped to the crop, and `drawPage` places it with contain-fit (rotated −90° for a `/Rotate 90` source page). The raster variant puts 200 dpi canvases in the same print for comparison.
+
+| Check | Result |
+|---|---|
+| Placement and clipping | ✅ all four crops land exactly in their boxes, matching the raster variant; the `/Rotate 90` crop is oriented correctly |
+| Sharpness | ✅ vector stays crisp at ~576 dpi zoom; raster at 200 dpi is visibly soft (`.dev/spike-output/s8-zoom-*.png`) |
+| Text in crops | ✅ selectable and searchable (251 text items vs 84 in the raster variant) |
+| Bookmarks (outline) | ✅ added via `pdf-lib` low-level objects |
+| Page labels | ✅ `/PageLabels` gave "i", "7" in PDF.js |
+| Metadata | ✅ title, creator |
+| Vector tiling | ✅ a 1000 × 700 mm printed page → 15 A4 sheets (5 × 3), each a clipped vector copy, edge tiles padded, row/column label drawn |
+| Time | vector 1.7 s vs raster 2.2 s for this sheet; `pdf-lib` parsed the 64 MB rulebook in ~780 ms; compose + save 50–75 ms |
+| Library | `pdf-lib` 1.17.1 (last release 2021) and the maintained fork `@cantoo/pdf-lib` 2.11.1 (Sept 2026) both ran the code unchanged with identical results |
+
+**Two costs found:**
+1. **File size.** A Form XObject carries the **whole source page's resources**, not just the visible part. The vector sheet was **5.9 MB vs 0.6 MB** raster, mostly because the illustration crop embeds the full-resolution artwork and the text crop embeds the page's paper texture. Text-only or vector-art pages stay small.
+2. **Hidden text.** Text outside the crop is still in the file: searching the exported PDF finds text you can't see (probe: fixture page 1 text outside the stat block was found). Copy/select can pick it up too. Removing it would mean rewriting content streams (out of scope).
+
+Also by construction: vector PDF modules are drawn **after** the HTML layer, so they sit on top of everything; a module that has other modules stacked above it must fall back to raster.
+
+**Recommendation:** adopt the two-stage pipeline.
+- Stage 1 (Chromium) prints each board page at its native size, PDF modules left empty.
+- Stage 2 (`pdf-lib`) places PDF modules, then builds output sheets: native, scaled, or tiled (vector), and adds bookmarks, page labels and metadata. Booklet imposition and crop marks (M4) fit the same stage.
+- PDF modules get a **render mode**: `vector` (sharp, selectable, can be large), `raster` (small, at export DPI), or `auto` (default). `auto` picks vector unless the module is overlapped from above, or embedding its page would add more than a size threshold (e.g. 2 MB) of resources. The export dialog can override all modules at once ("smallest file" / "best quality").
+- Use the maintained fork `@cantoo/pdf-lib` (MIT, ~580 KB minified, ~245 KB gzip). Justification: Chromium can't place vector PDF content or write outlines/labels, and this is the only way to get sharp crops from rulebooks.
+- PNG export is unchanged: rasterize the final PDF with PDF.js.
 
 ---
 

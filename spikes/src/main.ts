@@ -9,6 +9,7 @@ import { s4Canvas } from './s4Canvas';
 import { s5MixedPages } from './s5MixedPages';
 import { registerS6View, s6FileView } from './s6FileView';
 import { s7Canvas } from './s7Canvas';
+import { s8Hybrid } from './s8Hybrid';
 
 const SPIKES: Record<string, Spike> = {
 	s1: s1Print,
@@ -19,6 +20,7 @@ const SPIKES: Record<string, Spike> = {
 	s5: s5MixedPages,
 	s6: s6FileView,
 	s7: s7Canvas,
+	s8: s8Hybrid,
 };
 
 export default class SpikesPlugin extends Plugin {
