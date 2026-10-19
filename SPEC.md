@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.3 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.4 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -83,7 +83,7 @@ Common: position/size (mm, relative to page), `z`, `locked`, `label`, `style` (p
 
 | Type | Purpose | Key options |
 |---|---|---|
-| `pdf` | A page (or crop) of a vault PDF | `file`, `page`, `crop` (normalized), `fit`, `rotation`, `invert` (M4), `renderDpi` |
+| `pdf` | A page (or crop) of a vault PDF | `file`, `page`, `crop` (normalized), `fit`, `rotation`, `invert` (M4), `renderDpi`, `render` (vector/raster/auto) |
 | `note` | Live view of a `.md` file or part of it | `file`, `subpath`, `lines`, `includeHeading`, `overflow`, `scale` |
 | `text` | Free markdown written in the board | `markdown` |
 | `image` | A vault image | `file`, `fit` |
@@ -181,6 +181,7 @@ export interface PdfModule extends BaseModule {
   rotation?: 0 | 90 | 180 | 270;
   invert?: boolean;                              // M4
   renderDpi?: number;
+  render?: "auto" | "vector" | "raster";        // export rendering, default "auto" (section 9.1)
 }
 
 export interface NoteModule extends BaseModule {
@@ -207,6 +208,7 @@ export interface ExportDefaults {
   tileOverlap: number;                           // mm
   cropMarks: boolean;                            // M4
   dpi: number;                                   // raster modules, default 200
+  quality: "best" | "small";                     // "small" forces raster PDF modules; default "best"
 }
 ```
 
@@ -220,7 +222,7 @@ Rules:
 
 ## 7. Architecture
 
-Stack: TypeScript (strict), esbuild, Obsidian API, vanilla DOM (Obsidian's `createEl` helpers) for the board to keep the bundle small, Vitest for pure logic. Start from the official `obsidian-sample-plugin` template. Optional runtime dependency: `pdf-lib` (MIT), only if a spike justifies it.
+Stack: TypeScript (strict), esbuild, Obsidian API, vanilla DOM (Obsidian's `createEl` helpers) for the board to keep the bundle small, Vitest for pure logic. Start from the official `obsidian-sample-plugin` template. Runtime dependency: `@cantoo/pdf-lib` (MIT, maintained fork of `pdf-lib`, ~580 KB minified), justified by spike S8: Chromium cannot place vector PDF content or write bookmarks and page labels.
 
 ```
 src/
@@ -236,8 +238,9 @@ src/
   sources/                 markdownSource (resolve file/subpath/lines), pdfSource (doc cache, render,
                            outline, text search), linkTracker (rename/delete/modify)
   render/                  scheduler (queue, priorities, cancel), bitmapCache (LRU), virtualization
-  export/                  printPipeline, settle, tiling (uses model/tiling), pdfExport, pngExport,
-                           canvasExport
+  export/                  printAdapter (@electron/remote, isolated), printHost, settle, assemble
+                           (pdf-lib stage: vector modules, sheets, tiling via model/tiling, outline,
+                           labels), pngExport, canvasExport
 tests/                     Vitest
 ```
 
@@ -269,16 +272,28 @@ Strategies:
 
 ## 9. Export
 
-### 9.1 Pipeline (v1)
-1. Build an offscreen **print host**: one `.pw-sheet` element per output sheet at exact mm size, with `@page { size: W H; margin: 0 }` and a page break after each sheet.
-2. Render modules into it: notes live via the Markdown renderer (light paper scope), PDF modules as canvases at export DPI (default 200, selectable up to 300+), images decoded.
-3. **Settle:** wait for all module render promises, `document.fonts.ready`, image `decode()`, and a MutationObserver quiet period (≈300 ms, 10 s timeout). Report any module that never settled.
-4. Produce the file: PDF via Chromium's print engine (see spike S1 for the access path), PNG by rasterizing each sheet in tiles.
+### 9.1 Pipeline (v1): two stages (spikes S1, S5, S8)
 
-Text in notes stays vector in the PDF. PDF-module regions are raster at the chosen DPI in v1. A vector pass-through (pdf-lib page embedding with a clip box) is a research item for after M4.
+**Stage 1, HTML layer (Chromium).**
+1. Build an offscreen **print host** in the main window: `div.pw-print-host.print` (Obsidian's print CSS hides `body > :not(.print)`) holding one `.pw-sheet.pw-paper.theme-light` per **board page** at its native mm size. Each sheet gets a CSS named page (`@page pw-sN { size: W H; margin: 0 }`) so sizes can differ within one PDF.
+2. Render modules into it: notes live via the Markdown renderer (light paper scope), images decoded. PDF modules rendered as **vector** are left empty (their position is known from the model). PDF modules rendered as **raster** become canvases at export DPI (default 200).
+3. **Settle:** wait for all module render promises, `document.fonts.ready`, image `decode()`, and a MutationObserver quiet period (≈300 ms, 10 s timeout). Report any module that never settled.
+4. Print with `webContents.printToPDF({ preferCSSPageSize: true, printBackground: true })` via `@electron/remote`, isolated in one adapter (`export/printAdapter.ts`, hard rule 6). Fallback if `remote` ever disappears: `window.print()` and the system dialog.
+
+**Stage 2, assembly (`@cantoo/pdf-lib`).**
+5. Draw each vector PDF module: `embedPage(sourcePage, cropBox)` gives a Form XObject clipped to the crop; `drawPage` places it with the module's fit and rotation. Crops are mapped from the displayed page to the source page's user space, honouring its `/Rotate`.
+6. Build the output sheets from the printed pages: native size, scaled to fit, or **tiled** (each tile a clipped vector copy of its region, section 9.2). Booklet imposition and crop marks (M4) live here too.
+7. Add document features: bookmarks from page names, `/PageLabels` matching our page numbering, title and creator metadata.
+
+**PNG export:** render the final PDF with PDF.js, sheet by sheet, within the raster tile cap (section 8).
+
+**PDF module render mode.** Each PDF module has `render: "auto" | "vector" | "raster"` (default `auto`). `auto` means vector, unless another module is stacked above it on the same page: vector content is drawn after the HTML layer and would cover it, so such a module falls back to raster. The export dialog has a quality switch: **Best quality** (default; honours module modes) or **Smallest file** (everything raster).
+
+Known costs of vector modules (spike S8), stated in the export dialog's help: the file carries the whole source page's resources (a crop of an illustrated page can add several MB), and text outside the crop stays in the file, invisible but findable by search.
 
 ### 9.2 Output sheet and tiling
-- `sheet: "native"` exports each page at its own size (needs mixed page sizes in one PDF; see spike S5).
+- `sheet: "native"` exports each page at its own size (CSS named pages, spike S5).
+- Every output layout is built in stage 2 from the native-size printed pages, so tiles and scaled sheets stay vector.
 - A fixed sheet (e.g. A4) with a page that is the same size: 1 sheet. Smaller page: placed at actual size or scaled to fit (option). **Larger page: split into a regular grid of tiles, each exactly the sheet size.**
 - Tile count per axis: `max(1, ceil((pageSize − overlap − ε) / (sheetSize − overlap)))` with a tolerance `ε = 0.1 mm`, so floating-point error (e.g. 297.0000001 mm) never adds a near-empty tile. Overlap must be ≥ 0 and smaller than the sheet side; reject otherwise. Edge tiles are padded with blank space so every sheet is the same size. Tile order is reading order. (Tolerance flagged for review; see `docs/open-questions.md`.)
 - Optional labels (row/col, e.g. "B3") and, in M4, crop and registration marks. Overlap default 0 mm, configurable.
@@ -311,10 +326,10 @@ Text in notes stays vector in the PDF. PDF-module regions are raster at the chos
 - Board with pan/zoom; add page from preset; move page.
 - Save/load round-trip with unknown-key preservation; corrupt-file safety.
 - Minimal `note` module (whole note or heading section) and minimal `pdf` module (page + crop), added by command.
-- Basic PDF export of the board at native page size.
+- Basic PDF export of the board at native page size, both stages: Chromium HTML layer plus vector PDF modules placed with `pdf-lib`.
 - Model unit tests (units, geometry, ordering, migration, tiling).
 - Stress-board generator exists.
-- **Acceptance:** one A4 page with a note section and a PDF crop exports to a correct PDF with vector text.
+- **Acceptance:** one A4 page with a note section and a PDF crop exports to a correct PDF; note text and the PDF crop are both vector and selectable.
 
 **M1 — Board editing and modules**
 - Grid, rulers, page resize, snapping; undo/redo.
@@ -354,7 +369,7 @@ Text in notes stays vector in the PDF. PDF-module regions are raster at the chos
 - Licence (MIT recommended since no MCM code is reused).
 - Plugin id: `patchwork` if free in the community list, otherwise `patchwork-boards`.
 - Minimum Obsidian version (take the current sample-plugin default, raise only if an API needs it).
-- Whether `pdf-lib` is bundled (decided by spikes S5 and the vector pass-through research item).
+- ~~Whether `pdf-lib` is bundled~~: decided in v0.4, `@cantoo/pdf-lib` is bundled (spike S8).
 - Default export DPI (200 proposed).
 
 ## 14. Research notes
@@ -373,6 +388,10 @@ Text in notes stays vector in the PDF. PDF-module regions are raster at the chos
   - Saves check for external changes and never silently overwrite them.
   - Raster export canvases are capped at 8192 × 8192 px and verified with a pixel probe.
   - Print pipeline (section 9.1) not yet changed: a two-stage Chromium + `pdf-lib` pipeline is under discussion.
+- **v0.4 · 2026-10-19** (after spike S8)
+  - Export is two-stage: Chromium prints the HTML layer at native page sizes; `@cantoo/pdf-lib` places vector PDF modules, builds sheets and tiles (vector), and adds bookmarks, page labels and metadata. PNG = rasterized final PDF.
+  - New `PdfModule.render: "auto" | "vector" | "raster"` (auto = vector unless something is stacked above) and `ExportDefaults.quality: "best" | "small"` (default best).
+  - `@cantoo/pdf-lib` becomes the one runtime dependency. M0's export includes vector PDF modules.
 - **v0.2 · 2026-10-19**
   - Manual page order moves from `page.index` to `board.pageOrder: string[]`.
   - Dropped `meta.modified` (it would change on every save and cause git/Sync noise).
