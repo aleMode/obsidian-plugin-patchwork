@@ -12,11 +12,11 @@ Questions raised while building, each with the recommended answer we are proceed
 - **Current answer:** tile count per axis is `max(1, ceil((page − overlap − ε) / (sheet − overlap)))` with ε = 0.1 mm, so float error like 297.0000001 mm never adds a near-empty tile. Overlap must be ≥ 0 and < sheet side.
 - **Check at M2:** confirm with unit tests (exact fit, off-by-one, just-over-ε, overlap) **and** a real export that a page exactly N sheets wide gives N tiles, and that a page just over ε larger gets an extra tile. Also confirm that clipping up to 0.1 mm at the edge is invisible in print.
 
-## Open
+## Resolved
 
 ### Q3. Rename `page.label` to `numberLabel`?
 - `page.name`, `page.label` (page-number override) and `module.label` are easy to confuse.
-- **Recommendation:** rename to `numberLabel`. Not yet decided.
+- **Decided (2026-10-19):** renamed to `page.numberLabel` in SPEC v0.2.
 
 ## Recommendations to verify during spikes
 
