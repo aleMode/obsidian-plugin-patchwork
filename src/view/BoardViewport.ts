@@ -6,6 +6,7 @@ import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
+import { snapToGuides } from '../model/guides';
 import { snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
@@ -35,6 +36,8 @@ type Drag =
 	| { kind: 'resize'; target: NonNullable<Selection>; handle: Handle; startPointer: Point; start: Rect };
 
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+/** How close (screen px) an edge must come to another to snap to it. */
+const GUIDE_SNAP_PX = 6;
 /** Smallest page or module a resize can produce, in mm. */
 const MIN_SIZE_MM = 5;
 
@@ -52,6 +55,7 @@ export class BoardViewport implements BoardSurface {
 	private root: HTMLElement;
 	private layer: HTMLElement;
 	private selectionBox: HTMLElement;
+	private guideLayer: HTMLElement;
 	private zoomLabel!: HTMLElement;
 	private pages = new Map<string, PageElement>();
 	private modules: ModuleHost;
@@ -71,6 +75,7 @@ export class BoardViewport implements BoardSurface {
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
 		// Above the pages so handles are never clipped by a page edge.
 		this.selectionBox = this.layer.createDiv({ cls: 'pw-selection' });
+		this.guideLayer = this.layer.createDiv({ cls: 'pw-guides' });
 		for (const h of HANDLES) this.selectionBox.createDiv({ cls: `pw-handle pw-handle-${h}`, attr: { 'data-handle': h } });
 		this.modules = new ModuleHost({
 			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, resolution: () => this.resolution() },
@@ -466,13 +471,49 @@ export class BoardViewport implements BoardSurface {
 		const grid = this.store.file.board.grid;
 		if (d.kind === 'resize') return this.resizeTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
 		const raw = { x: d.startPos.x + p.x - d.startPointer.x, y: d.startPos.y + p.y - d.startPointer.y };
-		// Alt bypasses snapping (SPEC 5.1).
-		const pos = grid.snap && !e.altKey ? snapPoint(raw, grid.size) : raw;
+		const pos = this.snapMove(d, raw, grid, e.altKey);
 		if (d.kind === 'page') this.store.update((f) => movePage(f, d.id, pos.x, pos.y), { coalesce: `move-page:${d.id}` });
 		else {
 			this.store.update((f) => moveModule(f, d.pageId, d.id, pos.x, pos.y), { coalesce: `move-module:${d.id}` });
 			this.highlightDropPage(this.reparentTarget(d));
 		}
+	}
+
+	/**
+	 * Where a dragged page or module lands: smart guides first (edges and centres of its neighbours,
+	 * SPEC 5.6), else the grid. Alt bypasses both (SPEC 5.1). Guide lines are drawn while dragging.
+	 */
+	private snapMove(d: Extract<Drag, { kind: 'page' | 'module' }>, raw: Point, grid: { size: number; snap: boolean }, free: boolean): Point {
+		const file = this.store.file;
+		let size: { w: number; h: number } | undefined;
+		let others: Rect[] = [];
+		let offset = { x: 0, y: 0 };
+		if (d.kind === 'page') {
+			size = file.pages.find((p) => p.id === d.id);
+			others = file.pages.filter((p) => p.id !== d.id);
+		} else {
+			const page = file.pages.find((p) => p.id === d.pageId);
+			size = page?.modules.find((m) => m.id === d.id);
+			if (page) {
+				others = [{ x: 0, y: 0, w: page.w, h: page.h }, ...page.modules.filter((m) => m.id !== d.id)];
+				offset = page;
+			}
+		}
+		if (free || !size) {
+			this.drawGuides([], [], offset);
+			return raw;
+		}
+		const g = snapToGuides({ ...raw, w: size.w, h: size.h }, others, GUIDE_SNAP_PX / (PX_PER_MM * this.camera.zoom));
+		this.drawGuides(g.vertical, g.horizontal, offset);
+		const gridSnap = (v: number) => (grid.snap ? snapValue(v, grid.size) : v);
+		return { x: g.x ?? gridSnap(raw.x), y: g.y ?? gridSnap(raw.y) };
+	}
+
+	/** Guide positions come in page or board coordinates; `offset` moves them onto the board. */
+	private drawGuides(vertical: number[], horizontal: number[], offset: Point) {
+		this.guideLayer.empty();
+		for (const x of vertical) this.guideLayer.createDiv({ cls: 'pw-guide pw-guide-v' }).setCssProps({ '--pw-x': `${offset.x + x}mm` });
+		for (const y of horizontal) this.guideLayer.createDiv({ cls: 'pw-guide pw-guide-h' }).setCssProps({ '--pw-y': `${offset.y + y}mm` });
 	}
 
 	/** The other page a dragged module's centre is over, if any (SPEC 5.2: re-parent on drop). */
@@ -520,6 +561,7 @@ export class BoardViewport implements BoardSurface {
 		if (!this.drag) return;
 		if (this.drag.kind === 'module') this.reparent(this.drag);
 		this.drag = null;
+		this.guideLayer.empty();
 		this.store.endCoalesce();
 		this.root.removeClass('is-dragging');
 		if (this.root.hasPointerCapture(e.pointerId)) this.root.releasePointerCapture(e.pointerId);

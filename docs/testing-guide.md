@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, ~01:00)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 108 checks across 9 suites, all passing; `npm test`: 127 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 109 checks across 9 suites, all passing; `npm test`: 131 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -19,6 +19,10 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - **Ctrl+D** duplicates the selected module (offset 5 mm) or page (placed to the right, modules included). Also in the right-click menu.
 - **Arrow keys** move the selection 1 mm; **Shift+arrow** 10 mm. A burst of presses undoes as one step.
 - Right-click a module → **Lock**: no handles, can't be dragged or nudged. **Unlock** restores.
+
+### 2a. Smart guides (new)
+- Drag a module near another module (or the page's edges / centre): when an edge or centre comes within ~6 px on screen, it snaps and a pink guide line appears. Guides win over the grid; **Alt** places freely.
+- Dragging a page snaps it to other pages' edges and centres the same way.
 
 ### 2b. Move a module to another page (new)
 - Drag a module so its centre is over another page: that page gets a dashed outline, and on release the module moves onto it (same spot on the board, snapped to the grid). One Ctrl+Z undoes the whole move.
@@ -67,7 +71,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 ## Known gaps (not bugs, not built yet)
 
 - No inspector or outline panel yet (positions, sizes and options are set by dragging, the crop editor, or editing the `.patchwork` JSON).
-- No rulers, multi-select, align/distribute or smart guides yet.
+- No rulers, multi-select or align/distribute yet.
 - Page numbers, headers/footers, tiled export, PNG export are M2.
 
 ## If something breaks

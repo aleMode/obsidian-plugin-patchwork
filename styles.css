@@ -368,6 +368,33 @@
 .pw-crop-handle.pw-handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
 .pw-crop-handle.pw-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
 
+.pw-guides {
+	position: absolute;
+	left: 0;
+	top: 0;
+	pointer-events: none;
+	z-index: 11;
+}
+
+.pw-guide {
+	position: absolute;
+	background: var(--color-pink, #e91e63);
+}
+
+.pw-guide-v {
+	left: var(--pw-x);
+	top: -100000mm;
+	width: calc(1px / var(--pw-zoom));
+	height: 200000mm;
+}
+
+.pw-guide-h {
+	top: var(--pw-y);
+	left: -100000mm;
+	height: calc(1px / var(--pw-zoom));
+	width: 200000mm;
+}
+
 .pw-skeletons {
 	position: absolute;
 	inset: 0;

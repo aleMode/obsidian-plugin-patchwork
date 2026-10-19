@@ -83,6 +83,20 @@ try {
 	await sleep(50);
 	const back = await inView("return view.store.file.pages[0].modules.some((m) => m.id === 'mover');");
 	check('one undo returns it to the original page', back);
+
+	// Smart guides: dragging near another module's left edge snaps to it (off-grid on purpose).
+	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: [
+		{ id: 'anchor', type: 'text', markdown: 'anchor', x: 33, y: 20, w: 40, h: 20 },
+		{ id: 'g', type: 'text', markdown: 'guided', x: 80, y: 120, w: 40, h: 20 },
+	] }, f.pages[1]] })); s.zoomToFit(); await new Promise((r) => setTimeout(r, 300));`);
+	const z3 = await inView('return s.camera.zoom;');
+	const k3 = (96 / 25.4) * z3;
+	const g = await rectOf('.pw-module[data-module-id="g"]');
+	const gFrom = { x: g.x + 10, y: g.y + 10 };
+	await cdp.drag(gFrom, { x: gFrom.x - 46 * k3, y: gFrom.y + 0.2 * k3 }, { steps: 10 });
+	await sleep(100);
+	const gm = await inView("return view.store.file.pages[0].modules.find((m) => m.id === 'g');");
+	check('smart guide snaps to a neighbour edge (off the grid)', gm.x === 33, gm);
 } catch (e) {
 	check('no exception', false, String(e.stack ?? e));
 } finally {
