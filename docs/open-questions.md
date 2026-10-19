@@ -31,10 +31,12 @@ Questions raised while building, each with the recommended answer we are proceed
 - **Recommendation:** lay out page content in real CSS mm (and note text in pt), zoom with a CSS transform. Screen and print then share one layout.
 
 ### Q7. Transitive embed dependencies
+- **Decided in SPEC v0.3** (section 7).
 - If note A embeds note B and a module shows A, editing B must refresh the module.
 - **Recommendation (updated by S2):** `MarkdownRenderer` expands embeds itself, so build each module's dependency set from `metadataCache.getFileCache(file).embeds`, recursively with a visited set, and re-render when any file in the set changes.
 
 ### Q8. Saves vs. external changes and rename rewrites
+- **Save conflict check decided in SPEC v0.3** (section 6). Rename rewrites through the open view's store are still open.
 - **S6 found data loss:** an external change (Sync, git) arriving while our debounced save is pending gets overwritten silently.
 - **Recommendation:** remember the last loaded/saved text; before writing, compare with disk. If different: reload when we have no unsaved changes, otherwise show a conflict notice (keep ours / take theirs / save ours as a copy). Clear undo history when the model is reloaded from disk.
 - Rename rewrites: if the board is open, apply through its store (undoable); use `vault.process` only for closed files.

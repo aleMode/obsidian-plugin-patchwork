@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.2 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.3 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -109,6 +109,7 @@ PDF module rules:
 
 ### 5.5 Theming
 - Export and on-screen "paper" always use a **light scope** by default (CSS variable overrides) so dark-mode vaults do not produce white-on-white pages. Board setting `useAppTheme` opts out.
+- Mechanism (spike S1): a nested `.theme-light` alone does nothing, because Obsidian declares its derived variables (`--background-primary`, `--text-normal`, …) on `body`, where they resolve once against the app theme. At runtime we copy every custom property declared on `body` into a `.pw-paper { … }` rule, and paper elements get `pw-paper theme-light`, so the variables resolve against the light base colours. Rebuild that rule on `css-change` (theme or snippet changes).
 - Board-level font override optional. Per-module font scale.
 
 ### 5.6 Editing interactions
@@ -213,6 +214,7 @@ Rules:
 - **Round-trip safety:** preserve unknown keys at every level. Never drop data you do not understand.
 - **Migration:** `version` is checked on load; `migrate.ts` upgrades step by step. A file with a newer version than the plugin opens read-only with a warning.
 - **Corrupt file:** if parsing fails, show an error view with the raw text and a copy button. Never overwrite the file.
+- **External changes:** never silently overwrite a change made outside the view (Sync, git, another editor). Remember the text last loaded or saved; before writing, compare it with the file on disk. If they differ: reload from disk when there are no unsaved changes, otherwise show a conflict notice (keep mine / take theirs / save mine as a copy). Reloading from disk clears the undo history. (Spike S6 showed the default `TextFileView` debounced save does overwrite.)
 - **IDs:** short random strings, unique within the file.
 - **Paths:** vault-relative. On vault `rename`, rewrite references in every `.patchwork` file (use `vault.process` for atomic edits). On `delete`, keep the reference and mark the module missing.
 
@@ -241,11 +243,11 @@ tests/                     Vitest
 
 Layers: `model` knows nothing about Obsidian or the DOM. `store` mutates the model through commands. `view` renders the store. `sources` and `render` supply content to modules. `export` builds an offscreen print host from the same model.
 
-File I/O: `PatchworkView extends TextFileView`. `setViewData` parses and migrates; `getViewData` serializes; saves go through `requestSave()` (debounced). Register extension `patchwork` so it shows in the file explorer. Add commands: "Patchwork: New board", "Patchwork: Add page", "Patchwork: Export…".
+File I/O: `PatchworkView extends TextFileView`. `setViewData` parses and migrates; `getViewData` serializes; saves go through `requestSave()` (debounced, ~2 s) wrapped by the external-change check in section 6. Register extension `patchwork` so it shows in the file explorer. Add commands: "Patchwork: New board", "Patchwork: Add page", "Patchwork: Export…".
 
-Rendering notes via `MarkdownRenderer.render(app, markdown, el, sourcePath, component)` with a per-module child `Component` for cleanup. This API historically does not render link embeds (`![[…]]`); see spike S2. Fallback: pre-expand embeds ourselves with cycle detection and a depth limit of 3.
+Rendering notes via `MarkdownRenderer.render(app, markdown, el, sourcePath, component)` with a per-module child `Component` for cleanup. Spike S2 showed it renders note, section, block and image embeds natively (and stops embed cycles itself), so we do **not** expand embeds ourselves. Render into an attached, offscreen container so async content (embeds, Dataview) settles.
 
-Live updates: listen to `vault.on('modify')`, debounce, and re-render only modules that reference the changed file. For PDFs, invalidate the cached document and bitmaps.
+Live updates: listen to `vault.on('modify')`, debounce, and re-render only modules whose **dependency set** contains the changed file. A note module's dependency set is its source file plus everything it embeds, transitively, built from `metadataCache.getFileCache(file).embeds` with a visited set. For PDFs, invalidate the cached document and bitmaps.
 
 ## 8. Rendering and performance
 
@@ -262,7 +264,7 @@ Strategies:
 5. **Render scheduler:** priority queue (visible and selected first), limited concurrency, cancel on viewport change.
 6. **Note modules:** render once and keep DOM while visible; unmount when culled. Use `content-visibility: auto` where safe.
 7. **Debounce** vault events and save requests. Coalesce drag/resize into single undo steps.
-8. **Export memory control:** process one output sheet at a time, release canvases between sheets, tile rasters so no single canvas exceeds a safe size (browsers cap canvas dimensions and area; determine the safe cap in spike S4).
+8. **Export memory control:** process one output sheet at a time, release canvases between sheets, tile rasters so no single canvas exceeds **8192 × 8192 px**. Spike S4 measured Chromium's hard limits (area ≤ 16384² px, side ≤ 65535 px) and found that exceeding them fails **silently** (blank pixels, no error), so every allocated export canvas is verified by drawing and reading back one pixel, and export fails loudly if the probe fails.
 9. **Stress tooling:** command "Patchwork: Generate stress board" creates N pages × M modules from vault files, for manual profiling and an automated smoke test of the model layer.
 
 ## 9. Export
@@ -358,13 +360,19 @@ Text in notes stays vector in the PDF. PDF-module regions are raster at the chos
 ## 14. Research notes
 
 - Obsidian exposes `loadPdfJs()` returning the bundled PDF.js; other plugins render PDF pages to canvas and read PDF outlines with it. PDF++ also uses `pdf-lib`.
-- `MarkdownRenderer.render(app, markdown, el, sourcePath, component)` is the current render API. Link embeds historically needed workarounds (forum thread 24617).
+- `MarkdownRenderer.render(app, markdown, el, sourcePath, component)` is the current render API. Link embeds historically needed workarounds (forum thread 24617); as of Obsidian 1.14.4 they render natively (spike S2).
 - Print: existing plugins print a live DOM through Chromium (`printToPDF`, `preferCSSPageSize`) or use the system print dialog with exact slide geometry. An attempt to integrate Paged.js in Obsidian ended in blank pages, and Obsidian's native print preview can be blank in some runtimes. Hence fixed-size sheets, no pagination engine.
 - JSON Canvas 1.0: nodes are text/file/link/group with integer pixel coordinates; file nodes have an optional `subpath` (heading/block); group containment is implied by geometry.
 - PDF page size limit is 14,400 units (200 in / 5080 mm) per side unless `UserUnit` (PDF 1.6) is used, which not all viewers support.
 
 ## Changelog
 
+- **v0.3 · 2026-10-19** (after spikes S1–S7, see `docs/spike-results.md`)
+  - Embeds are rendered by `MarkdownRenderer` natively; dropped our own embed expansion. Live updates use a transitive dependency set built from `metadataCache` embeds.
+  - Documented the light paper scope mechanism (re-declare `body` variables under `.pw-paper.theme-light`).
+  - Saves check for external changes and never silently overwrite them.
+  - Raster export canvases are capped at 8192 × 8192 px and verified with a pixel probe.
+  - Print pipeline (section 9.1) not yet changed: a two-stage Chromium + `pdf-lib` pipeline is under discussion.
 - **v0.2 · 2026-10-19**
   - Manual page order moves from `page.index` to `board.pageOrder: string[]`.
   - Dropped `meta.modified` (it would change on every save and cause git/Sync noise).
