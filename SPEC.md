@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.1 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.2 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -91,18 +91,21 @@ Common: position/size (mm, relative to page), `z`, `locked`, `label`, `style` (p
 Note module rules:
 - `subpath` forms: `#Heading`, `#Parent#Child`, `#^blockid`. Heading section = from the heading line to the line before the next heading of equal or higher level.
 - Frontmatter is stripped by default. `includeHeading` toggles the heading line itself.
-- Overflow policy: `clip`, `fit` (uniform shrink down to a configurable minimum scale, then clip), or `grow` (module height follows content). In edit mode an overflow indicator is always shown; it never appears in exports.
+- `lines` is relative to the `subpath` section when one is set, otherwise to the whole note. (Provisional; see `docs/open-questions.md`.)
+- Overflow policy: `clip`, `fit` (uniform shrink down to a configurable minimum scale, then clip), or `grow` (module height follows content). The grown height is computed at render time and never written to the file; the stored `h` is left untouched, so opening a board never modifies it. In edit mode an overflow indicator is always shown; it never appears in exports.
 - Missing file or section: placeholder with a "pick another" action. Never silently blank.
 
 PDF module rules:
 - Crop is stored as normalized `[x0, y0, x1, y1]` (0–1, top-left origin) of the PDF page so it survives zoom and DPI changes.
+- Crop is applied first, on the page as normally displayed (the PDF's own page rotation already applied). The module's `rotation` then rotates the cropped result.
 - A crop editor lets the user drag a rectangle over the PDF page preview.
 - `fit`: `contain` (default), `cover`, or `stretch`.
 
 ### 5.4 Page order and numbering
-- Default order is reading order (rows top to bottom by y-band, then left to right). Manual override via `page.index`. Auto-arrange can rewrite positions.
+- Default order is reading order (rows top to bottom by y-band, then left to right). Manual override via `board.pageOrder` (a list of page IDs, used when `order` is `"manual"`). Pages missing from the list follow in reading order; IDs with no matching page are ignored and removed on save. Auto-arrange can rewrite positions.
 - Board-level numbering: enabled, start offset, format (`arabic`, `roman`, `alpha`), position (6 presets), skip-first-page. Per-page override: custom label or hidden.
 - Header/footer text per page and board default, with tokens `{page}`, `{pages}`, `{title}`, `{date}`.
+- `{page}` and `{pages}` count **board pages**, not output sheets. A page split into tiles keeps one page number; individual tiles are identified by their row/col label (section 9.2).
 
 ### 5.5 Theming
 - Export and on-screen "paper" always use a **light scope** by default (CSS variable overrides) so dark-mode vaults do not produce white-on-white pages. Board setting `useAppTheme` opts out.
@@ -124,7 +127,7 @@ export const SCHEMA_VERSION = 1;
 export interface PatchworkFile {
   version: number;                       // SCHEMA_VERSION
   unit: "mm";                            // storage unit, always mm
-  meta?: { title?: string; created?: string; modified?: string };
+  meta?: { title?: string; created?: string };   // no `modified`: it would churn every save
   board: BoardSettings;
   pages: Page[];
   masters?: Master[];                    // M4
@@ -136,6 +139,7 @@ export interface BoardSettings {
   grid: { size: number; snap: boolean; visible: boolean };      // mm, default 5
   displayUnit: "mm" | "cm" | "in";
   order: "reading" | "manual";
+  pageOrder?: string[];                  // page IDs; used when order = "manual"
   numbering: {
     enabled: boolean; start: number;
     format: "arabic" | "roman" | "alpha";
@@ -155,7 +159,6 @@ export interface Page {
   id: string;
   name?: string;
   x: number; y: number; w: number; h: number;   // mm on the board
-  index?: number;                                // manual order
   safeArea?: Insets;
   background?: string;
   label?: string | false;                        // page-number override
@@ -182,7 +185,7 @@ export interface PdfModule extends BaseModule {
 export interface NoteModule extends BaseModule {
   type: "note"; file: string;
   subpath?: string;                              // "#Heading" | "#^block"
-  lines?: [number, number];
+  lines?: [number, number];                      // relative to the subpath section if set
   includeHeading?: boolean;
   overflow?: "clip" | "fit" | "grow";
   scale?: number;
@@ -275,7 +278,7 @@ Text in notes stays vector in the PDF. PDF-module regions are raster at the chos
 ### 9.2 Output sheet and tiling
 - `sheet: "native"` exports each page at its own size (needs mixed page sizes in one PDF; see spike S5).
 - A fixed sheet (e.g. A4) with a page that is the same size: 1 sheet. Smaller page: placed at actual size or scaled to fit (option). **Larger page: split into a regular grid of tiles, each exactly the sheet size.**
-- Tile count per axis: `ceil((pageSize − overlap) / (sheetSize − overlap))`. Edge tiles are padded with blank space so every sheet is the same size. Tile order is reading order.
+- Tile count per axis: `max(1, ceil((pageSize − overlap − ε) / (sheetSize − overlap)))` with a tolerance `ε = 0.1 mm`, so floating-point error (e.g. 297.0000001 mm) never adds a near-empty tile. Overlap must be ≥ 0 and smaller than the sheet side; reject otherwise. Edge tiles are padded with blank space so every sheet is the same size. Tile order is reading order. (Tolerance flagged for review; see `docs/open-questions.md`.)
 - Optional labels (row/col, e.g. "B3") and, in M4, crop and registration marks. Overlap default 0 mm, configurable.
 - `tiling.ts` is a pure function with thorough unit tests (exact fit, off-by-one, overlap, page smaller than sheet, rotation choice).
 - Guardrails: a native page larger than 5080 mm per side cannot be a single PDF page; force tiling or show an error. Do not rely on PDF UserUnit in v1.
@@ -299,17 +302,21 @@ Text in notes stays vector in the PDF. PDF-module regions are raster at the chos
 
 ## 11. Milestones and acceptance criteria
 
-**M0 — Foundations**
+**M0 — Foundations and vertical slice** (thin end-to-end path first, to prove the riskiest parts early)
 - Repo from sample template, esbuild, Vitest, lint, test vault, dev loop documented.
 - Spikes S1–S7 done and written up.
 - `.patchwork` file registered; "New board" command; view opens.
-- Board with pan/zoom, grid, rulers; add page from preset; move/resize page with snap.
-- Save/load round-trip with unknown-key preservation; corrupt-file safety; undo/redo for page operations.
-- Model unit tests (units, geometry, snapping, ordering, migration).
+- Board with pan/zoom; add page from preset; move page.
+- Save/load round-trip with unknown-key preservation; corrupt-file safety.
+- Minimal `note` module (whole note or heading section) and minimal `pdf` module (page + crop), added by command.
+- Basic PDF export of the board at native page size.
+- Model unit tests (units, geometry, ordering, migration, tiling).
 - Stress-board generator exists.
+- **Acceptance:** one A4 page with a note section and a PDF crop exports to a correct PDF with vector text.
 
-**M1 — Modules**
-- `note` and `pdf` modules, plus `text` and `image`; add by drag from file explorer and by command.
+**M1 — Board editing and modules**
+- Grid, rulers, page resize, snapping; undo/redo.
+- `note` and `pdf` modules complete, plus `text` and `image`; add by drag from file explorer and by command.
 - Crop editor for PDF modules; heading/block/line-range picker for notes; overflow policies.
 - Inspector, outline panel, multi-select, align/distribute, duplicate, lock, z-order, smart guides.
 - Link tracking: rename updates references; delete shows placeholders; modify refreshes modules.
@@ -355,3 +362,16 @@ Text in notes stays vector in the PDF. PDF-module regions are raster at the chos
 - Print: existing plugins print a live DOM through Chromium (`printToPDF`, `preferCSSPageSize`) or use the system print dialog with exact slide geometry. An attempt to integrate Paged.js in Obsidian ended in blank pages, and Obsidian's native print preview can be blank in some runtimes. Hence fixed-size sheets, no pagination engine.
 - JSON Canvas 1.0: nodes are text/file/link/group with integer pixel coordinates; file nodes have an optional `subpath` (heading/block); group containment is implied by geometry.
 - PDF page size limit is 14,400 units (200 in / 5080 mm) per side unless `UserUnit` (PDF 1.6) is used, which not all viewers support.
+
+## Changelog
+
+- **v0.2 · 2026-10-19**
+  - Manual page order moves from `page.index` to `board.pageOrder: string[]`.
+  - Dropped `meta.modified` (it would change on every save and cause git/Sync noise).
+  - `overflow: "grow"` height is computed at render time and never persisted.
+  - PDF crop is applied before module `rotation`, on the page as displayed.
+  - Note `lines` is relative to the `subpath` section when set (provisional).
+  - Tiling uses a 0.1 mm tolerance and rejects overlap ≥ sheet size (flagged for review).
+  - `{page}`/`{pages}` count board pages, not output sheets.
+  - M0 reordered into a vertical slice (note + PDF crop + basic PDF export); grid, rulers, snapping and undo/redo move to M1.
+  - `z` is kept as specified.
