@@ -66,3 +66,17 @@ describe('BoardStore', () => {
 		expect(store.file.pages[0]).toBe(before);
 	});
 });
+
+describe('module ops', () => {
+	it('restack puts a module on top even when others use z', async () => {
+		const { restack } = await import('../../src/store/pageOps');
+		const { file, page } = addPage(newBoardFile(), A4);
+		const mod = (id: string, z?: number) => ({ id, type: 'text', x: 0, y: 0, w: 1, h: 1, markdown: '', ...(z === undefined ? {} : { z }) });
+		const withMods = { ...file, pages: [{ ...page, modules: [mod('a', 5), mod('b'), mod('c', 2)] }] };
+		const top = restack(withMods, page.id, 'b', 'front').pages[0]!.modules;
+		expect(top.map((m) => m.id)).toEqual(['a', 'c', 'b']);
+		expect(top[2]!.z).toBe(5);
+		const bottom = restack(withMods, page.id, 'a', 'back').pages[0]!.modules;
+		expect(bottom.map((m) => [m.id, m.z ?? 0])).toEqual([['a', 0], ['b', 0], ['c', 2]]);
+	});
+});

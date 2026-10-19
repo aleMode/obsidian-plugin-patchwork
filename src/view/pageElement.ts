@@ -20,17 +20,13 @@ export class PageElement {
 		const prev = this.page;
 		this.page = page;
 		this.el.dataset.pageId = page.id;
-		if (!prev || prev.x !== page.x || prev.y !== page.y) {
-			this.el.style.left = `${page.x}mm`;
-			this.el.style.top = `${page.y}mm`;
-		}
-		if (!prev || prev.w !== page.w || prev.h !== page.h) {
-			this.el.style.width = `${page.w}mm`;
-			this.el.style.height = `${page.h}mm`;
+		if (!prev || prev.x !== page.x || prev.y !== page.y || prev.w !== page.w || prev.h !== page.h) {
+			this.el.setCssProps({ '--pw-x': `${page.x}mm`, '--pw-y': `${page.y}mm`, '--pw-w': `${page.w}mm`, '--pw-h': `${page.h}mm` });
 		}
 		this.paper.toggleClass('pw-paper', !opts.appTheme);
 		this.paper.toggleClass('theme-light', !opts.appTheme);
-		this.paper.style.background = page.background ?? '';
+		this.paper.toggleClass('has-background', !!page.background);
+		this.paper.setCssProps({ '--pw-page-bg': page.background ?? '' });
 		this.el.toggleClass('is-selected', opts.selected);
 		this.label.setText(`${page.name ?? 'Untitled page'} · ${formatLength(page.w, opts.unit)} × ${formatLength(page.h, opts.unit)}`);
 	}

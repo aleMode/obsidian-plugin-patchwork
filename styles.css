@@ -67,12 +67,17 @@
 	top: 0;
 	width: 0;
 	height: 0;
+	transform: translate(var(--pw-tx, 0), var(--pw-ty, 0)) scale(var(--pw-zoom));
 	transform-origin: 0 0;
 	will-change: transform;
 }
 
 .pw-page {
 	position: absolute;
+	left: var(--pw-x);
+	top: var(--pw-y);
+	width: var(--pw-w);
+	height: var(--pw-h);
 	cursor: move;
 }
 
@@ -83,6 +88,10 @@
 	background-color: #fff;
 	box-shadow: 0 calc(2px / var(--pw-zoom)) calc(10px / var(--pw-zoom)) rgba(0, 0, 0, 0.35);
 	font-size: 10pt;
+}
+
+.pw-page-paper.has-background {
+	background: var(--pw-page-bg);
 }
 
 .pw-page.is-selected .pw-page-paper {
@@ -133,6 +142,108 @@
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
+}
+
+/* ---------- modules ---------- */
+
+.pw-module {
+	position: absolute;
+	left: var(--pw-x);
+	top: var(--pw-y);
+	width: var(--pw-w);
+	height: var(--pw-h);
+	z-index: var(--pw-z);
+	overflow: hidden;
+	cursor: move;
+}
+
+.pw-module.is-locked {
+	cursor: default;
+}
+
+/* Selection outline drawn inside so it isn't clipped by the page. */
+.pw-module.is-selected::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	outline: calc(2px / var(--pw-zoom)) solid var(--interactive-accent);
+	outline-offset: calc(-2px / var(--pw-zoom));
+	pointer-events: none;
+}
+
+.pw-module-body {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	/* While editing, content is not interactive: clicks select and drag the module. */
+	pointer-events: none;
+	user-select: none;
+}
+
+.pw-markdown {
+	font-size: inherit;
+	line-height: 1.4;
+}
+
+.pw-markdown > :first-child {
+	margin-top: 0;
+}
+
+.pw-pdf-canvas {
+	position: absolute;
+	left: var(--pw-x);
+	top: var(--pw-y);
+	width: var(--pw-w);
+	height: var(--pw-h);
+	transform: rotate(var(--pw-rotate, 0deg));
+	transform-origin: center;
+}
+
+.pw-image {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+.pw-image.pw-fit-contain {
+	object-fit: contain;
+}
+
+.pw-image.pw-fit-cover {
+	object-fit: cover;
+}
+
+.pw-image.pw-fit-stretch {
+	object-fit: fill;
+}
+
+.pw-suggest-section {
+	padding-left: calc(var(--pw-indent, 0) * 1.2em);
+}
+
+.pw-module-placeholder {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 3mm;
+	text-align: center;
+	font-size: 9pt;
+	color: #7a5c00;
+	background: repeating-linear-gradient(45deg, #fff8e1, #fff8e1 3mm, #fdf0c4 3mm, #fdf0c4 6mm);
+	border: 0.3mm dashed #c9a227;
+}
+
+.pw-module-placeholder.is-info {
+	color: #555;
+	background: #f2f2f2;
+	border-color: #aaa;
+}
+
+.pw-suggest-detail {
+	color: var(--text-faint);
+	margin-left: var(--size-4-2);
 }
 
 /* ---------- error view ---------- */

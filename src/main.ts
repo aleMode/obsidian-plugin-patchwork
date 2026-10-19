@@ -2,13 +2,18 @@ import { Notice, Plugin, TFile, TFolder } from 'obsidian';
 import { newBoardFile } from './model/defaults';
 import { presetById } from './model/presets';
 import { serializeBoard } from './model/serialize';
-import { BoardViewport, createBoardViewport } from './view/BoardViewport';
+import { PdfDocCache } from './sources/pdfSource';
+import { BoardViewport } from './view/BoardViewport';
 import { refreshPaperScope, removePaperScope } from './view/paperScope';
 import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from './view/PatchworkView';
 
 export default class PatchworkPlugin extends Plugin {
+	pdfDocs!: PdfDocCache;
+
 	async onload() {
-		this.registerView(VIEW_TYPE_BOARD, (leaf) => new PatchworkView(leaf, createBoardViewport));
+		this.pdfDocs = new PdfDocCache(this.app);
+		const services = { pdfDocs: this.pdfDocs };
+		this.registerView(VIEW_TYPE_BOARD, (leaf) => new PatchworkView(leaf, (el, store, view) => new BoardViewport(el, store, view, services)));
 		this.registerExtensions([BOARD_EXTENSION], VIEW_TYPE_BOARD);
 
 		refreshPaperScope();
@@ -20,6 +25,8 @@ export default class PatchworkPlugin extends Plugin {
 			callback: () => void this.createBoard(this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? '')),
 		});
 		this.addBoardCommand('add-page', 'Add page', (v) => v.showAddPageMenu(), true);
+		this.addBoardCommand('add-note', 'Add note to page', (v) => v.pickNote(), true);
+		this.addBoardCommand('add-pdf', 'Add PDF to page', (v) => v.pickPdf(), true);
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
 
 		this.registerEvent(
@@ -37,6 +44,7 @@ export default class PatchworkPlugin extends Plugin {
 
 	onunload() {
 		removePaperScope();
+		this.pdfDocs.destroyAll();
 	}
 
 	/** A command that only shows up while a board is the active view. */

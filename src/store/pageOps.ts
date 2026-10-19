@@ -32,3 +32,52 @@ export function removePage(file: PatchworkFile, id: string): PatchworkFile {
 export function addModule(file: PatchworkFile, pageId: string, module: AnyModule): PatchworkFile {
 	return mapPage(file, pageId, (p) => ({ ...p, modules: [...p.modules, module] }));
 }
+
+export function mapModule(file: PatchworkFile, pageId: string, moduleId: string, fn: (m: AnyModule) => AnyModule): PatchworkFile {
+	return mapPage(file, pageId, (p) => {
+		let changed = false;
+		const modules = p.modules.map((m) => {
+			if (m.id !== moduleId) return m;
+			const next = fn(m);
+			changed ||= next !== m;
+			return next;
+		});
+		return changed ? { ...p, modules } : p;
+	});
+}
+
+export function moveModule(file: PatchworkFile, pageId: string, moduleId: string, x: number, y: number): PatchworkFile {
+	return mapModule(file, pageId, moduleId, (m) => (m.x === x && m.y === y ? m : { ...m, x, y }));
+}
+
+export function removeModule(file: PatchworkFile, pageId: string, moduleId: string): PatchworkFile {
+	return mapPage(file, pageId, (p) => {
+		const modules = p.modules.filter((m) => m.id !== moduleId);
+		return modules.length === p.modules.length ? p : { ...p, modules };
+	});
+}
+
+/**
+ * Move a module to the top or bottom of the page's draw order. Order is by `z`, then array order
+ * (SPEC 6), so the module also takes the extreme `z` when other modules use one.
+ */
+export function restack(file: PatchworkFile, pageId: string, moduleId: string, to: 'front' | 'back'): PatchworkFile {
+	return mapPage(file, pageId, (p) => {
+		const m = p.modules.find((x) => x.id === moduleId);
+		if (!m) return p;
+		const rest = p.modules.filter((x) => x !== m);
+		const zs = rest.map((x) => x.z ?? 0);
+		const z = to === 'front' ? Math.max(0, ...zs) : Math.min(0, ...zs);
+		const moved = (m.z ?? 0) === z ? m : { ...m, z };
+		return { ...p, modules: to === 'front' ? [...rest, moved] : [moved, ...rest] };
+	});
+}
+
+/** Where a new module goes: inside a 10 mm margin, cascading so new modules don't hide each other. */
+export function defaultModuleRect(page: Page, size?: { w: number; h: number }): { x: number; y: number; w: number; h: number } {
+	const margin = 10;
+	const offset = (page.modules.length % 8) * 10;
+	const w = Math.min(size?.w ?? page.w - 2 * margin, page.w - 2 * margin - offset);
+	const h = Math.min(size?.h ?? page.h - 2 * margin, page.h - 2 * margin - offset);
+	return { x: margin + offset, y: margin + offset, w: Math.max(10, w), h: Math.max(10, h) };
+}
