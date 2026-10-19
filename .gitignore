@@ -10,8 +10,13 @@ data.json
 test-vault/.obsidian/*
 !test-vault/.obsidian/app.json
 !test-vault/.obsidian/community-plugins.json
+# private test material (e.g. real rulebooks for perf checks); never committed
+test-vault/_private/
 
 # editors / OS
 .vscode/
 .idea/
 .DS_Store
+
+# local Obsidian profile used for automated spike runs
+.dev/

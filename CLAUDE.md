@@ -11,6 +11,9 @@ Patchwork is an Obsidian **desktop-only** plugin that composes boards of fixed-s
   - `npm test` — Vitest
   - `npm run lint`
   - `npm run fixtures` — regenerate the test vault's sample PDF and image (`scripts/makeFixtures.mjs`)
+  - `npm run spikes:build` — build the throwaway spike plugin (`spikes/`) into the test vault
+  - `scripts/launchObsidian.sh` — start Obsidian on `./test-vault` with an isolated profile and remote debugging on port 9222
+  - `node scripts/cdp.mjs '<js>'` — evaluate JS in that Obsidian (`--shot file.png` for a screenshot). Use this to verify features in the real app.
 - Node comes from Homebrew (`/home/linuxbrew/.linuxbrew/bin`). Obsidian is the Flatpak `md.obsidian.Obsidian`.
 - Test vault: `./test-vault` (committed fixtures only; no personal notes).
 

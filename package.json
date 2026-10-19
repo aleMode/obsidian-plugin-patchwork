@@ -11,6 +11,7 @@
 		"test:watch": "vitest",
 		"lint": "eslint .",
 		"fixtures": "node scripts/makeFixtures.mjs",
+		"spikes:build": "tsc -p spikes -noEmit && node spikes/esbuild.config.mjs",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
 	"keywords": [
