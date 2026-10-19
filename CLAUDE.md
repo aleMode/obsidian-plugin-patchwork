@@ -10,6 +10,8 @@ Patchwork is an Obsidian **desktop-only** plugin that composes boards of fixed-s
   - `npm run build` — production build
   - `npm test` — Vitest
   - `npm run lint`
+  - `npm run fixtures` — regenerate the test vault's sample PDF and image (`scripts/makeFixtures.mjs`)
+- Node comes from Homebrew (`/home/linuxbrew/.linuxbrew/bin`). Obsidian is the Flatpak `md.obsidian.Obsidian`.
 - Test vault: `./test-vault` (committed fixtures only; no personal notes).
 
 ## Hard rules

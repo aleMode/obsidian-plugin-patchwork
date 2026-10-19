@@ -1,0 +1,9 @@
+{
+	"id": "patchwork",
+	"name": "Patchwork",
+	"version": "0.0.1",
+	"minAppVersion": "1.0.0",
+	"description": "Compose boards of fixed-size pages from live references to notes and PDF regions, and export them to PDF or PNG.",
+	"author": "aleMode",
+	"isDesktopOnly": true
+}
