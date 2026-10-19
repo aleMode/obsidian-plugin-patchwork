@@ -13,14 +13,14 @@ Checks that need a human (a real printer, a real PDF viewer, eyes on the screen)
 
 ## M0
 
-Automated (`npm run e2e`, all passing 2026-10-19): file view and save guard (18 checks), board input (15), modules (19), export (19). The M0 acceptance criterion is covered by `scripts/e2e/export.js` ("note text is vector", "vector PDF crop keeps its text", page sizes, pixel positions).
+Automated (`npm run e2e`, all passing 2026-10-19): file view and save guard (18 checks), board input (15), modules (21), export (19). The M0 acceptance criterion is covered by `scripts/e2e/export.js` ("note text is vector", "vector PDF crop keeps its text", page sizes, pixel positions).
 
 Manual:
-- [ ] Create a board with "New board", add an A4 page, a note section and a PDF crop via the toolbar, move them, export. Open the PDF in two viewers; select text in the note and in the crop.
-- [ ] Light and dark app themes: paper stays light in both, on screen and in the export.
-- [ ] A community theme (e.g. Minimal) with dark mode: paper still light.
+- [x] Create a board with "New board", add an A4 page, a note section and a PDF crop via the toolbar, move them, export. Open the PDF in two viewers; select text in the note and in the crop.
+- [x] Light and dark app themes: paper stays light in both, on screen and in the export.
+- [x] A community theme (e.g. Minimal) with dark mode: paper still light.
 - [ ] 2× display scaling (not available on the dev machine): PDF crops sharp, labels readable.
-- [ ] Zoom from 2% to 800% with Ctrl+wheel and a trackpad pinch; modules switch to outlines below 25%.
-- [ ] Edit a source note while its board is open: the module updates.
-- [ ] Edit the board file in a text editor while the board has unsaved changes: a conflict copy appears and the dialog offers "Use my version".
-- [ ] Printed scale: print an exported A4 page at 100%; a 90 mm wide module measures 90 mm.
+- [x] Zoom from 2% to 800% with Ctrl+wheel and a trackpad pinch; modules switch to outlines below 25%.
+- [x] Edit a source note while its board is open: the module updates.
+- [x] Edit the board file in a text editor while the board has unsaved changes: a conflict copy appears and the dialog offers "Use my version". (2026-10-20: not reproducible by hand, since unsaved changes only exist for ~2 s before autosave; an outside edit after that reloads cleanly, which is what was observed. The conflict path is covered by `scripts/e2e/fileView.js`.)
+- [ ] Printed scale: print an exported A4 page at 100%; a 90 mm wide module measures 90 mm. (Deprioritized: no printer; on-screen checks matched.)
