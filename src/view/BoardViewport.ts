@@ -22,6 +22,7 @@ import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import { ContextBar } from './ContextBar';
 import { canEditInline, editInline as startInlineEdit } from './InlineEdit';
+import { OutlinePanel } from './OutlinePanel';
 import { PropertiesPopover } from './PropertiesPopover';
 import type { PropertiesSection } from './PropertiesForm';
 import type { BitmapCache } from '../render/bitmapCache';
@@ -132,6 +133,7 @@ export class BoardViewport implements BoardSurface {
 	private cleanups: (() => void)[] = [];
 	private contextBar!: ContextBar;
 	private popover!: PropertiesPopover;
+	private outlinePanel!: OutlinePanel;
 	private host: HTMLElement;
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
@@ -170,7 +172,9 @@ export class BoardViewport implements BoardSurface {
 		this.buildToolbar(container);
 		this.contextBar = new ContextBar(this, container, ALIGN_ACTIONS);
 		this.popover = new PropertiesPopover(this, container, view.app);
-		this.cleanups.push(() => this.contextBar.destroy(), () => this.popover.destroy());
+		this.outlinePanel = new OutlinePanel(this, container, view.app, rememberOutline);
+		if (outlinePreferred()) this.outlinePanel.open();
+		this.cleanups.push(() => this.contextBar.destroy(), () => this.popover.destroy(), () => this.outlinePanel.destroy());
 		this.cleanups.push(store.subscribe(() => this.render()));
 		this.bindInput();
 		const dup = view.scope?.register(['Mod'], 'd', () => {
@@ -245,6 +249,7 @@ export class BoardViewport implements BoardSurface {
 		this.modules.sync();
 		this.contextBar.refresh();
 		this.popover.refresh();
+		this.outlinePanel.refresh();
 	}
 
 	/** The selection's rect on the board (mm), and whether it can be resized. */
@@ -329,6 +334,19 @@ export class BoardViewport implements BoardSurface {
 
 	contextBarRect(): { x: number; y: number; w: number; h: number } | null {
 		return this.contextBar.rect;
+	}
+
+	/** True while an item, page or handle is being dragged. */
+	get isDragging(): boolean {
+		return this.drag !== null;
+	}
+
+	toggleOutline() {
+		this.outlinePanel.toggle();
+	}
+
+	get outlineOpen(): boolean {
+		return this.outlinePanel.isOpen;
 	}
 
 	get propertiesOpen(): boolean {
@@ -836,6 +854,7 @@ export class BoardViewport implements BoardSurface {
 			this.zoomToFit();
 		}
 		this.fitToolbar();
+		this.outlinePanel?.place();
 		// The ruler canvases are sized in code, not CSS: without a redraw they are stretched (and blur) until the next pan.
 		this.renderRulers();
 		this.updateVisibility();
@@ -1358,6 +1377,7 @@ export class BoardViewport implements BoardSurface {
 		this.store.endCoalesce();
 		this.root.removeClass('is-dragging');
 		this.contextBar.reposition();
+		this.outlinePanel.refresh();
 		if (this.root.hasPointerCapture(e.pointerId)) this.root.releasePointerCapture(e.pointerId);
 	}
 
@@ -1664,7 +1684,7 @@ export class BoardViewport implements BoardSurface {
 		sep();
 		if (!this.store.readOnly) labelled('settings-2', 'Settings', 'Settings for the whole patchwork: units, grid, numbering, appearance. Right-click a page or an item for its own settings.', () => this.showSettings());
 		labelled('file-output', 'Export', 'Export as PDF or PNG, or to a canvas', (e) => this.showExportMenu(e));
-		labelled('layout-panel-left', 'View', 'Outline, inspector and minimap', (e) => this.showViewMenu(e));
+		labelled('layout-panel-left', 'View', 'Outline and views, minimap, sidebar inspector', (e) => this.showViewMenu(e));
 		this.cleanups.push(() => bar.remove());
 		this.fitToolbar();
 	}
@@ -1699,7 +1719,8 @@ export class BoardViewport implements BoardSurface {
 
 	showViewMenu(e?: MouseEvent) {
 		const menu = new Menu();
-		if (this.services.openPanels) menu.addItem((i) => i.setTitle('Inspector and outline').setIcon('panel-right').onClick(() => this.services.openPanels?.()));
+		menu.addItem((i) => i.setTitle('Outline and views').setIcon('list-tree').setChecked(this.outlinePanel.isOpen).onClick(() => this.outlinePanel.toggle()));
+		if (this.services.openPanels) menu.addItem((i) => i.setTitle('Inspector and outline in the sidebar').setIcon('panel-right').onClick(() => this.services.openPanels?.()));
 		menu.addItem((i) => i.setTitle('Minimap').setIcon('map').setChecked(!this.minimap.hasClass('is-hidden')).onClick(() => this.toggleMinimap()));
 		this.showMenuAt(menu, e);
 	}
@@ -1728,6 +1749,23 @@ export function today(): string {
 	const d = new Date();
 	const pad = (n: number) => String(n).padStart(2, '0');
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Whether the outline panel is shown: a per-viewer convenience, like the minimap (storage may be unavailable). */
+function outlinePreferred(): boolean {
+	try {
+		return window.localStorage.getItem('patchwork-outline') === 'on';
+	} catch {
+		return false;
+	}
+}
+
+function rememberOutline(show: boolean) {
+	try {
+		window.localStorage.setItem('patchwork-outline', show ? 'on' : 'off');
+	} catch {
+		// Not remembered; the panel still works.
+	}
 }
 
 /** Whether the minimap is shown: a per-viewer convenience, so browser storage (may be unavailable). */

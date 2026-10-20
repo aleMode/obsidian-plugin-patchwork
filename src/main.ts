@@ -99,6 +99,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('export-canvas', 'Export to canvas', (v) => void v.exportCanvas());
 		this.addBoardCommand('save-view', 'Save current view…', (v) => v.promptSaveView(), true);
 		this.addBoardCommand('go-to-view', 'Go to view…', (v) => v.pickView());
+		this.addBoardCommand('toggle-outline', 'Toggle outline and views panel', (v) => v.toggleOutline());
 		this.addBoardCommand('toggle-minimap', 'Toggle minimap', (v) => v.toggleMinimap());
 
 		this.addCommand({

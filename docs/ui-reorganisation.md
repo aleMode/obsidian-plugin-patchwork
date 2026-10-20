@@ -1,6 +1,6 @@
 # Interface reorganisation and inline editing (proposal, 2026-10-20)
 
-Written after the manual test rounds. **Status:** quick wins, step 1 (Patchwork settings dialog, toolbar, export menu, wording), step 2 (context bar and properties popover) and step 3 (inline editing, options A and B with a plain text area rather than CodeMirror) are built; option C (real Live Preview) is not. The decisions in section 6 were taken on 2026-10-20: optional dock, inline editing on double-click, "patchwork" in place of "board", toolbar first.
+Written after the manual test rounds. **Status:** quick wins, step 1 (Patchwork settings dialog, toolbar, export menu, wording), step 2 (context bar and properties popover) and step 3 (inline editing, options A and B with a plain text area rather than CodeMirror) and the floating outline-and-views panel are built; option C (real Live Preview) is not. The decisions in section 6 were taken on 2026-10-20: optional dock, inline editing on double-click, "patchwork" in place of "board", toolbar first.
 
 ## 1. Where everything is today
 

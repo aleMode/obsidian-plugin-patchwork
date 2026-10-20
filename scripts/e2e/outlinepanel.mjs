@@ -1,0 +1,94 @@
+// End-to-end check of the floating outline and views panel: View menu entry, the list of pages and
+// modules, selecting from it, live updates, saved views, close and the remembered on/off choice.
+import { connect } from '../cdpClient.mjs';
+
+const cdp = await connect();
+const results = [];
+const check = (name, ok, detail) => results.push({ name, ok: !!ok, ...(ok ? {} : { detail }) });
+const V = `const L = app.workspace.getLeavesOfType('patchwork-board').find((l) => l.view.file?.path.startsWith('_e2e/')); const v = L.view; const s = v.surface;`;
+const ev = (body) => cdp.evaluate(`${V} ${body}`);
+const wait = (ms) => `await new Promise((r) => setTimeout(r, ${ms}));`;
+const until = async (fn, ms = 30000) => {
+	const t = Date.now();
+	while (Date.now() - t < ms) {
+		if (await fn()) return true;
+		await new Promise((r) => setTimeout(r, 300));
+	}
+	return false;
+};
+const open = () => ev(`return !document.querySelector('.pw-outline-panel').classList.contains('is-hidden')`);
+const rows = () => ev(`return [...document.querySelectorAll('.pw-outline-panel .pw-outline-row span:not(.pw-outline-icon):not(.pw-outline-lock):not(.clickable-icon)')].map((e) => e.textContent).join('|')`);
+
+try {
+	await cdp.evaluate(`
+		const vv = app.vault;
+		localStorage.removeItem('patchwork-outline');
+		for (const l of app.workspace.getLeavesOfType('patchwork-board')) l.detach();
+		await new Promise((r) => setTimeout(r, 400));
+		if (vv.getAbstractFileByPath('_e2e')) await vv.delete(vv.getAbstractFileByPath('_e2e'), true);
+		await vv.createFolder('_e2e');
+		await app.plugins.plugins.patchwork.createBoard(vv.getAbstractFileByPath('_e2e'));
+		await new Promise((r) => setTimeout(r, 800));
+		${V} app.workspace.setActiveLeaf(L, { focus: true });
+		v.store.update((f) => ({ ...f, pages: [
+			{ ...f.pages[0], id: 'a', name: 'Front', modules: [
+				{ id: 't', type: 'text', markdown: 'hello world', x: 10, y: 10, w: 80, h: 30 },
+				{ id: 'tr', type: 'tracker', kind: 'counter', label: 'HP', value: 3, x: 10, y: 50, w: 50, h: 25 }] },
+			{ id: 'b', name: 'Back', x: 260, y: 0, w: 210, h: 297, modules: [] }] }));
+		s.zoomToFit(); await new Promise((r) => setTimeout(r, 1000));`);
+
+	check('the panel starts closed', !(await open()));
+	await ev(`document.querySelector('.pw-toolbar [aria-label^="Outline and views"]').click(); ${wait(300)}`);
+	const view = await ev(`const t = [...document.querySelectorAll('.menu .menu-item-title')].map((e) => e.textContent); document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); return t`);
+	check('the View menu offers the panel and the sidebar dock', view.includes('Outline and views') && view.includes('Inspector and outline in the sidebar') && view.includes('Minimap'), view);
+	await ev(`s.toggleOutline(); ${wait(400)}`);
+	check('toggling opens it', await open());
+	const list = await rows();
+	const sections = await ev(`return [...document.querySelectorAll('.pw-outline-panel .pw-outline-section')].map((e) => e.textContent).join('|')`);
+	check('it lists the views section, the pages and their modules', sections.includes('Views') && sections.includes('Pages') && list.includes('1. Front') && list.includes('2. Back') && list.includes('hello world') && list.includes('HP'), list);
+	check('it sits below the toolbar and inside the board', await ev(`const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); const h = document.querySelector('.pw-surface-host').getBoundingClientRect(); const t = document.querySelector('.pw-toolbar').getBoundingClientRect(); return p.top >= t.bottom && p.left >= h.left && p.bottom <= h.bottom`));
+	check('the choice is remembered', (await ev(`return localStorage.getItem('patchwork-outline')`)) === 'on');
+
+	// selecting from it
+	await ev(`[...document.querySelectorAll('.pw-outline-panel .pw-outline-module')].find((r) => r.textContent.includes('HP')).click(); ${wait(400)}`);
+	check('clicking a module row selects it', (await ev(`return JSON.stringify(s.selected)`)) === '{"pageId":"a","moduleId":"tr"}', await ev(`return JSON.stringify(s.selected)`));
+	check('and the row shows it as selected', await until(() => ev(`return !!document.querySelector('.pw-outline-panel .pw-outline-module.is-selected')`)));
+	await ev(`[...document.querySelectorAll('.pw-outline-panel .pw-outline-page')].find((r) => r.textContent.includes('Back')).click(); ${wait(400)}`);
+	check('clicking a page row selects the page', (await ev(`return JSON.stringify(s.selected)`)) === '{"pageId":"b"}');
+	await ev(`document.querySelector('.pw-outline-panel').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 })); ${wait(200)}`);
+	check('pressing inside the panel does not clear the selection', (await ev(`return JSON.stringify(s.selected)`)) === '{"pageId":"b"}');
+
+	// live updates
+	await ev(`v.store.update((f) => ({ ...f, pages: f.pages.map((p) => (p.id === 'b' ? { ...p, name: 'Cover' } : p)) }));`);
+	check('renaming a page updates the list', await until(async () => (await rows()).includes('2. Cover')), await rows());
+	await ev(`v.store.update((f) => ({ ...f, pages: f.pages.map((p) => (p.id === 'a' ? { ...p, modules: [...p.modules, { id: 'x', type: 'text', markdown: 'late arrival', x: 10, y: 90, w: 60, h: 20 }] } : p)) }));`);
+	check('adding a module updates the list', await until(async () => (await rows()).includes('late arrival')), await rows());
+
+	// saved views
+	await ev(`s.saveView('Overview'); ${wait(300)}`);
+	check('a saved view is listed under Views', await until(async () => (await rows()).includes('Overview')), await rows());
+	await ev(`s.zoomToSelection(); ${wait(500)} const before = JSON.stringify(s.camera); window.__before = before; [...document.querySelectorAll('.pw-outline-panel .pw-outline-view')].find((r) => r.textContent.includes('Overview')).click(); ${wait(600)}`);
+	check('clicking the view goes back to it', await until(async () => (await ev(`return JSON.stringify(s.camera)`)) !== (await ev(`return window.__before`))));
+
+	// close and remember
+	await ev(`document.querySelector('.pw-outline-panel [aria-label^="Close"]').click(); ${wait(300)}`);
+	check('the close button hides it', !(await open()));
+	check('and the choice is remembered', (await ev(`return localStorage.getItem('patchwork-outline')`)) === 'off');
+	await ev(`document.querySelector('.pw-toolbar [aria-label^="Outline and views"]').click(); ${wait(300)}`);
+	await ev(`const it = [...document.querySelectorAll('.menu .menu-item')].find((e) => e.querySelector('.menu-item-title')?.textContent === 'Outline and views'); it.dispatchEvent(new MouseEvent('click', { bubbles: true })); ${wait(400)}`);
+	check('the View menu entry opens it again', await open());
+} catch (e) {
+	check('no exception', false, String(e.stack ?? e));
+} finally {
+	await cdp
+		.evaluate(`localStorage.removeItem('patchwork-outline');
+			for (let k = 0; k < 10 && (document.querySelector('.menu') || document.querySelector('.modal-container')); k++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise((r) => setTimeout(r, 80)); }
+			for (const l of app.workspace.getLeavesOfType('patchwork-board')) if (l.view.file?.path.startsWith('_e2e/')) l.detach();
+			await new Promise((r) => setTimeout(r, 500));
+			const d = app.vault.getAbstractFileByPath('_e2e'); if (d) await app.vault.delete(d, true);`)
+		.catch(() => {});
+	cdp.close();
+}
+const failed = results.filter((r) => !r.ok);
+console.log(JSON.stringify({ passed: results.length - failed.length, failed }, null, 2));
+process.exitCode = failed.length ? 1 : 0;

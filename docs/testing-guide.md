@@ -17,6 +17,9 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - Check: the bar follows the item while you pan and zoom, hides while you drag, comes back where the item lands, and stays reachable for a page bigger than the screen. Typing Delete or the arrow keys in a popover field must not delete or move the item.
 - Adding text, a tracker or a table of contents opens the popover on it. The sidebar inspector no longer opens by itself: **View → Inspector and outline** if you want the dock.
 
+### Outline and views panel
+- Toolbar **View → Outline and views** (or the command *Toggle outline and views panel*) opens a floating panel at the left of the board: saved **Views** (+ saves the current camera, click goes back, hover for rename and delete) and the **Pages** with their items. Click a row to select it; Shift-click adds to the selection. It updates as you edit and is remembered per device. The sidebar dock still exists under **View → Inspector and outline in the sidebar**.
+
 ### Where settings live
 - **Toolbar → Settings** is for the whole patchwork only (units, grid, numbering, header and footer, appearance, title).
 - **Right-click a page** → Page settings, Size and position, Page numbers, header and footer. **Right-click an item** → Item settings, Size and position, Style. They open the same popover as the ⋯ button, on the right tab.
