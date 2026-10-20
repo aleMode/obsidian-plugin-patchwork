@@ -196,6 +196,43 @@
 	box-shadow: var(--shadow-s);
 }
 
+/* Labelled toolbar buttons: the primary actions say what they are. */
+.pw-tb-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	height: var(--clickable-icon-size, 28px);
+	padding: 0 var(--size-4-2);
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+
+.pw-tb-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.pw-toolbar.is-compact .pw-tb-btn > span:not(.pw-tb-icon) {
+	display: none;
+}
+
+.pw-toolbar.is-compact .pw-tb-btn {
+	padding: 0 var(--size-2-3);
+}
+
+.pw-tb-icon {
+	display: inline-flex;
+}
+
+.pw-tb-icon svg {
+	width: var(--icon-s, 16px);
+	height: var(--icon-s, 16px);
+}
+
 .pw-toolbar-sep {
 	width: 1px;
 	align-self: stretch;
@@ -948,6 +985,59 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 .pw-inspector .setting-item-control input[type='text'],
 .pw-inspector .setting-item-control input[type='number'] {
 	width: 7.5em;
+}
+
+/* Tabbed dialogs (Patchwork settings). */
+.pw-settings-modal {
+	width: min(520px, 92vw);
+}
+
+.pw-tabs {
+	display: flex;
+	gap: var(--size-2-1);
+	margin-bottom: var(--size-4-2);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.pw-tab {
+	padding: var(--size-2-3) var(--size-4-3);
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.pw-tab:hover {
+	color: var(--text-normal);
+}
+
+.pw-tab.is-active {
+	border-bottom-color: var(--interactive-accent);
+	color: var(--text-normal);
+}
+
+.pw-tab-body {
+	min-height: 260px;
+}
+
+/* Collapsible groups in the export dialog. */
+.pw-export-section {
+	margin-top: var(--size-4-2);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.pw-export-section > summary {
+	padding: var(--size-4-2) 0;
+	color: var(--text-muted);
+	font-weight: var(--font-semibold);
+	cursor: pointer;
+}
+
+.pw-export-section[open] > summary {
+	color: var(--text-normal);
 }
 
 .pw-unit-suffix {

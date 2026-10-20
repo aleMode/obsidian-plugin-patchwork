@@ -37,7 +37,7 @@ export class PatchworkView extends TextFileView {
 	}
 
 	getDisplayText() {
-		return this.file?.basename ?? 'Patchwork board';
+		return this.file?.basename ?? 'Patchwork';
 	}
 
 	getIcon() {
@@ -179,9 +179,9 @@ class ConflictModal extends Modal {
 	}
 
 	onOpen() {
-		this.setTitle('Board changed on disk');
+		this.setTitle('Patchwork changed on disk');
 		this.contentEl.createEl('p', {
-			text: `"${this.fileName}" was changed outside this view (for example by Sync or git) while you had unsaved edits. The board now shows the version on disk. Your version is saved as "${this.copyPath}".`,
+			text: `"${this.fileName}" was changed outside this view (for example by Sync or git) while you had unsaved edits. It now shows the version on disk. Your version is saved as "${this.copyPath}".`,
 		});
 		const buttons = this.contentEl.createDiv({ cls: 'modal-button-container' });
 		buttons.createEl('button', { text: 'Keep version on disk', cls: 'mod-cta' }, (b) => b.addEventListener('click', () => this.close()));

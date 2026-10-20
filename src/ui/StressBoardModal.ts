@@ -9,8 +9,8 @@ export class StressBoardModal extends Modal {
 	}
 
 	onOpen() {
-		this.setTitle('Generate stress board');
-		this.contentEl.createEl('p', { text: 'Creates a board in the vault root from notes, PDF files and images in this vault, for profiling.' });
+		this.setTitle('Generate stress-test patchwork');
+		this.contentEl.createEl('p', { text: 'Creates a patchwork in the vault root from notes, PDF files and images in this vault, for profiling.' });
 		const number = (name: string, value: number, set: (v: number) => void) =>
 			new Setting(this.contentEl).setName(name).addText((t) => {
 				t.inputEl.type = 'number';

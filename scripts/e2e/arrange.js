@@ -24,7 +24,7 @@ try {
 
 	const out = await view.surface.exportCanvas();
 	const canvas = JSON.parse(await vault.read(out));
-	check('.canvas written next to the board', out.path === `${DIR}/Untitled board.canvas`, out.path);
+	check('.canvas written next to the board', out.path === `${DIR}/Untitled patchwork.canvas`, out.path);
 	check('pages become groups, modules file nodes with subpaths', JSON.stringify(canvas.nodes.map((n) => n.type + (n.subpath ?? ''))) === JSON.stringify(['group', 'file#Prone', 'file#page=2', 'group', 'group']), canvas.nodes.map((n) => n.type));
 	check('all coordinates are integer pixels', canvas.nodes.every((n) => [n.x, n.y, n.width, n.height].every(Number.isInteger)));
 	const notice = [...document.querySelectorAll('.notice')].map((n) => n.innerText).join(' ');

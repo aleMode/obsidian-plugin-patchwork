@@ -5,7 +5,7 @@ export function renderErrorView(el: HTMLElement, errors: string[], raw: string, 
 	el.empty();
 	el.removeClass('pw-view');
 	const box = el.createDiv({ cls: 'pw-error-view' });
-	box.createEl('h3', { text: 'This board could not be opened' });
+	box.createEl('h3', { text: 'This patchwork could not be opened' });
 	box.createEl('p', {
 		text: 'Patchwork will not change this file. Fix it in a text editor or restore it from a backup, then reload.',
 	});

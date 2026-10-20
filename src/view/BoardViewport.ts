@@ -27,7 +27,8 @@ import { type PdfDocCache, pdfSourceId } from '../sources/pdfSource';
 import { loadNoteContent } from '../sources/markdownSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
-import { BoardSettingsModal } from '../ui/BoardSettingsModal';
+import { withField } from '../ui/formHelpers';
+import { PatchworkSettingsModal, type SettingsDraft } from '../ui/PatchworkSettingsModal';
 import { NamedPickerModal, TextPromptModal } from '../ui/prompts';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
@@ -583,9 +584,15 @@ export class BoardViewport implements BoardSurface {
 		}
 	}
 
-	showBoardSettings() {
+	showSettings() {
 		if (this.store.readOnly) return;
-		new BoardSettingsModal(this.view.app, this.store.file.board, (board) => this.store.update((f) => ({ ...f, board: { ...f.board, ...board } }))).open();
+		const f = this.store.file;
+		new PatchworkSettingsModal(this.view.app, { board: f.board, title: f.meta?.title }, { apply: (d) => this.applySettings(d), arrange: (mode) => this.autoArrange(mode) }).open();
+	}
+
+	/** One undo step for everything the settings dialog changed. */
+	private applySettings(d: SettingsDraft) {
+		this.store.update((f) => ({ ...f, board: { ...f.board, ...d.board }, ...(d.title === f.meta?.title ? {} : { meta: withField(f.meta ?? {}, 'title', d.title) }) }));
 	}
 
 	// ---------- export ----------
@@ -756,9 +763,18 @@ export class BoardViewport implements BoardSurface {
 			this.fitted = true;
 			this.zoomToFit();
 		}
+		this.fitToolbar();
 		// The ruler canvases are sized in code, not CSS: without a redraw they are stretched (and blur) until the next pan.
 		this.renderRulers();
 		this.updateVisibility();
+	}
+
+	/** Labels on the toolbar buttons only while the toolbar fits; otherwise icons with tooltips. */
+	private fitToolbar() {
+		const bar = this.toolbar;
+		if (!bar || this.root.clientWidth === 0) return;
+		bar.removeClass('is-compact');
+		if (bar.scrollWidth + 2 * 28 > this.root.clientWidth) bar.addClass('is-compact');
 	}
 
 	/** Grid drawn as a CSS background, so panning never touches page layout. */
@@ -1522,31 +1538,70 @@ export class BoardViewport implements BoardSurface {
 			setIcon(b, icon);
 			b.addEventListener('click', onClick);
 		};
+		const labelled = (icon: string, text: string, tip: string, onClick: (e: MouseEvent) => void) => {
+			const b = bar.createEl('button', { cls: 'pw-tb-btn', attr: { 'aria-label': tip } });
+			setIcon(b.createSpan({ cls: 'pw-tb-icon' }), icon);
+			b.createSpan({ text });
+			b.addEventListener('click', onClick);
+		};
 		const sep = () => bar.createDiv({ cls: 'pw-toolbar-sep' });
 		if (!this.store.readOnly) {
-			button('file-plus', 'Add page', (e) => this.showAddPageMenu(e));
-			button('file-text', 'Add note', () => this.pickNote());
-			button('book-open', 'Add PDF', () => this.pickPdf());
-			button('type', 'Add text', () => this.addText());
-			button('image', 'Add image', () => this.pickImage());
-			button('list-checks', 'Add tracker', (e) => this.showTrackerMenu(e));
+			labelled('file-plus', 'Page', 'Add a page', (e) => this.showAddPageMenu(e));
+			labelled('file-text', 'Note', 'Add a note', () => this.pickNote());
+			labelled('book-open', 'PDF', 'Add a region of a PDF', () => this.pickPdf());
+			labelled('plus', 'More', 'Add text, an image, a tracker or a table of contents', (e) => this.showAddMenu(e));
 			sep();
 		}
-		button('file-output', 'Export as PDF or PNG', () => this.showExport());
-		if (!this.store.readOnly) button('settings-2', 'Board settings', () => this.showBoardSettings());
-		if (this.services.openPanels) button('panel-right', 'Inspector and outline', () => this.services.openPanels?.());
-		sep();
 		button('zoom-out', 'Zoom out', () => this.zoomBy(1 / 1.25));
 		this.zoomLabel = bar.createDiv({ cls: 'pw-zoom-label', text: '100%' });
 		button('zoom-in', 'Zoom in', () => this.zoomBy(1.25));
 		button('maximize', 'Zoom to fit', () => this.zoomToFit());
-		button('map', 'Minimap', () => this.toggleMinimap());
 		if (!this.store.readOnly) {
 			sep();
 			button('undo-2', 'Undo', () => this.store.undo());
 			button('redo-2', 'Redo', () => this.store.redo());
 		}
+		sep();
+		if (!this.store.readOnly) labelled('settings-2', 'Settings', 'Patchwork settings: units, grid, page numbers, appearance', () => this.showSettings());
+		labelled('file-output', 'Export', 'Export as PDF or PNG, or to a canvas', (e) => this.showExportMenu(e));
+		labelled('layout-panel-left', 'View', 'Outline, inspector and minimap', (e) => this.showViewMenu(e));
 		this.cleanups.push(() => bar.remove());
+		this.fitToolbar();
+	}
+
+	private showMenuAt(menu: Menu, e?: MouseEvent) {
+		if (e) {
+			menu.showAtMouseEvent(e);
+			return;
+		}
+		const r = this.root.getBoundingClientRect();
+		menu.showAtPosition({ x: r.left + 40, y: r.top + 40 });
+	}
+
+	/** Everything that is not a page, a note or a PDF, so the toolbar keeps three add buttons. */
+	showAddMenu(e?: MouseEvent) {
+		const menu = new Menu();
+		menu.addItem((i) => i.setTitle('Text box').setIcon('type').onClick(() => this.addText()));
+		menu.addItem((i) => i.setTitle('Image').setIcon('image').onClick(() => this.pickImage()));
+		menu.addItem((i) => i.setTitle('Table of contents').setIcon('list').onClick(() => this.addToc()));
+		menu.addSeparator();
+		menu.addItem((i) => i.setTitle('Counter').setIcon('plus-minus').onClick(() => this.addTracker('counter')));
+		menu.addItem((i) => i.setTitle('Boxes').setIcon('square').onClick(() => this.addTracker('boxes')));
+		menu.addItem((i) => i.setTitle('Checklist').setIcon('list-checks').onClick(() => this.addTracker('checklist')));
+		this.showMenuAt(menu, e);
+	}
+
+	showExportMenu(e?: MouseEvent) {
+		const menu = new Menu();
+		this.addViewMenuItems(menu);
+		this.showMenuAt(menu, e);
+	}
+
+	showViewMenu(e?: MouseEvent) {
+		const menu = new Menu();
+		if (this.services.openPanels) menu.addItem((i) => i.setTitle('Inspector and outline').setIcon('panel-right').onClick(() => this.services.openPanels?.()));
+		menu.addItem((i) => i.setTitle('Minimap').setIcon('map').setChecked(!this.minimap.hasClass('is-hidden')).onClick(() => this.toggleMinimap()));
+		this.showMenuAt(menu, e);
 	}
 
 	showAddPageMenu(e?: MouseEvent) {

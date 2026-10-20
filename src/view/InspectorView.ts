@@ -4,7 +4,7 @@ import { flowChains } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule, TocModule, TrackerModule } from '../model/schema';
+import type { AnyModule, DisplayUnit, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, TextModule, TocModule, TrackerModule } from '../model/schema';
 import { formatLength, formatLengthValue, parseLength } from '../model/units';
 import { MAX_PAGE_SIDE_MM } from '../model/schema';
 import { mapModule, mapPage, restack } from '../store/pageOps';
@@ -12,33 +12,11 @@ import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import type { ActiveBoard } from './activeBoard';
 import { ALIGN_ACTIONS, type BoardViewport } from './BoardViewport';
 import { moduleTitle } from './OutlineView';
+import { insets, PLAIN_NUMBER, uniformInset, withField } from '../ui/formHelpers';
 
 export const VIEW_TYPE_INSPECTOR = 'patchwork-inspector';
 
-/** A bare number, comma or point as decimal separator; unit text is not accepted in length fields. */
-const PLAIN_NUMBER = /^\s*-?\d+(?:[.,]\d+)?\s*$/;
-
 const FIT = { contain: 'Contain', cover: 'Cover (crop to fill)', stretch: 'Stretch' };
-const POSITIONS: Record<NumberPosition, string> = {
-	'bottom-center': 'Bottom centre',
-	'bottom-left': 'Bottom left',
-	'bottom-right': 'Bottom right',
-	'top-center': 'Top centre',
-	'top-left': 'Top left',
-	'top-right': 'Top right',
-};
-
-const insets = (mm: number): Insets => ({ top: mm, right: mm, bottom: mm, left: mm });
-/** The inspector edits one inset for all sides; uneven insets (from the file) show their smallest side. */
-const uniformInset = (i: Insets | undefined) => (i ? Math.min(i.top, i.right, i.bottom, i.left) : 0);
-
-/** Copy of `o` with `key` set, or removed when `value` is undefined (absent keys stay absent in the file). */
-function withField<T extends object>(o: T, key: string, value: unknown): T {
-	const next = { ...o } as Record<string, unknown>;
-	if (value === undefined) delete next[key];
-	else next[key] = value;
-	return next as T;
-}
 
 /** Small form builder on top of Obsidian's Setting, in the board's display unit. */
 class Form {
@@ -125,7 +103,7 @@ export class InspectorView extends ItemView {
 	}
 
 	getDisplayText() {
-		return 'Board inspector';
+		return 'Inspector';
 	}
 
 	getIcon() {
@@ -156,13 +134,13 @@ export class InspectorView extends ItemView {
 		const board = this.active.get();
 		this.shownKey = this.keyOf(board);
 		if (!board) {
-			el.createDiv({ cls: 'pw-panel-empty', text: 'Open a Patchwork board to edit it here.' });
+			el.createDiv({ cls: 'pw-panel-empty', text: 'Open a patchwork to edit it here.' });
 			return;
 		}
 		const file = board.boardStore.file;
 		const form = new Form(el, file.board.displayUnit, () => board.boardStore.endCoalesce());
 		const readOnly = board.boardStore.readOnly;
-		if (readOnly) el.createDiv({ cls: 'pw-panel-empty', text: 'This board is read-only.' });
+		if (readOnly) el.createDiv({ cls: 'pw-panel-empty', text: 'This patchwork is read-only.' });
 		const page = file.pages.find((p) => p.id === board.selected?.pageId);
 		const mod = page?.modules.find((m) => m.id === board.selected?.moduleId);
 		if (readOnly) return;
@@ -204,7 +182,7 @@ export class InspectorView extends ItemView {
 			b.setButtonText('Delete').onClick(() => board.deleteSelection());
 			b.buttonEl.addClass('mod-warning');
 		});
-		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Shift-click adds or removes items; Shift-drag on empty board selects by area.' });
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Shift-click adds or removes items; Shift-drag on empty space selects by area.' });
 	}
 
 	private update(board: BoardViewport, field: string, recipe: (f: PatchworkFile) => PatchworkFile) {
@@ -214,46 +192,11 @@ export class InspectorView extends ItemView {
 	// ---------- board ----------
 
 	private renderBoard(form: Form, board: BoardViewport, file: PatchworkFile) {
-		const setBoard = (field: string, patch: Partial<BoardSettings>) => this.update(board, field, (f) => ({ ...f, board: { ...f.board, ...patch } }));
-		form.heading('Board');
-		form.text('Title', file.meta?.title, (v) => this.update(board, 'title', (f) => ({ ...f, meta: withField(f.meta ?? {}, 'title', v) })), 'Used for the exported PDF');
-		form.dropdown('Display unit', { mm: 'Millimetres', cm: 'Centimetres', in: 'Inches' }, file.board.displayUnit, (v) => setBoard('unit', { displayUnit: v as DisplayUnit }));
-		form.length('Grid size', file.board.grid.size, (mm) => mm > 0 && setBoard('grid', { grid: { ...file.board.grid, size: mm } }), { min: 0.1 });
-		form.toggle('Snap to grid', file.board.grid.snap, (v) => setBoard('snap', { grid: { ...board.boardStore.file.board.grid, snap: v } }));
-		form.toggle('Show grid', file.board.grid.visible, (v) => setBoard('visible', { grid: { ...board.boardStore.file.board.grid, visible: v } }));
-		form.toggle('Use app theme for pages', file.board.useAppTheme, (v) => setBoard('theme', { useAppTheme: v }), 'Off: pages look like white paper, also in dark mode and in exports.');
-		form.text('Font', file.board.fontFamily, (v) => setBoard('font', withField(file.board, 'fontFamily', v)), 'Theme font');
-		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'For notes and text on the pages, e.g. "Georgia, serif". Empty: the theme’s font.' });
-		form.toggle('Dark PDFs in dark mode', !!file.board.pdfDarkMode, (v) => setBoard('pdfDark', withField(file.board, 'pdfDarkMode', v ? true : undefined)), 'Viewing only: PDF regions are shown colour-inverted while Obsidian uses a dark theme. Exports are unchanged.');
-		const n = file.board.numbering;
-		const setNum = (field: string, patch: Partial<BoardSettings['numbering']>) => setBoard(`num.${field}`, { numbering: { ...board.boardStore.file.board.numbering, ...patch } });
-		form.heading('Page numbers');
-		form.toggle('Show page numbers', n.enabled, (v) => {
-			setNum('enabled', { enabled: v });
-			this.render();
-		});
-		if (n.enabled) {
-			form.number('Start at', n.start, (v) => v !== undefined && Number.isInteger(v) && setNum('start', { start: v }));
-			form.dropdown('Format', { arabic: '1, 2, 3', roman: 'i, ii, iii', alpha: 'a, b, c' }, n.format, (v) => setNum('format', { format: v as NumberFormat }));
-			form.dropdown('Position', POSITIONS, n.position, (v) => setNum('position', { position: v as NumberPosition }));
-			form.toggle('Skip first page', n.skipFirst, (v) => setNum('skipFirst', { skipFirst: v }), 'The first page still counts.');
-		}
-		form.heading('Header and footer');
-		form.text('Header', file.board.header, (v) => setBoard('header', withField(file.board, 'header', v)), '{title}');
-		form.text('Footer', file.board.footer, (v) => setBoard('footer', withField(file.board, 'footer', v)), '{page} / {pages}');
-		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Tokens: {page}, {pages}, {title}, {date}. Pages can override these.' });
-		new Setting(this.contentEl)
-			.setName('Arrange pages')
-			.setDesc('In output order.')
-			.addButton((b) => b.setButtonText('In a row').onClick(() => board.autoArrange('row')))
-			.addButton((b) => b.setButtonText('In a grid').onClick(() => board.autoArrange('grid')));
-		new Setting(this.contentEl)
-			.setName('Canvas')
-			.setDesc('Write a .canvas next to the board (one-way; crops and styles are dropped).')
-			.addButton((b) => b.setButtonText('Export to canvas').onClick(() => void board.exportCanvas()));
-		form.heading('Guides');
-		form.length('Safe area', uniformInset(file.board.defaultSafeArea), (mm) => setBoard('safe', withField(file.board, 'defaultSafeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
-		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: `A dashed margin guide on every page; never printed. ${file.pages.length} page(s) on this board.` });
+		form.heading('Patchwork');
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: `${file.pages.length} page(s). Select a page or an item to edit it here.` });
+		form.button('Settings', 'Settings…', () => board.showSettings(), 'Units, grid, page numbers, header and footer, appearance, title.');
+		form.button('Export', 'Export…', () => board.showExport(), 'PDF or PNG, with sheet sizes, tiling, booklets and bleed.');
+		form.button('Canvas', 'Export to canvas', () => void board.exportCanvas(), 'Writes a .canvas next to this patchwork (one-way; crops and styles are dropped).');
 	}
 
 	// ---------- page ----------
@@ -288,7 +231,7 @@ export class InspectorView extends ItemView {
 		this.renderMaster(form, board, page);
 		form.heading('Page furniture');
 		this.overrideRow('Number', page.numberLabel === false ? 'none' : page.numberLabel, (v) => setPage('numberLabel', (p) => withField(p, 'numberLabel', v === 'none' ? false : v)), 'Automatic');
-		const inherit = page.master ? 'From master' : 'Board default';
+		const inherit = page.master ? 'From master' : 'Patchwork default';
 		this.overrideRow('Header', page.header === '' ? 'none' : page.header, (v) => setPage('header', (p) => withField(p, 'header', v === 'none' ? '' : v)), inherit);
 		this.overrideRow('Footer', page.footer === '' ? 'none' : page.footer, (v) => setPage('footer', (p) => withField(p, 'footer', v === 'none' ? '' : v)), inherit);
 		form.length('Safe area', uniformInset(page.safeArea), (mm) => setPage('safe', (p) => withField(p, 'safeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
@@ -414,7 +357,7 @@ export class InspectorView extends ItemView {
 			this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'One item per line. Ticks stay with their line.' });
 		}
 		form.toggle('Print blank', !!m.printBlank, (v) => set('printBlank', (x) => withField(x, 'printBlank', v ? true : undefined)), 'Exports show it empty, to fill in by hand.');
-		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'The label (above) is its title. Click the tracker on the board to change it; each click can be undone.' });
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'The label (above) is its title. Click the tracker on its page to change it; each click can be undone.' });
 	}
 
 	/** Linked frame (M5): where it sits in its chain. */
@@ -461,7 +404,7 @@ export class InspectorView extends ItemView {
 			freeze.addButton((b) => b.setButtonText('Update snapshot').onClick(() => void board.freezeNote(page.id, m.id)));
 			freeze.addButton((b) => b.setButtonText('Unfreeze').onClick(() => board.unfreezeNote(page.id, m.id)));
 		} else {
-			freeze.setDesc('Keep showing the note as it is now, even if it changes later (the snapshot is stored in the board).');
+			freeze.setDesc('Keep showing the note as it is now, even if it changes later (the snapshot is stored in the patchwork).');
 			freeze.addButton((b) => b.setButtonText('Freeze').onClick(() => void board.freezeNote(page.id, m.id)));
 		}
 	}

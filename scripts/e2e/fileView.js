@@ -23,11 +23,11 @@ try {
 	const file = await plugin.createBoard(vault.getAbstractFileByPath(DIR));
 	await sleep(300);
 	let view = viewOf(file);
-	check('new board created', file && file.path === `${DIR}/Untitled board.patchwork`, file?.path);
+	check('new board created', file && file.path === `${DIR}/Untitled patchwork.patchwork`, file?.path);
 	check('opens in board view', view && view.store, view?.getViewType());
 	check('starts with one A4 page', view?.store.file.pages.length === 1 && view.store.file.pages[0].w === 210);
 	const second = await plugin.createBoard(vault.getAbstractFileByPath(DIR));
-	check('second board gets a free name', second?.path === `${DIR}/Untitled board 1.patchwork`, second?.path);
+	check('second board gets a free name', second?.path === `${DIR}/Untitled patchwork 1.patchwork`, second?.path);
 
 	// 2. Edits are saved (debounced) and unknown keys survive.
 	const withExtra = JSON.parse(await vault.read(file));
@@ -48,7 +48,7 @@ try {
 	await vault.modify(file, JSON.stringify(theirs, null, 2));
 	await sleep(2800);
 	const disk = JSON.parse(await vault.read(file));
-	const copies = vault.getFiles().filter((f) => f.path.startsWith(`${DIR}/Untitled board (conflict`));
+	const copies = vault.getFiles().filter((f) => f.path.startsWith(`${DIR}/Untitled patchwork (conflict`));
 	view = viewOf(file);
 	check('outside change not overwritten', disk.meta.title === 'theirs', disk.meta.title);
 	check('our version kept in a conflict copy', copies.length === 1 && JSON.parse(await vault.read(copies[0])).meta.title === 'mine', copies.map((c) => c.path));

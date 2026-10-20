@@ -93,7 +93,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
 		this.addBoardCommand('zoom-to-selection', 'Zoom to selection', (v) => v.zoomToSelection());
 		this.addBoardCommand('export', 'Export…', (v) => v.showExport());
-		this.addBoardCommand('board-settings', 'Board settings…', (v) => v.showBoardSettings(), true);
+		this.addBoardCommand('board-settings', 'Settings…', (v) => v.showSettings(), true);
 		this.addBoardCommand('arrange-row', 'Arrange pages in a row', (v) => v.autoArrange('row'), true);
 		this.addBoardCommand('arrange-grid', 'Arrange pages in a grid', (v) => v.autoArrange('grid'), true);
 		this.addBoardCommand('export-canvas', 'Export to canvas', (v) => void v.exportCanvas());
@@ -103,7 +103,7 @@ export default class PatchworkPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'generate-stress-board',
-			name: 'Generate stress board',
+			name: 'Generate stress-test patchwork',
 			callback: () => new StressBoardModal(this.app, (pages, modulesPerPage) => void this.createStressBoard(pages, modulesPerPage)).open(),
 		});
 
@@ -173,14 +173,14 @@ export default class PatchworkPlugin extends Plugin {
 		});
 	}
 
-	async createBoard(folder: TFolder, content = newBoardFile({ created: new Date().toISOString().slice(0, 10), firstPage: presetById('A4') }), base = 'Untitled board'): Promise<TFile | null> {
+	async createBoard(folder: TFolder, content = newBoardFile({ created: new Date().toISOString().slice(0, 10), firstPage: presetById('A4') }), base = 'Untitled patchwork'): Promise<TFile | null> {
 		const path = this.availablePath(folder, base);
 		try {
 			const created = await this.app.vault.create(path, serializeBoard(content));
 			await this.app.workspace.getLeaf(true).openFile(created);
 			return created;
 		} catch (e) {
-			new Notice(`Patchwork: could not create the board: ${e instanceof Error ? e.message : String(e)}`);
+			new Notice(`Patchwork: could not create the patchwork: ${e instanceof Error ? e.message : String(e)}`);
 			return null;
 		}
 	}
@@ -203,10 +203,10 @@ export default class PatchworkPlugin extends Plugin {
 			}
 		}
 		const board = generateStressBoard(sources, { pages, modulesPerPage, seed: 1 });
-		return this.createBoard(this.app.vault.getRoot(), board, `Stress board ${pages}x${modulesPerPage}`);
+		return this.createBoard(this.app.vault.getRoot(), board, `Stress patchwork ${pages}x${modulesPerPage}`);
 	}
 
-	/** "Untitled board.patchwork", then "Untitled board 1.patchwork", … in the given folder. */
+	/** "Untitled patchwork.patchwork", then "Untitled patchwork 1.patchwork", … in the given folder. */
 	private availablePath(folder: TFolder, base: string): string {
 		const prefix = folder.isRoot() ? '' : `${folder.path}/`;
 		for (let i = 0; ; i++) {

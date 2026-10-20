@@ -26,7 +26,8 @@ try {
 	await plugin.openPanels();
 	await sleep(300);
 	check('inspector and outline open', panel('patchwork-inspector') && panel('patchwork-outline'));
-	check('inspector follows the board: board settings when nothing is selected', panel('patchwork-inspector').contentEl.innerText.includes('Display unit'));
+	const idle = panel('patchwork-inspector').contentEl.innerText;
+	check('inspector with nothing selected points to Settings and Export, not a long board form', idle.includes('Settings…') && idle.includes('Export…') && !idle.includes('Display unit'), idle);
 	check('outline lists the page and module', panel('patchwork-outline').contentEl.innerText.includes('1. Front') && panel('patchwork-outline').contentEl.innerText.includes('Combat'));
 
 	s.select({ pageId: view.store.file.pages[0].id, moduleId: 'n' });
@@ -36,7 +37,7 @@ try {
 	typeInto('Width', '120');
 	check('typing a width updates the module', view.store.file.pages[0].modules[0].w === 120, view.store.file.pages[0].modules[0].w);
 	typeInto('Width', '5 cm');
-	check('lengths accept other units', view.store.file.pages[0].modules[0].w === 50, view.store.file.pages[0].modules[0].w);
+	check('unit text is not accepted: the unit is a fixed label beside the number', view.store.file.pages[0].modules[0].w === 120 && !!panel('patchwork-inspector').contentEl.querySelector('.pw-unit-suffix'), view.store.file.pages[0].modules[0].w);
 	view.store.undo();
 	check('a field edit undoes in one step', view.store.file.pages[0].modules[0].w === 90, view.store.file.pages[0].modules[0].w);
 	typeInto('Section', '#Prone');

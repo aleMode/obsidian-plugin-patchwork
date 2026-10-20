@@ -30,6 +30,8 @@ const MAX_BLEED_MM = 10;
 export class ExportModal extends Modal {
 	private c: ExportChoices;
 	private warning!: HTMLElement;
+	/** Which sections are open; they open by themselves when a choice inside them is not the default. */
+	private expanded = { sheets: false, quality: false };
 
 	constructor(
 		app: App,
@@ -39,10 +41,11 @@ export class ExportModal extends Modal {
 	) {
 		super(app);
 		this.c = { ...initial };
+		this.expanded.sheets = initial.sheet !== 'native' || initial.layout === 'booklet' || initial.bleed > 0 || initial.cropMarks;
 	}
 
 	onOpen() {
-		this.setTitle('Export board');
+		this.setTitle('Export patchwork');
 		this.render();
 	}
 
@@ -84,11 +87,13 @@ export class ExportModal extends Modal {
 		);
 		if (c.pages === 'range') pages.addText((t) => t.setPlaceholder('1-3, 5').setValue(c.range).onChange((v) => (c.range = v)));
 
+		new Setting(el).setName('Open after export').addToggle((t) => t.setValue(c.open).onChange((v) => (c.open = v)));
+		const sheets = this.section(el, 'Sheets and printing', 'sheets');
 		const sheetValue = typeof c.sheet === 'string' ? c.sheet : 'custom';
 		const sheetOptions: Record<string, string> = { native: 'Each page at its own size' };
 		for (const k of Object.keys(SHEET_SIZES)) sheetOptions[k] = k;
 		sheetOptions.custom = 'Custom size';
-		new Setting(el)
+		new Setting(sheets)
 			.setName('Sheet size')
 			.setDesc('Pages larger than the sheet are split into tiles; smaller ones are centred.')
 			.addDropdown((d) =>
@@ -103,7 +108,7 @@ export class ExportModal extends Modal {
 		if (typeof c.sheet === 'object') {
 			const custom = c.sheet;
 			const len = (name: string, key: 'w' | 'h') =>
-				new Setting(el).setName(name).addText((t) =>
+				new Setting(sheets).setName(name).addText((t) =>
 					t.setValue(formatLength(custom[key], this.ctx.unit)).onChange((v) => {
 						const mm = parseLength(v, this.ctx.unit);
 						if (mm !== null && mm > 0) custom[key] = mm;
@@ -113,19 +118,19 @@ export class ExportModal extends Modal {
 			len('Sheet height', 'h');
 		}
 		if (c.sheet !== 'native') {
-			new Setting(el).setName('Orientation').addDropdown((d) =>
+			new Setting(sheets).setName('Orientation').addDropdown((d) =>
 				d
 					.addOptions({ auto: 'Automatic (fewest sheets)', portrait: 'Portrait', landscape: 'Landscape' })
 					.setValue(c.orientation)
 					.onChange((v) => (c.orientation = v as ExportChoices['orientation'])),
 			);
-			new Setting(el).setName('Smaller pages').addDropdown((d) =>
+			new Setting(sheets).setName('Smaller pages').addDropdown((d) =>
 				d
 					.addOptions({ actual: 'Actual size', fit: 'Scale to fit the sheet' })
 					.setValue(c.fitSmallPages ? 'fit' : 'actual')
 					.onChange((v) => (c.fitSmallPages = v === 'fit')),
 			);
-			new Setting(el)
+			new Setting(sheets)
 				.setName('Tile overlap')
 				.setDesc('Repeated strip between neighbouring tiles, for gluing or aligning.')
 				.addText((t) =>
@@ -134,10 +139,11 @@ export class ExportModal extends Modal {
 						if (mm !== null && mm >= 0) c.overlap = mm;
 					}),
 				);
-			new Setting(el).setName('Tile labels').setDesc('Print a row and column label in a corner of each tile.').addToggle((t) => t.setValue(c.tileLabels).onChange((v) => (c.tileLabels = v)));
+			new Setting(sheets).setName('Tile labels').setDesc('Print a row and column label in a corner of each tile.').addToggle((t) => t.setValue(c.tileLabels).onChange((v) => (c.tileLabels = v)));
 		}
-		this.renderPrintShop(el);
-		new Setting(el)
+		this.renderPrintShop(sheets);
+		const quality = this.section(el, 'Quality', 'quality');
+		new Setting(quality)
 			.setName('Quality')
 			.setDesc('Best quality keeps PDF regions as sharp, selectable vector content (larger files). Smallest file turns them into images.')
 			.addDropdown((d) =>
@@ -147,24 +153,32 @@ export class ExportModal extends Modal {
 					.setValue(c.quality)
 					.onChange((v) => (c.quality = v as 'best' | 'small')),
 			);
-		new Setting(el)
+		new Setting(quality)
 			.setName('Ink saver')
 			.setDesc('PDF regions and images print grayscale and lighter (as images). Notes and text are unchanged.')
 			.addToggle((t) => t.setValue(c.inkSaver).onChange((v) => (c.inkSaver = v)));
-		new Setting(el)
+		new Setting(quality)
 			.setName('Image resolution')
 			.setDesc(c.format === 'png' ? 'Dots per inch of the PNG images (and of PDF regions exported as images).' : 'Dots per inch for PDF regions exported as images.')
 			.addText((t) => {
 				t.inputEl.type = 'number';
 				t.setValue(String(c.dpi)).onChange((v) => (c.dpi = Number(v)));
 			});
-		new Setting(el).setName('Open after export').addToggle((t) => t.setValue(c.open).onChange((v) => (c.open = v)));
 		new Setting(el).addButton((b) =>
 			b
 				.setButtonText('Export')
 				.setCta()
 				.onClick(() => this.submit()),
 		);
+	}
+
+	/** A collapsible group of settings; its open state survives re-rendering. */
+	private section(parent: HTMLElement, title: string, key: 'sheets' | 'quality'): HTMLElement {
+		const d = parent.createEl('details', { cls: 'pw-export-section' });
+		d.open = this.expanded[key];
+		d.createEl('summary', { text: title });
+		d.addEventListener('toggle', () => (this.expanded[key] = d.open));
+		return d.createDiv();
 	}
 
 	/** Booklet imposition, bleed and crop marks (M4). */

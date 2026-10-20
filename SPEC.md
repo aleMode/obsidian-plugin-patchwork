@@ -458,3 +458,9 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - `z` is kept as specified.
   - `page.label` renamed to `page.numberLabel` (avoids confusion with `page.name` and `module.label`). Pages with a custom or hidden number still count toward numbering and `{pages}`.
   - A page's custom number prints even when board numbering is off (an explicit per-page choice wins over the board default, as a page's own header already does). PDF page labels still need numbering on.
+- **v0.9 · 2026-10-20 (interface pass, step 1; see docs/ui-reorganisation.md)**
+  - User-facing wording: the file is a "patchwork" (New patchwork, Patchwork settings, Untitled patchwork); "board" is no longer used in the UI. Internal names and the file format are unchanged.
+  - One tabbed **Patchwork settings** dialog (Layout, Numbering, Appearance, Document) replaces the inspector's board section and the small Board settings dialog. The inspector with nothing selected only links to Settings and Export.
+  - Toolbar regrouped: Page, Note, PDF, More (text, image, table of contents, trackers), zoom, undo/redo, Settings, Export, View. Labels collapse to icons when the toolbar does not fit.
+  - Export is also in the view's menu; the export dialog groups sheet/tiling/booklet/bleed and quality into collapsible sections.
+  - Decided, not yet built: inspector becomes an optional dock behind a floating context bar and properties popover; double-click on a note or text module will edit inline (opening the note in a pane moves to a button, the right-click menu and Alt+double-click).

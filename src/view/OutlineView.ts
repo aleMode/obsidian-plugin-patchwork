@@ -45,7 +45,7 @@ export class OutlineView extends ItemView {
 	}
 
 	getDisplayText() {
-		return 'Board outline';
+		return 'Outline';
 	}
 
 	getIcon() {
@@ -67,7 +67,7 @@ export class OutlineView extends ItemView {
 		el.addClass('pw-outline');
 		const board = this.active.get();
 		if (!board) {
-			el.createDiv({ cls: 'pw-panel-empty', text: 'Open a Patchwork board to see its pages here.' });
+			el.createDiv({ cls: 'pw-panel-empty', text: 'Open a patchwork to see its pages here.' });
 			return;
 		}
 		const file = board.boardStore.file;

@@ -13,13 +13,13 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Zoom out below 25 %: PDF regions and images you've seen at working zoom show as small previews instead of flat boxes; notes and text show faint lines. Panning a 100-page board stays at 60 fps (`docs/perf.md`).
 
 ### Small spec items filled in
-- Inspector (nothing selected) → **Font**, e.g. `Georgia, serif`: notes, text and headers on the pages use it, on screen, in exports, and when linked frames measure their text.
+- Toolbar → **Settings** → Appearance → **Font**, e.g. `Georgia, serif`: notes, text and headers on the pages use it, on screen, in exports, and when linked frames measure their text.
 - A module whose note, PDF or image was deleted shows **Pick another…** right on the board. For a PDF, the crop editor opens after picking, to check the crop.
 - Right-click a page → **Zoom to page**; command *Zoom to selection* fits whatever is selected.
 - A page wider or taller than 5080 mm gets a warning in the inspector: export it on a sheet size (tiles).
 
 ### Trackers
-- Toolbar → **Add tracker** (checklist icon) → Counter, Boxes or Checklist. Click − / + on a counter, click boxes (clicking the last filled one empties it), tick checklist items. Every click is one undo step and is saved.
+- Toolbar → **More** → Counter, Boxes or Checklist. Click − / + on a counter, click boxes (clicking the last filled one empties it), tick checklist items. Every click is one undo step and is saved.
 - Clicking the tracker anywhere except its controls selects it; drag to move. Lock it to keep it in place while playing.
 - Inspector: kind, value, min/max/step, number of boxes, checklist items (one per line; ticks stay with their line), **Print blank**. Export: the state prints without the −/+ buttons; with Print blank, empty boxes and an empty value to fill in by pencil.
 
@@ -32,7 +32,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 ## New in M4 (M4 complete)
 
 ### Dark PDFs, invert, ink saver
-- Inspector (nothing selected) → **Dark PDFs in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.
+- Toolbar → **Settings** → Appearance → **PDF regions in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.
 - Select a PDF module → **Invert colours**: for rulebook pages with dark backgrounds. Applies on screen and in exports (such modules export as images).
 - Export dialog → **Ink saver**: PDF regions and images print grayscale and lighter. Notes and text are unchanged. Pages with a dark background stay dark by decision (2026-10-20): use **Invert colours** on those modules.
 
@@ -65,12 +65,12 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ### Saved views and minimap
 - **Views** (top of the outline panel): *+* saves the current camera position under a name; click a view to jump back; hover for rename and delete. Also: **Patchwork: Save current view…**, **Go to view…**. Views are stored in the board file.
-- **Minimap** (bottom right; toolbar *map* icon or **Toggle minimap**): all pages and the visible area; click or drag in it to move around. Whether it's shown is remembered on this device.
+- **Minimap** (bottom right; toolbar **View** → Minimap, or **Toggle minimap**): all pages and the visible area; click or drag in it to move around. Whether it's shown is remembered on this device.
 
 ## New in M2 (session 3)
 
 ### Page numbers, headers, footers, safe area
-- Inspector with nothing selected → **Page numbers**: on/off, start at, format (1/i/a), position (6 options), skip first page. **Header / Footer** with tokens `{page}`, `{pages}`, `{title}`, `{date}`. **Safe area**: a dashed margin guide on every page (never printed).
+- Toolbar → **Settings** → Numbering → **Show page numbers**: on/off, start at, format (1/i/a), position (6 options), skip first page. **Header / Footer** with tokens `{page}`, `{pages}`, `{title}`, `{date}`. **Safe area**: a dashed margin guide on every page (never printed).
 - Select a page → **Page furniture**: number Automatic / Custom (e.g. "Cover") / None, header and footer Board default / Custom / None, and a per-page safe area.
 - Export: numbers, headers and footers print exactly as on screen; the PDF viewer's page box shows the same numbers (try roman with a custom "Cover" first page).
 
@@ -81,8 +81,8 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Your choices are remembered in the board.
 
 ### Auto-arrange and canvas export
-- Inspector (nothing selected) → **Arrange pages: In a row / In a grid**, or the commands *Arrange pages in a row / in a grid*. Pages keep their output order; the first page stays put; one Ctrl+Z undoes it.
-- **Export to canvas** (inspector button or command): writes `Board name.canvas` next to the board; open it in Obsidian's Canvas. Pages become groups, notes keep their section, PDFs open at the right page (crops and styles are dropped — the notice says so).
+- Toolbar → **Settings** → Layout → **Arrange pages: In a row / In a grid**, or the commands *Arrange pages in a row / in a grid*. Pages keep their output order; the first page stays put; one Ctrl+Z undoes it.
+- **Export to canvas** (toolbar **Export** menu, the view's ⋮ menu, or command): writes `Board name.canvas` next to the board; open it in Obsidian's Canvas. Pages become groups, notes keep their section, PDFs open at the right page (crops and styles are dropped — the notice says so).
 
 ## New since M0
 
@@ -98,7 +98,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Right-click a module → **Lock**: no handles, can't be dragged or nudged. **Unlock** restores.
 
 ### 1a. Inspector and outline panels (new, session 3)
-- Toolbar *panel* icon, or **Patchwork: Open inspector and outline**: both open in the right sidebar and follow the last board you clicked.
+- Toolbar **View** → Inspector and outline, or **Patchwork: Open inspector and outline**: both open in the right sidebar and follow the last board you clicked.
 - **Inspector:** nothing selected → board settings and title; a page → name, position, size, size preset, orientation, background; a module → label, position, size, lock, arrange, its own options (note: file, section, include heading, **line range**, overflow, scale; PDF: file, page, crop with *Edit crop…*, fit, rotation, vector/image in exports; text: markdown; image: file, fit) and **style** (padding, border width/colour/radius, background, opacity, text scale, CSS class).
 - Lengths are in the board's display unit, but you can type any unit ("5 cm", "2 in"). Typing in a field updates live and undoes as one step.
 - **Outline:** pages in output order with their modules; click one to select it and centre the board on it.
@@ -112,11 +112,11 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Also check: "zoom to fit" now keeps the page clear of the floating toolbar (it used to sit under it with the sidebar open).
 
 ### 1b. Rulers (new)
-- Top and left rulers in the board's display unit (mm by default; change it in **Board settings**, below).
+- Top and left rulers in the board's display unit (mm by default; change it in **Settings**, below).
 - Zero is the **selected page's top-left corner** (or the board origin when nothing is selected), so you can read module positions directly. Zoom and pan: ticks stay readable (label spacing adapts).
 
-### 1c. Board settings (new)
-- Toolbar gear icon, or **Patchwork: Board settings…**: display unit (mm / cm / in), grid size (type "5", "0.5 cm", "0.25 in"), snap on/off, grid on/off, "use app theme for pages".
+### 1c. Patchwork settings (new)
+- Toolbar **Settings**, or **Patchwork: Settings…**: one dialog with four tabs: Layout (display unit, grid size, snap, grid, safe area, arrange pages), Numbering (page numbers, header, footer), Appearance (app theme for pages, font, PDF regions in dark mode), Document (title). Lengths are a plain number with the unit beside them. *Apply* is one undo step for everything you changed.
 - Page labels and rulers switch units; *Apply* is one undo step.
 - Try "use app theme" in dark mode: pages turn dark on screen *and in the export* (that's what the option means).
 
@@ -133,7 +133,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - **PDF module:** opens the **crop editor** (also: right-click → *Edit crop…*).
 
 ### 3b. Crop editor (new)
-- Toolbar → *Add PDF* → pick a PDF: the crop editor opens on page 1 instead of asking for a page number. Use *Previous / Next* to find the page.
+- Toolbar → **PDF** → pick a PDF: the crop editor opens on page 1 instead of asking for a page number. Use *Previous / Next* to find the page.
 - Drag on the page to draw a crop; drag inside it to move; drag a corner to resize; *Full page* clears it.
 - "Resize module to the crop shape" (on by default) sets the module's height so the crop fills it without bars.
 - *Apply* is one undo step. Try it on the big rulebook and on the rotated page 3 of `Sample rulebook.pdf`.

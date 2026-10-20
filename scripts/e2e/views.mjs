@@ -19,17 +19,18 @@ try {
 		s.zoomToFit(); await new Promise((r) => setTimeout(r, 300));`);
 
 	// Save a view zoomed on the far page, move away, come back.
-	await inView(`s.select({ pageId: 'far' }); s.revealSelection(); await new Promise((r) => setTimeout(r, 200)); s.saveView('Far page'); s.select(null); s.zoomToFit(); await new Promise((r) => setTimeout(r, 200));`);
+	await inView(`s.select({ pageId: 'far' }); s.zoomToSelection(); await new Promise((r) => setTimeout(r, 200)); s.saveView('Far page'); s.select(null); s.zoomToFit(); await new Promise((r) => setTimeout(r, 200));`);
 	const saved = await inView('return view.store.file.views;');
 	check('view saved in the board', saved?.length === 1 && saved[0].name === 'Far page', saved);
 	const id = saved?.[0]?.id;
 	await inView(`s.goToView('${id}'); await new Promise((r) => setTimeout(r, 200));`);
 	const centre = await inView("const vp = { w: s.root.clientWidth, h: s.root.clientHeight }; const c = s.camera; const k = (96 / 25.4) * c.zoom; return { x: (vp.w / 2 - c.tx) / k, y: (vp.h / 2 - c.ty) / k };");
-	check('going to the view centres the far page', Math.abs(centre.x - 2105) < 5 && Math.abs(centre.y - 1648.5) < 5, centre);
+	// Zoom-to-selection keeps the page clear of the floating toolbar, so vertically it sits a little low.
+	check('going to the view centres the far page', Math.abs(centre.x - 2105) < 5 && Math.abs(centre.y - 1648.5) < 40, centre);
 	await inView(`s.renameView('${id}', 'Renamed'); await new Promise((r) => setTimeout(r, 50));`);
 	check('rename', (await inView('return view.store.file.views[0].name;')) === 'Renamed');
 	await sleep(2600);
-	const disk = await cdp.evaluate("return JSON.parse(await app.vault.read(app.vault.getAbstractFileByPath('_e2e/Untitled board.patchwork'))).views;");
+	const disk = await cdp.evaluate("return JSON.parse(await app.vault.read(app.vault.getAbstractFileByPath('_e2e/Untitled patchwork.patchwork'))).views;");
 	check('views saved to the file', disk?.[0]?.name === 'Renamed', disk);
 	await inView(`s.deleteView('${id}');`);
 	check('delete removes the key', (await inView('return view.store.file.views === undefined;')));
