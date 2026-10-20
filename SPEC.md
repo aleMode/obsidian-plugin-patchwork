@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.6 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.7 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -392,6 +392,12 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Saves check for external changes and never silently overwrite them.
   - Raster export canvases are capped at 8192 × 8192 px and verified with a pixel probe.
   - Print pipeline (section 9.1) not yet changed: a two-stage Chromium + `pdf-lib` pipeline is under discussion.
+- **v0.7 · 2026-10-20** (M2 complete)
+  - `{pages}` is the last page's number; `{date}` is YYYY-MM-DD; exported PDFs carry matching `/PageLabels` (tiles: "iii B2").
+  - All output layouts (native, fixed sheets, tiles, scale-to-fit) are built in the pdf-lib stage from native-size printed pages, so tiles stay vector. Oversized pages are only rejected for native export.
+  - PNG export rasterizes the final PDF; sheets above 8192 px per side become several files (`-r1c1`, …), resolving Q11 with option (a).
+  - Export dialog adds page selection (all / selected / range) and remembers its choices in `board.export` (new optional `fitSmallPages`, `tileLabels`).
+  - Auto-arrange keeps the first page in place and lays pages out in output order (row, or a grid of ⌈√n⌉ columns).
 - **v0.6 · 2026-10-20** (M1 complete)
   - Drag from the file explorer reads the `obsidian://open?…&file=…` URIs Obsidian puts on the drag (no internals).
   - Shift-drag draws a marquee (also when starting on a page's paper); plain drag on empty board pans. Shift-click toggles; selections never mix pages and modules.

@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 162 checks across 14 suites, all passing; `npm test`: 157 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 168 checks across 15 suites, all passing; `npm test`: 160 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -19,6 +19,10 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Try a big page (e.g. set a page to 1000 × 700 mm in the inspector) and export to A4: it becomes a grid of A4 tiles, all vector (zoom in: text stays sharp), with "A1… C5" labels if enabled. Bookmarks jump to each page's first sheet.
 - PNG: each sheet becomes an image (`name-01.png`, …). Very large sheets at high DPI are split into `-r1c1`, `-r1c2`, … tiles (8192 px cap).
 - Your choices are remembered in the board.
+
+### Auto-arrange and canvas export
+- Inspector (nothing selected) → **Arrange pages: In a row / In a grid**, or the commands *Arrange pages in a row / in a grid*. Pages keep their output order; the first page stays put; one Ctrl+Z undoes it.
+- **Export to canvas** (inspector button or command): writes `Board name.canvas` next to the board; open it in Obsidian's Canvas. Pages become groups, notes keep their section, PDFs open at the right page (crops and styles are dropped — the notice says so).
 
 ## New since M0
 
@@ -106,7 +110,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ## Known gaps (not bugs, not built yet)
 
-- Still to come in M2: auto-arrange pages, `.canvas` export.
+- M2 is complete. Next (M3): PDF outline picker, PDF text search to a region, saved views, minimap.
 
 ## Fixed tonight (worth a quick re-check)
 - Deleting a board while it has unsaved changes no longer shows Obsidian's scary "Failed to save file … make a backup" notice.

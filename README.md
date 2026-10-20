@@ -2,7 +2,7 @@
 
 An Obsidian desktop plugin for composing **boards** of fixed-size pages from live references to notes and PDF regions, and exporting them to PDF or PNG. See [`SPEC.md`](SPEC.md) for scope and design.
 
-Status: pre-alpha. Milestones M0 and M1 are done: boards and pages with rulers, grid, snapping and smart guides; note / PDF / text / image modules with styles, a crop editor and overflow policies; inspector and outline panels; multi-select with align and distribute; drag files from the explorer; renames follow; and PDF export with vector text and vector PDF crops. See `docs/testing-guide.md`.
+Status: pre-alpha. Milestones M0, M1 and M2 are done. M2 adds page numbers, headers and footers, a safe-area guide, auto-arrange, an export dialog with sheet sizes, vector tiling, page ranges and PNG, and `.canvas` export. Earlier: boards and pages with rulers, grid, snapping and smart guides; note / PDF / text / image modules with styles, a crop editor and overflow policies; inspector and outline panels; multi-select with align and distribute; drag files from the explorer; renames follow; and PDF export with vector text and vector PDF crops. See `docs/testing-guide.md`.
 
 ## Using it (M0)
 

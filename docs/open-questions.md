@@ -50,6 +50,7 @@ Questions raised while building, each with the recommended answer we are proceed
 - **Recommendation:** during export settle, detect `.mermaid-wrapper.is-guarded` and warn ("allow Mermaid diagrams in this vault first") instead of printing the guard box.
 
 ### Q11. PNG sheets larger than the raster tile cap
+- **Decided in M2 (SPEC v0.7):** option (a), several files named `-r1c1`, `-r1c2`, …
 - A sheet over 8192 px per side at the chosen DPI (e.g. 1 m wide at 300 dpi = 11 811 px) can't be one canvas tile.
 - Options: (a) write such sheets as multiple PNG files named by row/column (same labels as print tiling); (b) stream one large PNG ourselves, rendering one strip of rows at a time and compressing with Node's `zlib` (available in the renderer), so no giant canvas is ever needed; (c) cap DPI for oversized sheets.
 - **Recommendation:** (b) if it stays small (a PNG writer is ~100 lines), else (a). Decide in M2.

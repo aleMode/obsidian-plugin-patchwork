@@ -41,3 +41,14 @@ The cold-page miss is decode-bound: the two crops come from full-page illustrati
 - **M1 (render scheduler):** in-memory bitmap cache keyed by (file, page, crop, resolution) with an LRU budget (SPEC 8.4), so revisiting a page or toggling level of detail never re-decodes; spread module mounting across frames to remove the hitches while panning.
 - **M3:** low-resolution bitmap instead of outlines below the detail threshold; consider a persistent thumbnail cache for big PDFs. Re-measure on a 2× display.
 - See `docs/open-questions.md` Q13 for the target itself.
+
+## M2 export of the stress board (2026-10-20)
+
+`scripts/perf/exportStress.js`: the 100-page × 3-module stress board (fixture notes, the fixture PDF, the 64 MB illustrated rulebook, an image), exported at native size.
+
+| Quality | Time | Pages | File | Peak JS heap | Renderer RSS after |
+|---|---|---|---|---|---|
+| Smallest file (PDF regions as 150 dpi images) | 19.1 s | 100 | 12 MB | 119 MB | 1.47 GB |
+| Best quality (PDF regions as vector) | 11.7 s | 100 | 84 MB | 411 MB | 1.58 GB |
+
+No crash (M2 acceptance). Vector export is faster (no rasterizing) but larger: each crop carries its source page's full-resolution art (spike S8). RSS includes Chromium's print buffers and drops back over time.
