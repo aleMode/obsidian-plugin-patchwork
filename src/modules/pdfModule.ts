@@ -2,6 +2,7 @@ import { TFile } from 'obsidian';
 import { fitRect } from '../model/geometry';
 import { displayedCropSize, FULL_PAGE, normalizeRotation } from '../model/pdfGeometry';
 import type { AnyModule, Crop, PdfModule } from '../model/schema';
+import { contentBox } from '../model/style';
 import { PX_PER_MM } from '../model/units';
 import { BitmapCache, bucketResolution } from '../render/bitmapCache';
 import type { PdfDocument, PdfPage } from '../sources/pdfSource';
@@ -99,7 +100,9 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		const rot = normalizeRotation(m.rotation ?? 0);
 		// The viewport already applies the page's own /Rotate, so pass 0 for the page here.
 		const shown = displayedCropSize({ w: vp1.width, h: vp1.height }, 0, crop, rot);
-		const placed = fitRect(shown.w / shown.h, { x: 0, y: 0, w: m.w, h: m.h }, m.fit ?? 'contain');
+		// Coordinates are relative to the module body, which already sits inside border and padding.
+		const box = contentBox(m);
+		const placed = fitRect(shown.w / shown.h, { x: 0, y: 0, w: box.w, h: box.h }, m.fit ?? 'contain');
 		// The canvas holds the crop before the module's rotation.
 		const unrotated = rot % 180 ? { w: placed.h, h: placed.w } : { w: placed.w, h: placed.h };
 		const want = this.pxPerMm ?? this.ctx.resolution?.() ?? PX_PER_MM * window.devicePixelRatio;

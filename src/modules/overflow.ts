@@ -18,7 +18,9 @@ export function applyOverflow(moduleEl: HTMLElement, body: HTMLElement, policy: 
 	content.removeClass('is-fit');
 	if (policy === 'grow') {
 		// The grown height is display-only; the stored `h` never changes (SPEC 5.3).
-		moduleEl.setCssProps({ '--pw-grow-h': `${Math.max(content.offsetHeight / PX_PER_MM, 5)}mm` });
+		// Border and padding sit around the body; keep them when growing to the content.
+		const chrome = Math.max(0, moduleEl.offsetHeight - body.clientHeight);
+		moduleEl.setCssProps({ '--pw-grow-h': `${Math.max((content.offsetHeight + chrome) / PX_PER_MM, 5)}mm` });
 		return false;
 	}
 	const box = body.clientHeight;

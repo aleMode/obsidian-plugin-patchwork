@@ -190,8 +190,20 @@
 	width: var(--pw-w);
 	height: var(--pw-h);
 	z-index: var(--pw-z);
+	box-sizing: border-box;
 	overflow: hidden;
+	opacity: var(--pw-opacity, 1);
 	cursor: move;
+}
+
+/* Module style (SPEC 5.3): border inside the module's size, padding around the content. */
+.pw-module.has-border {
+	border: var(--pw-border-w) solid var(--pw-border-c);
+	border-radius: var(--pw-radius, 0);
+}
+
+.pw-module.has-background {
+	background: var(--pw-bg);
 }
 
 .pw-module.is-grow {
@@ -237,7 +249,8 @@
 
 .pw-module-body {
 	position: absolute;
-	inset: 0;
+	inset: var(--pw-pad, 0);
+	font-size: calc(1em * var(--pw-text-scale, 1));
 	overflow: hidden;
 	/* While editing, content is not interactive: clicks select and drag the module. */
 	pointer-events: none;

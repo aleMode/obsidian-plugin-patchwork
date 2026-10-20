@@ -38,6 +38,8 @@ try {
 					// Fixture page 3 has /Rotate 90; its blue box shows at displayed x 217-247, y 20-70 mm.
 					{ id: 'rot', type: 'pdf', file: 'PDFs/Sample rulebook.pdf', page: 3, crop: [217 / 297, 20 / 210, 247 / 297, 70 / 210], x: 20, y: 20, w: 30, h: 50 },
 					{ id: 'img', type: 'image', file: 'Images/Map.png', x: 60, y: 20, w: 80, h: 60 },
+					// Styled vector crop: red padding around the content, a black border.
+					{ id: 'styled', type: 'pdf', file: 'PDFs/Sample rulebook.pdf', page: 1, crop: statCrop, x: 150, y: 20, w: 50, h: 50, style: { padding: 5, background: '#ff0000', border: { width: 1, color: '#000000' } } },
 				],
 			},
 		],
@@ -87,6 +89,9 @@ try {
 		check('raster crop drawn in its box', near(p1.px(197, 140), fill), p1.px(197, 140));
 		check('nothing drawn outside the vector crop box', near(p1.px(105, 50), [255, 255, 255], 2), p1.px(105, 50));
 		check('rotated-page crop shows the blue box', near(p2.px(35, 45), [204, 230, 255]), p2.px(35, 45));
+		check('module style: padding shows the background', near(p2.px(152.5, 45), [255, 0, 0], 12), p2.px(152.5, 45));
+		check('module style: border drawn', near(p2.px(150.4, 45), [0, 0, 0], 40), p2.px(150.4, 45));
+		check('module style: vector content inside the padding', !near(p2.px(175, 45), [255, 0, 0], 40), p2.px(175, 45));
 		check('image module printed', !near(p2.px(100, 50), [255, 255, 255], 2), p2.px(100, 50));
 		check('paper is white even in a dark app theme', near(p1.px(60, 200), [255, 255, 255], 2), p1.px(60, 200));
 		check('a sheet wider than the first page is not clipped', near(p2.px(214.5, 200), [255, 255, 255], 2), p2.px(214.5, 200));

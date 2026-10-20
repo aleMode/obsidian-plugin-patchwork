@@ -70,3 +70,14 @@ describe('batches', () => {
 		expect(batches([], 3)).toEqual([]);
 	});
 });
+
+describe('vectorTarget with style', () => {
+	it('places and clips content inside border and padding', () => {
+		const m = pdf('m', 10, { y: 20, w: 100, h: 100, style: { padding: 4, border: { width: 1, color: '#000' } } });
+		const H = mmToPt(297);
+		const { clip } = vectorTarget(m, { w: mmToPt(210), h: mmToPt(297), rotate: 0 }, H);
+		expect(clip.x).toBeCloseTo(mmToPt(15));
+		expect(clip.w).toBeCloseTo(mmToPt(90));
+		expect(clip.y).toBeCloseTo(H - mmToPt(20 + 5 + 90));
+	});
+});

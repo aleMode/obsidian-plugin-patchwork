@@ -4,13 +4,14 @@ import type { BoardStore } from '../store/BoardStore';
 import { ImageModuleRenderer } from './imageModule';
 import { NoteModuleRenderer, TextModuleRenderer } from './noteModule';
 import { applyOverflow } from './overflow';
+import { applyModuleStyle } from './style';
 import { PdfModuleRenderer } from './pdfModule';
 import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
 
 /** Fields that change what a module shows. Anything else (position, label, …) is layout only. */
 const CONTENT_KEYS: Record<string, readonly string[]> = {
 	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow'],
-	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'w', 'h'],
+	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'w', 'h', 'style'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
 };
@@ -200,6 +201,7 @@ export class ModuleHost {
 		mounted.el.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
 		mounted.el.toggleClass('is-selected', m.id === this.selectedModule);
 		mounted.el.toggleClass('is-locked', !!m.locked);
+		applyModuleStyle(mounted.el, m);
 		if (resized && m.type === 'note') this.updateOverflow({ ...mounted, module: m });
 	}
 

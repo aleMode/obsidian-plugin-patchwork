@@ -1,6 +1,7 @@
 import { fitRect, intersects, type Rect } from './geometry';
 import { displayedCropSize, FULL_PAGE } from './pdfGeometry';
 import { type AnyModule, MAX_PAGE_SIDE_MM, type Page, type PdfModule } from './schema';
+import { contentBox } from './style';
 import { mmToPt } from './units';
 
 // Pure decisions for export (SPEC 9.1).
@@ -41,9 +42,12 @@ export function oversizedPages(pages: readonly Page[]): Page[] {
 export function vectorTarget(m: PdfModule, sourcePage: { w: number; h: number; rotate: number }, pageHeightPt: number): { content: Rect; clip: Rect } {
 	const crop = m.crop ?? FULL_PAGE;
 	const shown = displayedCropSize({ w: sourcePage.w, h: sourcePage.h }, sourcePage.rotate, crop, m.rotation ?? 0);
-	const placed = fitRect(shown.w / shown.h, { x: m.x, y: m.y, w: m.w, h: m.h }, m.fit ?? 'contain');
+	// Inside border and padding, exactly like the on-screen renderer.
+	const cb = contentBox(m);
+	const box = { x: m.x + cb.x, y: m.y + cb.y, w: cb.w, h: cb.h };
+	const placed = fitRect(shown.w / shown.h, box, m.fit ?? 'contain');
 	const toPdf = (r: Rect): Rect => ({ x: mmToPt(r.x), y: pageHeightPt - mmToPt(r.y + r.h), w: mmToPt(r.w), h: mmToPt(r.h) });
-	return { content: toPdf(placed), clip: toPdf({ x: m.x, y: m.y, w: m.w, h: m.h }) };
+	return { content: toPdf(placed), clip: toPdf(box) };
 }
 
 /** Split pages into print batches, so a large board is never all in the DOM at once (hard rule 9). */

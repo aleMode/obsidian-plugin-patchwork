@@ -5,6 +5,7 @@ import { ImageModuleRenderer } from '../modules/imageModule';
 import { NoteModuleRenderer, TextModuleRenderer } from '../modules/noteModule';
 import { applyOverflow } from '../modules/overflow';
 import { PdfModuleRenderer } from '../modules/pdfModule';
+import { applyModuleStyle } from '../modules/style';
 import { type ModuleContext, type ModuleRenderer, placeholder } from '../modules/types';
 import { printWindowToPdf } from './printAdapter';
 
@@ -98,6 +99,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 			drawOrder(page.modules).forEach((m, rank) => {
 				const mod = el.createDiv({ cls: 'pw-module' });
 				mod.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
+				applyModuleStyle(mod, m);
 				const body = mod.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
 				const r = createRenderer(m, body, ctx, o);
 				if (!r) return;
