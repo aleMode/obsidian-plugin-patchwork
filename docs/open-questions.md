@@ -58,8 +58,10 @@ Questions raised while building, each with the recommended answer we are proceed
 - **Recommendation:** (b) if it stays small (a PNG writer is ~100 lines), else (a). Decide in M2.
 
 ### Q12. Minimum Obsidian version
-- `minAppVersion` is raised only when an API needs it (SPEC 13); the `obsidianmd/no-unsupported-api` lint rule enforces this. Currently **1.6.6** (`FileManager.trashFile`).
+- `minAppVersion` is raised only when an API needs it (SPEC 13); the `obsidianmd/no-unsupported-api` lint rule enforces this. Currently **1.6.7** (tested; the API floor is 1.6.6, `FileManager.trashFile`).
 - All behaviour is verified on **1.14.4** only. Some findings may be version-dependent (native embed rendering in `MarkdownRenderer`, the Mermaid guard). **Recommendation:** before the first release, either test on the oldest claimed version or raise `minAppVersion` to the oldest version actually tested.
+- **Resolved 2026-10-20:** tested on **1.6.7** (Electron 30, Chromium 124), the oldest Linux AppImage on GitHub (1.6.6 has none), run from `.dev/` on a copy of the test vault with its own profile and CDP port 9223. All e2e suites pass with a full-size window, except checks that read back exported text: Chromium 124 prints a hyphen between capitals (`TOP-LEFT`) as a glyph with no text value, so copying it from the PDF gives a null character. The page looks right; this is Chromium's, fixed in newer Obsidian. `minAppVersion` raised to **1.6.7**, the oldest version tested.
+- To repeat: extract the AppImage (`--appimage-extract`), start `squashfs-root/obsidian --no-sandbox --user-data-dir=<new profile> --remote-debugging-port=9223` (through `flatpak-spawn --host` from the VS Code Flatpak), size the window to 1920×1040, then `CDP_PORT=9223 npm run e2e`. Use a fresh profile each time: Obsidian downloads its update in the background and runs it on the next start.
 
 ### Q13. "Visible pages paint in under 1 s" with heavy PDF art
 - Measured in M0 (`docs/perf.md`): a page with two crops of full-page rulebook illustrations takes 1.2–1.5 s the first time, bound by PDF.js decoding (one page at a time per document). Everything else meets the target.
