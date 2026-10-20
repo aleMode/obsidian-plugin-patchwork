@@ -83,3 +83,4 @@ Below 25 % zoom, outline boxes show previews kept from earlier renders (≤ 96 p
 - Image previews decode at 96 px with `createImageBitmap` resize options, not at full size; the crop editor frees a superseded page canvas at once.
 - The context bar builds its buttons only while open, so drags no longer rebuild hidden controls on every frame.
 - Stress board after the review: pan **p50 16.6 ms, p95 17.8 ms**, no long tasks.
+- The properties popover rebuilds its form at most once per frame (a drag changed it on every pointer move); the in-place formatting bar is placed on camera moves and module resizes instead of measuring layout every frame while typing.

@@ -87,6 +87,12 @@ try {
 	await ev(`s.editInline('a', 't');`);
 	check('editing shows the formatting toolbar', (await until(editing, 15000)) && (await ev(`return !!document.querySelector('.pw-format-bar')`)));
 	check('with bold, italic, headings, lists, quote and link', await ev(`const tips = [...document.querySelectorAll('.pw-format-bar button')].map((b) => b.getAttribute('aria-label')); return ['Bold', 'Italic', 'Strikethrough', 'Code', 'Heading 1', 'Heading 2', 'Heading 3', 'Bulleted list', 'Numbered list', 'Quote', 'Link'].every((t) => tips.includes(t))`));
+	// The bar is placed on camera moves, not every frame: panning must still carry it along.
+	const barX = () => ev(`return document.querySelector('.pw-format-bar').getBoundingClientRect().left`);
+	const before = await barX();
+	await ev(`s.setCamera({ ...s.camera, tx: s.camera.tx - 40 }); ${wait(150)}`);
+	check('the toolbar follows the module when the view pans', Math.abs((await barX()) - (before - 40)) < 2, [before, await barX()]);
+	await ev(`s.setCamera({ ...s.camera, tx: s.camera.tx + 40 }); ${wait(150)}`);
 	const text = await value();
 	const at = text.indexOf('plain');
 	await selectText(at, at + 5);

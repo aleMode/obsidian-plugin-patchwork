@@ -133,6 +133,8 @@ export class BoardViewport implements BoardSurface {
 	private minimap: Minimap;
 	/** Panels (inspector, outline) listen here; the store has its own subscription for content. */
 	private selectionListeners = new Set<(sel: Selection) => void>();
+	/** Things floating over the board that follow it on screen (the formatting bar of in-place editing). */
+	private cameraListeners = new Set<() => void>();
 	private drag: Drag | null = null;
 	private spaceHeld = false;
 	private frame = 0;
@@ -830,6 +832,7 @@ export class BoardViewport implements BoardSurface {
 		this.renderMinimap();
 		this.contextBar.reposition();
 		this.popover.reposition();
+		this.cameraListeners.forEach((fn) => fn());
 		// Switch level of detail right away, so zooming out never mounts content it won't show.
 		this.modules.setDetail(zoom >= DETAIL_ZOOM);
 		this.updateVisibility();
@@ -881,6 +884,7 @@ export class BoardViewport implements BoardSurface {
 		}
 		this.fitToolbar();
 		this.outlinePanel?.place();
+		this.cameraListeners.forEach((fn) => fn());
 		// The ruler canvases are sized in code, not CSS: without a redraw they are stretched (and blur) until the next pan.
 		this.renderRulers();
 		this.updateVisibility();
@@ -1455,7 +1459,12 @@ export class BoardViewport implements BoardSurface {
 
 	/** Edit a text box or note in place (double-click, Enter, or Edit on the context bar). */
 	editInline(pageId: string, moduleId: string) {
-		void startInlineEdit({ app: this.view.app, store: this.store, modules: this.modules, done: () => this.focusBoard(), host: this.host, topInset: () => this.toolbarBottom() }, pageId, moduleId);
+		void startInlineEdit({ app: this.view.app, store: this.store, modules: this.modules, done: () => this.focusBoard(), host: this.host, topInset: () => this.toolbarBottom(), onCameraMove: (fn) => this.onCameraMove(fn) }, pageId, moduleId);
+	}
+
+	private onCameraMove(fn: () => void): () => void {
+		this.cameraListeners.add(fn);
+		return () => this.cameraListeners.delete(fn);
 	}
 
 	/** Enter on a selected text box or note starts editing it; false when the selection is something else. */

@@ -16,6 +16,8 @@ export interface InlineEditDeps {
 	/** The board host the formatting toolbar floats in, and the lowest y it may use (below the rulers and toolbar). */
 	host: HTMLElement;
 	topInset: () => number;
+	/** Subscribe to camera moves (pan, zoom, board resize); returns an unsubscribe. */
+	onCameraMove: (fn: () => void) => () => void;
 }
 
 /** Modules whose text can be edited where they sit: a text box (its markdown lives in the patchwork) or a note. */
@@ -219,9 +221,9 @@ function createFormatBar(d: InlineEditDeps, ta: HTMLTextAreaElement, moduleEl: H
 	button('quote', 'Quote', lines('quote'));
 	button('link', 'Link', () => insertLink(ta.value, ta.selectionStart, ta.selectionEnd));
 
-	// Above the module (below it when there is no room); follows it if the camera moves.
-	const win = ta.win;
-	let frame = 0;
+	// Above the module (below it when there is no room). It moves only when the camera moves or the
+	// module changes size, so it is placed then rather than on every frame (typing forces a layout, and
+	// measuring each frame would make the browser redo it).
 	const place = () => {
 		const m = moduleEl.getBoundingClientRect();
 		const h = d.host.getBoundingClientRect();
@@ -232,13 +234,16 @@ function createFormatBar(d: InlineEditDeps, ta: HTMLTextAreaElement, moduleEl: H
 		if (y < d.topInset() + gap) y = m.bottom - h.top + gap;
 		const x = Math.min(Math.max(gap, m.left - h.left + m.width / 2 - w / 2), Math.max(gap, h.width - w - gap));
 		bar.setCssProps({ '--pw-fb-x': `${Math.round(x)}px`, '--pw-fb-y': `${Math.round(y)}px` });
-		frame = win.requestAnimationFrame(place);
 	};
 	place();
+	const offCamera = d.onCameraMove(place);
+	const resized = new ResizeObserver(place);
+	resized.observe(moduleEl);
 	return {
 		run,
 		remove: () => {
-			win.cancelAnimationFrame(frame);
+			offCamera();
+			resized.disconnect();
 			bar.remove();
 		},
 	};

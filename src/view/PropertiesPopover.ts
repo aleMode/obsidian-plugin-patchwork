@@ -30,6 +30,7 @@ export class PropertiesPopover {
 	private kind: 'module' | 'page' | null = null;
 	private selKey = '';
 	private offDoc: (() => void) | null = null;
+	private frame = 0;
 
 	constructor(private board: BoardViewport, private host: HTMLElement, private app: App) {
 		this.el = host.createDiv({ cls: 'pw-popover is-hidden' });
@@ -96,8 +97,20 @@ export class PropertiesPopover {
 		else this.show(tab);
 	}
 
-	/** The selection or the model changed: follow it, keeping focus while the user types. */
+	/**
+	 * The selection or the model changed: follow it, at most once per frame. A drag changes the model on
+	 * every pointer move, and each update rebuilds the form.
+	 */
 	refresh() {
+		if (!this.isOpen || this.frame) return;
+		this.frame = this.host.win.requestAnimationFrame(() => {
+			this.frame = 0;
+			this.update();
+		});
+	}
+
+	/** Rebuild for the current selection, keeping focus while the user types. */
+	private update() {
 		if (!this.isOpen) return;
 		const kind = this.kindOfSelection();
 		if (!kind) return this.hide();
@@ -118,6 +131,7 @@ export class PropertiesPopover {
 	}
 
 	destroy() {
+		if (this.frame) this.host.win.cancelAnimationFrame(this.frame);
 		this.offDoc?.();
 		this.el.remove();
 	}
