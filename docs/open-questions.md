@@ -79,3 +79,6 @@ Questions raised while building, each with the recommended answer we are proceed
 ### Q17. Editing notes in place (like Canvas)
 - Obsidian has no public embeddable editor. Plain CodeMirror 6 is available without a new dependency; the Live Preview look needs undocumented internals (hard rule 6). Options A (text modules), B (notes, plain editor), C (internals) in `docs/ui-reorganisation.md` section 4.
 - **Recommendation:** A, then B; spike C (S8) only if raw-markdown editing feels too bare. Double-click edits inline and "open note" moves to the context bar, right-click and Alt + double-click, which changes SPEC 5.x (changelog).
+
+### Q18. Live Preview editing (option C)
+- **Dropped (2026-10-20).** The user prefers a display mode to editing in Obsidian's editor: a patchwork gets a **Use** mode where content is live (links, checkboxes, plugin buttons) and nothing moves, next to today's **Arrange**. Plan and decisions: `docs/use-mode-plan.md`. In-place editing stays the plain text area (A and B).
