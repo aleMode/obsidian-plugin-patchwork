@@ -26,6 +26,7 @@ Tick these off; details for each are in the sections below.
 - [x] Colours: palette on the context bar (Arrange) and Style tab → Colour / Custom colour; tinted cards in a PDF export.
 - [x] Plugins (enable Dataview, Tasks, Buttons, Meta Bind; Bases in core plugins): `Dashboard/Plugin blocks.patchwork`, every block responds; Bases links open to the side.
 - [ ] Embedded PDF pages looked soft in the editor at normal zoom: now drawn at twice the pixels on the board (3.5× the edge sharpness by pixel measure). Check by eye at 100 % and at a fitted zoom.
+- [ ] Softness on the board at normal zoom (e.g. 94 %): PDF regions are now drawn at 1.5× the pixels (they were ~1:1, and up to 16 % under what the zoom needed), and the board layer sits on whole device pixels. Check PDF modules and note text at 94 %, 100 % and a fitted zoom. Notes' own text was already sharp.
 - [x] The dashboard looked slightly blurry: Chromium kept the board layer's first raster scale and stretched it. Fixed: the layer is re-rasterised when zoom settles (text 60 % sharper by pixel measure). Check by eye on `Dashboard/Dashboard.patchwork`, then zoom in and out.
 
 **Smaller changes**

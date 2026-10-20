@@ -870,7 +870,9 @@ export class BoardViewport implements BoardSurface {
 	private applyCamera() {
 		this.frame = 0;
 		const { tx, ty, zoom } = this.camera;
-		this.layer.style.transform = `translate(${tx}px, ${ty}px) scale(${zoom})`;
+		// Whole device pixels: a fractional offset makes the compositor resample the layer's raster.
+		const dpr = this.root.win.devicePixelRatio || 1;
+		this.layer.style.transform = `translate(${Math.round(tx * dpr) / dpr}px, ${Math.round(ty * dpr) / dpr}px) scale(${zoom})`;
 		this.zoomLabel.setText(`${Math.round(zoom * 100)}%`);
 		this.renderGrid();
 		this.renderRulers();

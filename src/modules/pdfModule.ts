@@ -13,6 +13,14 @@ import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setB
 /** Never allocate a canvas side beyond this, whatever the module size (memory, spike S4). */
 const MAX_CANVAS_SIDE = 4096;
 
+/**
+ * Canvas pixels per displayed pixel on the board. The zoom and page offsets are fractional, so a canvas
+ * drawn at about its shown size is resampled ~1:1 and turns soft, and snapping the size to the nearest
+ * half-octave step can land up to 16 % under what the zoom needs. With this headroom the bucket (which
+ * rounds to the nearest step) always stays at 1.26x or more and the browser downsamples cleanly.
+ */
+const SCREEN_OVERSAMPLE = 1.5;
+
 interface Layout {
 	crop: Crop;
 	rot: number;
@@ -50,7 +58,8 @@ export class PdfModuleRenderer implements ModuleRenderer {
 	/** True when the current canvas is too blurry or needlessly large for `pxPerMm`. */
 	wantsResolution(pxPerMm: number): boolean {
 		if (this.pxPerMm !== undefined || this.renderedPxPerMm === 0) return false;
-		return this.renderedPxPerMm < pxPerMm * 0.7 || this.renderedPxPerMm > pxPerMm * 2.5;
+		const need = pxPerMm * SCREEN_OVERSAMPLE;
+		return this.renderedPxPerMm < need * 0.8 || this.renderedPxPerMm > need * 2.5;
 	}
 
 	render(m: AnyModule) {
@@ -123,7 +132,7 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		const placed = fitRect(shown.w / shown.h, { x: 0, y: 0, w: box.w, h: box.h }, m.fit ?? 'contain');
 		// The canvas holds the crop before the module's rotation.
 		const unrotated = rot % 180 ? { w: placed.h, h: placed.w } : { w: placed.w, h: placed.h };
-		const want = this.pxPerMm ?? this.ctx.resolution?.() ?? PX_PER_MM * window.devicePixelRatio;
+		const want = (this.ctx.resolution?.() ?? PX_PER_MM * window.devicePixelRatio) * SCREEN_OVERSAMPLE;
 		const pxPerMm = this.pxPerMm ?? bucketResolution(want, PX_PER_MM);
 		const w = Math.min(MAX_CANVAS_SIDE, Math.max(1, Math.ceil(unrotated.w * pxPerMm)));
 		const h = Math.min(MAX_CANVAS_SIDE, Math.max(1, Math.ceil(unrotated.h * pxPerMm)));
