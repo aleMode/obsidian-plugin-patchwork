@@ -2,9 +2,9 @@
 
 ## Prep
 
-- [ ] Re-read [[Goblin]] tactics
+- [x] Re-read [[Goblin]] tactics ✅ 2026-10-20
 - [x] Print the [[Spell list]]
-- [ ] Prepare the ambush map
+- [x] Prepare the ambush map ✅ 2026-10-20
 
 ## Party
 
@@ -19,4 +19,4 @@
 ## Loot
 
 - [ ] 120 gp
-- [ ] Wand of sparks
+- [x] Wand of sparks

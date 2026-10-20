@@ -5,7 +5,31 @@
     "title": "Session dashboard"
   },
   "board": {
-    "mode": "use"
+    "grid": {
+      "size": 5,
+      "snap": true,
+      "visible": true
+    },
+    "displayUnit": "mm",
+    "order": "reading",
+    "numbering": {
+      "enabled": false,
+      "start": 1,
+      "format": "arabic",
+      "position": "bottom-center",
+      "skipFirst": false
+    },
+    "useAppTheme": false,
+    "mode": "use",
+    "export": {
+      "format": "pdf",
+      "sheet": "native",
+      "orientation": "auto",
+      "tileOverlap": 0,
+      "cropMarks": false,
+      "dpi": 200,
+      "quality": "best"
+    }
   },
   "pages": [
     {
@@ -20,14 +44,14 @@
           "id": "prep",
           "type": "note",
           "x": 8,
-          "y": 8,
-          "w": 90,
+          "y": 10,
+          "w": 87,
           "h": 60,
           "file": "Dashboard/Session.md",
           "subpath": "#Prep",
           "style": {
             "padding": 3,
-            "tint": "4"
+            "tint": "1"
           }
         },
         {
@@ -49,7 +73,7 @@
           "type": "note",
           "x": 8,
           "y": 74,
-          "w": 90,
+          "w": 87,
           "h": 66,
           "file": "Dashboard/Session.md",
           "subpath": "#Loot",
@@ -65,9 +89,9 @@
           "y": 8,
           "w": 79,
           "h": 25,
-          "kind": "counter",
           "label": "Hit points",
-          "value": 31,
+          "kind": "counter",
+          "value": 36,
           "min": 0
         },
         {
@@ -77,7 +101,7 @@
           "y": 106,
           "w": 100,
           "h": 34,
-          "markdown": "**Table notes**\n\n- [ ] Ask about the crown\n- [ ] Check [[Combat]] rules for prone",
+          "markdown": "**Table notes**\n\n- [x] Ask about the crown\n- [ ] Check [[Combat]] rules for prone",
           "style": {
             "padding": 3,
             "tint": "6"
