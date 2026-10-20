@@ -80,6 +80,25 @@ export function keepGrabbable(r: Rect, page: { w: number; h: number }, minVisibl
 	return { ...r, x: pull(r.x, r.w, page.w), y: pull(r.y, r.h, page.h) };
 }
 
+/**
+ * How far to pan so `sel` sits inside `region` (same coordinates, e.g. screen pixels): nothing when it
+ * is already inside, the least movement when it sticks out, and, when it is bigger than the region on
+ * that axis, nothing if it already spans the region's centre, else centred. Revealing an item then
+ * never moves the view more than it has to.
+ */
+export function revealShift(sel: Rect, region: Rect): Point {
+	const axis = (pos: number, size: number, regPos: number, regSize: number) => {
+		if (size >= regSize) {
+			const centre = regPos + regSize / 2;
+			return pos <= centre && centre <= pos + size ? 0 : centre - (pos + size / 2);
+		}
+		if (pos < regPos) return regPos - pos;
+		if (pos + size > regPos + regSize) return regPos + regSize - (pos + size);
+		return 0;
+	};
+	return { x: axis(sel.x, sel.w, region.x, region.w), y: axis(sel.y, sel.h, region.y, region.h) };
+}
+
 export type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
 /**

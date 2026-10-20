@@ -58,6 +58,34 @@ try {
 	await ev(`document.querySelector('.pw-outline-panel').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 })); ${wait(200)}`);
 	check('pressing inside the panel does not clear the selection', (await ev(`return JSON.stringify(s.selected)`)) === '{"pageId":"b"}');
 
+	// size and spacing: as big as its content, with room between the text and the edge
+	const geo = JSON.parse(await ev(`const p = document.querySelector('.pw-outline-panel'); const h = document.querySelector('.pw-surface-host').getBoundingClientRect(); const row = p.querySelector('.pw-outline-page'); const icon = row.querySelector('.pw-outline-icon').getBoundingClientRect(); const pr = p.getBoundingClientRect(); return JSON.stringify({ ph: pr.height, hh: h.height, pw: pr.width, hw: h.width, pad: icon.left - pr.left });`));
+	check('the panel is only as tall as its content needs', geo.ph < geo.hh * 0.7, geo);
+	check('and not wider than needed', geo.pw <= 330 && geo.pw <= geo.hw * 0.6 + 1, geo);
+	check('text keeps a margin from the panel edge', geo.pad >= 12, geo);
+
+	// dragging by the title
+	const head = JSON.parse(await ev(`const r = document.querySelector('.pw-outline-panel-head span').getBoundingClientRect(); const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); return JSON.stringify({ x: r.x + 10, y: r.y + r.height / 2, px: p.left, py: p.top })`));
+	await cdp.drag({ x: head.x, y: head.y }, { x: head.x + 60, y: head.y + 90 });
+	await ev(`${wait(300)}`);
+	const moved = JSON.parse(await ev(`const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); return JSON.stringify({ px: p.left, py: p.top })`));
+	check('dragging the title moves the panel', Math.abs(moved.px - head.px - 60) <= 3 && Math.abs(moved.py - head.py - 90) <= 3, { head, moved });
+	check('and the position is remembered', (await ev(`return !!localStorage.getItem('patchwork-outline-pos')`)));
+	await ev(`const h = document.querySelector('.pw-outline-panel-head'); h.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); ${wait(300)}`);
+	const reset = JSON.parse(await ev(`const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); return JSON.stringify({ px: p.left, py: p.top })`));
+	// (the toolbar may have settled since the first measurement, so the height gets a little room)
+	check('double-clicking the title puts it back', Math.abs(reset.px - head.px) <= 3 && Math.abs(reset.py - head.py) <= 14 && (await ev(`return !localStorage.getItem('patchwork-outline-pos')`)), { reset, head });
+
+	// revealing from the outline: not re-centred when comfortable, brought out from under the panel
+	await ev(`s.zoomToFit(); ${wait(500)}`);
+	await ev(`s.select({ pageId: 'a', moduleId: 'tr' }); const m = v.store.file.pages[0].modules.find((x) => x.id === 'tr'); const p = v.store.file.pages[0]; const k = (96 / 25.4) * s.camera.zoom; const vp = { w: s.root.clientWidth, h: s.root.clientHeight }; s.setCamera({ ...s.camera, tx: vp.w / 2 - (p.x + m.x + m.w / 2) * k, ty: vp.h / 2 - (p.y + m.y + m.h / 2) * k }); ${wait(700)}`);
+	await ev(`window.__cam = JSON.stringify(s.camera); [...document.querySelectorAll('.pw-outline-panel .pw-outline-module')].find((r) => r.textContent.includes('HP')).click(); ${wait(600)}`);
+	check('an item already in the comfortable middle does not move the view', (await ev(`return JSON.stringify(s.camera)`)) === (await ev(`return window.__cam`)));
+	await ev(`s.setCamera({ ...s.camera, tx: s.camera.tx - 5000 }); ${wait(600)}`);
+	await ev(`[...document.querySelectorAll('.pw-outline-panel .pw-outline-module')].find((r) => r.textContent.includes('HP')).click(); ${wait(700)}`);
+	const place = JSON.parse(await ev(`const r = s.selectionScreenRect(); const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); const h = document.querySelector('.pw-surface-host').getBoundingClientRect(); const pr = { x: p.left - h.left, y: p.top - h.top, w: p.width, h: p.height }; const hit = r.x < pr.x + pr.w && pr.x < r.x + r.w && r.y < pr.y + pr.h && pr.y < r.y + r.h; return JSON.stringify({ r, pr, hit, hw: h.width, hh: h.height })`));
+	check('an item far off screen is brought into view, clear of the panel', !place.hit && place.r.x >= 0 && place.r.x + place.r.w <= place.hw && place.r.y >= 0 && place.r.y + place.r.h <= place.hh, place);
+
 	// live updates
 	await ev(`v.store.update((f) => ({ ...f, pages: f.pages.map((p) => (p.id === 'b' ? { ...p, name: 'Cover' } : p)) }));`);
 	check('renaming a page updates the list', await until(async () => (await rows()).includes('2. Cover')), await rows());

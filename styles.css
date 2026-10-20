@@ -1200,14 +1200,17 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 
 .pw-outline-panel {
 	position: absolute;
-	left: 28px;
-	top: var(--pw-op-top, 80px);
-	bottom: 28px;
-	z-index: 3;
+	left: var(--pw-op-x, 28px);
+	top: var(--pw-op-y, 80px);
+	/* Above the context bar and pill (an item under the panel must not draw over its text), below the popover. */
+	z-index: 4;
 	display: flex;
 	flex-direction: column;
-	/* Shrinks with a narrow pane instead of covering the board. */
-	width: min(240px, 42%);
+	/* As big as its content needs, within the room left on the board. */
+	width: max-content;
+	min-width: 190px;
+	max-width: min(320px, 60%);
+	max-height: var(--pw-op-room, 60%);
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
@@ -1227,13 +1230,32 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	color: var(--text-muted);
 	font-size: var(--font-ui-smaller);
 	font-weight: var(--font-semibold);
+	/* Moved by its title. */
+	cursor: grab;
+	user-select: none;
+	touch-action: none;
+}
+
+.pw-outline-panel-head.is-dragging {
+	cursor: grabbing;
 }
 
 .pw-outline-panel-body {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
-	padding: var(--size-4-1) 0;
+	padding: var(--size-4-2) var(--size-4-3) var(--size-4-3);
+}
+
+/* Room between the text and the panel's edge (the sidebar's rows run edge to edge). */
+.pw-outline-panel-body .pw-outline-row,
+.pw-outline-panel-body .pw-outline-section {
+	padding-left: var(--size-4-3);
+	padding-right: var(--size-4-2);
+}
+
+.pw-outline-panel-body .pw-outline-module {
+	padding-left: var(--size-4-8);
 }
 
 /* ---------- context bar and properties popover (interface pass) ---------- */

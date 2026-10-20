@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { bounds, containsPoint, containsRect, fitRect, intersects, keepGrabbable, toBoard } from '../../src/model/geometry';
+import { bounds, containsPoint, containsRect, fitRect, intersects, keepGrabbable, revealShift, toBoard } from '../../src/model/geometry';
+
+describe('revealShift', () => {
+	const region = { x: 100, y: 100, w: 400, h: 300 };
+	it('does not move an item that is already inside the region', () => {
+		expect(revealShift({ x: 150, y: 150, w: 100, h: 50 }, region)).toEqual({ x: 0, y: 0 });
+	});
+	it('moves an item that sticks out by the least amount, on that axis only', () => {
+		expect(revealShift({ x: 50, y: 150, w: 100, h: 50 }, region)).toEqual({ x: 50, y: 0 });
+		expect(revealShift({ x: 450, y: 380, w: 100, h: 50 }, region)).toEqual({ x: -50, y: -30 });
+	});
+	it('brings an item that is entirely outside to the nearest edge of the region', () => {
+		expect(revealShift({ x: 900, y: 100, w: 100, h: 50 }, region)).toEqual({ x: -500, y: 0 });
+	});
+	it('leaves an item bigger than the region alone when it spans the middle', () => {
+		expect(revealShift({ x: 0, y: 120, w: 800, h: 50 }, region)).toEqual({ x: 0, y: 0 });
+	});
+	it('centres an item bigger than the region when it is off to one side', () => {
+		expect(revealShift({ x: 500, y: 120, w: 800, h: 50 }, region)).toEqual({ x: -600, y: 0 });
+	});
+});
 
 describe('keepGrabbable', () => {
 	const page = { w: 210, h: 297 };

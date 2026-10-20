@@ -5,7 +5,7 @@ import { parseRange } from '../model/sheetPlan';
 import { arrangePages } from '../model/arrange';
 import { toJsonCanvas } from '../model/canvasExport';
 import { allIds } from '../model/defaults';
-import { bounds, containsPoint, containsRect, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect } from '../model/geometry';
+import { bounds, containsPoint, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect, revealShift } from '../model/geometry';
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
@@ -428,17 +428,49 @@ export class BoardViewport implements BoardSurface {
 		this.zoomToFit(rects.length ? bounds(rects) ?? undefined : undefined);
 	}
 
-	/** Bring the selection into view; if it is already fully visible the camera stays where it is. */
+	/**
+	 * Bring the selection into a comfortable central part of the view. Nothing moves when it is already
+	 * there; otherwise the view pans just enough, and zooms out only if the item cannot fit at all. The
+	 * region keeps clear of the floating toolbar and of the outline panel, so an item at an edge or
+	 * under the panel is brought out, without re-centring every time.
+	 */
 	revealSelection() {
 		const sel = this.selectedRect();
 		const vp = this.viewportSize();
 		if (!sel || vp.w === 0) return;
-		if (containsRect(visibleRect(this.camera, vp), sel.rect)) return;
-		const fit = fitCamera(sel.rect, vp, 60);
-		const zoom = Math.min(this.camera.zoom, fit.zoom);
-		const k = PX_PER_MM * zoom;
 		const r = sel.rect;
-		this.setCamera({ zoom, tx: vp.w / 2 - (r.x + r.w / 2) * k, ty: vp.h / 2 - (r.y + r.h / 2) * k });
+		const region = this.comfortRegion(vp);
+		const fit = fitCamera(r, vp, 60);
+		if (fit.zoom < this.camera.zoom) {
+			// Too big for the view at this zoom: fit it, centred in the comfortable region (not under the panel).
+			const k = PX_PER_MM * fit.zoom;
+			this.setCamera({ zoom: fit.zoom, tx: region.x + region.w / 2 - (r.x + r.w / 2) * k, ty: region.y + region.h / 2 - (r.y + r.h / 2) * k });
+			return;
+		}
+		const k = PX_PER_MM * this.camera.zoom;
+		const onScreen = { x: this.camera.tx + r.x * k, y: this.camera.ty + r.y * k, w: r.w * k, h: r.h * k };
+		const shift = revealShift(onScreen, region);
+		if (shift.x !== 0 || shift.y !== 0) this.setCamera(panBy(this.camera, shift.x, shift.y));
+	}
+
+	/** The middle part of the view, less the toolbar along the top and the outline panel if it is open. */
+	private comfortRegion(vp: { w: number; h: number }): Rect {
+		const gap = 16;
+		let x0 = vp.w * 0.15;
+		let x1 = vp.w * 0.85;
+		const y0 = Math.max(vp.h * 0.15, this.toolbarBottom() + gap);
+		const y1 = vp.h * 0.85;
+		const panel = this.outlinePanel.rect();
+		if (panel) {
+			if (panel.x + panel.w / 2 < (x0 + x1) / 2) x0 = Math.max(x0, panel.x + panel.w + gap);
+			else x1 = Math.min(x1, panel.x - gap);
+		}
+		// A panel that leaves no room must not make the region vanish.
+		if (x1 - x0 < 120) {
+			x0 = vp.w * 0.15;
+			x1 = vp.w * 0.85;
+		}
+		return { x: x0, y: y0, w: x1 - x0, h: Math.max(60, y1 - y0) };
 	}
 
 	// ---------- adding things ----------
