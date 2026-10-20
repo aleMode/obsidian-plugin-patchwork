@@ -1,7 +1,7 @@
 import { PX_PER_MM } from '../model/units';
 
 /** Smallest scale "fit" will shrink a note to before it clips (SPEC 5.3). */
-export const MIN_FIT_SCALE = 0.5;
+const MIN_FIT_SCALE = 0.5;
 const FIT_STEPS = 7;
 
 export type OverflowPolicy = 'clip' | 'fit' | 'grow';

@@ -7,7 +7,7 @@ import type { AnyModule, Page, PatchworkFile } from './schema';
 // own and inherit its header, footer, background and safe area. Pure.
 
 /** Separates the page and master module IDs in an inherited module's ID; never valid in a real ID. */
-export const INHERITED_SEP = '~';
+const INHERITED_SEP = '~';
 
 /** Pages that are exported and numbered, in output order (master pages are left out). */
 export function outputPages(file: Pick<PatchworkFile, 'pages' | 'board'>): Page[] {

@@ -4,7 +4,7 @@ import type { PatchworkFile } from './schema';
 // One-way, lossy export to Obsidian's JSON Canvas (SPEC 9.3, spike S7).
 
 /** Default scale: 96 dpi CSS pixels per mm, rounded as the spec says. */
-export const CANVAS_PX_PER_MM = 3.78;
+const CANVAS_PX_PER_MM = 3.78;
 
 export interface CanvasNode {
 	id: string;

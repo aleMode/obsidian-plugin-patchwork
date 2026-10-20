@@ -25,10 +25,6 @@ function remote(): ElectronRemote | null {
 	}
 }
 
-export function canPrintToPdf(): boolean {
-	return remote() !== null;
-}
-
 /** Print the current window (only `.print` content is visible in print media) to PDF bytes. */
 export async function printWindowToPdf(): Promise<Uint8Array> {
 	const r = remote();

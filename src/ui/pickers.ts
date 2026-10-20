@@ -1,4 +1,4 @@
-import { App, FuzzySuggestModal, Modal, Setting, SuggestModal, TFile } from 'obsidian';
+import { App, FuzzySuggestModal, SuggestModal, TFile } from 'obsidian';
 
 export class FilePickerModal extends FuzzySuggestModal<TFile> {
 	constructor(app: App, private files: TFile[], placeholder: string, private onPick: (file: TFile) => void) {
@@ -56,40 +56,5 @@ export class SectionPickerModal extends SuggestModal<SectionChoice> {
 
 	onChooseSuggestion(choice: SectionChoice): void {
 		this.onPick(choice);
-	}
-}
-
-/** Ask for a 1-based page number. */
-export class PdfPageModal extends Modal {
-	private page = 1;
-
-	constructor(app: App, private fileName: string, private pageCount: number, private onPick: (page: number) => void) {
-		super(app);
-	}
-
-	onOpen() {
-		this.setTitle(`Page of ${this.fileName}`);
-		const submit = () => {
-			if (this.page >= 1 && this.page <= this.pageCount) {
-				this.close();
-				this.onPick(this.page);
-			}
-		};
-		new Setting(this.contentEl)
-			.setName('Page')
-			.setDesc(`1 to ${this.pageCount}`)
-			.addText((t) => {
-				t.inputEl.type = 'number';
-				t.inputEl.min = '1';
-				t.inputEl.max = String(this.pageCount);
-				t.setValue('1').onChange((v) => (this.page = Number(v)));
-				t.inputEl.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-				window.setTimeout(() => t.inputEl.select(), 0);
-			});
-		new Setting(this.contentEl).addButton((b) => b.setButtonText('Add').setCta().onClick(submit));
-	}
-
-	onClose() {
-		this.contentEl.empty();
 	}
 }

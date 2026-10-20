@@ -51,7 +51,7 @@ export interface PlanOptions {
 	cropMarks?: boolean;
 }
 
-export function sheetSize(sheet: Exclude<SheetSetting, 'native'>): Size {
+function sheetSize(sheet: Exclude<SheetSetting, 'native'>): Size {
 	return typeof sheet === 'string' ? SHEET_SIZES[sheet] : { w: sheet.w, h: sheet.h };
 }
 

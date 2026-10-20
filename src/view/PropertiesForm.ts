@@ -10,7 +10,7 @@ import { MAX_PAGE_SIDE_MM } from '../model/schema';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import { ALIGN_ACTIONS, type BoardViewport } from './BoardViewport';
-import { moduleTitle } from './OutlineView';
+import { moduleTitle } from './OutlineRenderer';
 import { insets, PLAIN_NUMBER, uniformInset, withField } from '../ui/formHelpers';
 
 export type PropertiesSection = 'content' | 'layout' | 'style' | 'furniture' | 'advanced';

@@ -14,7 +14,6 @@ export interface Point {
 
 export const right = (r: Rect) => r.x + r.w;
 export const bottom = (r: Rect) => r.y + r.h;
-export const center = (r: Rect): Point => ({ x: r.x + r.w / 2, y: r.y + r.h / 2 });
 
 /** Touching edges do not count as intersecting, so adjacent pages are not "overlapping". */
 export function intersects(a: Rect, b: Rect): boolean {

@@ -11,7 +11,7 @@ export interface Camera {
 	zoom: number;
 }
 
-export const MIN_ZOOM = 0.02;
+const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 8;
 
 export function boardToScreen(c: Camera, p: Point): Point {

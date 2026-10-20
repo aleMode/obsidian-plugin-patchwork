@@ -189,7 +189,7 @@ export interface ForeignModule extends BaseModule {
 
 export type AnyModule = Module | ForeignModule;
 
-export const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame', 'tracker'] as const;
+const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame', 'tracker'] as const;
 
 export function isKnownModule(m: AnyModule): m is Module {
 	return (MODULE_TYPES as readonly string[]).includes(m.type);

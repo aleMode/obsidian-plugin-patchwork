@@ -2,8 +2,6 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 import type { ActiveBoard } from './activeBoard';
 import { OutlineRenderer } from './OutlineRenderer';
 
-export { moduleTitle } from './OutlineRenderer';
-
 export const VIEW_TYPE_OUTLINE = 'patchwork-outline';
 
 /** The sidebar dock for the outline of whichever patchwork was used last. */

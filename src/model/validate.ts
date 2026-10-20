@@ -199,7 +199,7 @@ function checkPages(pages: unknown[], is: Issues) {
 	}
 }
 
-export function validateBoard(raw: unknown): ParseResult {
+function validateBoard(raw: unknown): ParseResult {
 	if (!isObj(raw)) return { ok: false, errors: ['The file is not a JSON object.'] };
 	if (!Number.isInteger(raw.version) || (raw.version as number) < 1) {
 		return { ok: false, errors: [`version: expected a whole number ≥ 1, got ${JSON.stringify(raw.version)}`] };
