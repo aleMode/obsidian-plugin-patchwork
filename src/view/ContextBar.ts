@@ -10,6 +10,10 @@ import type { BoardViewport } from './BoardViewport';
 
 type Rect = { x: number; y: number; w: number; h: number };
 
+/** How close the pointer must stay for the bar to stay open, and how long it may be away before it closes. */
+const NEAR_PX = 56;
+const COLLAPSE_MS = 350;
+
 /** One control on the bar. `menu` controls open a drop-down under themselves. */
 interface Ctl {
 	icon?: string;
@@ -41,6 +45,13 @@ const OVERFLOWS = [
  */
 export class ContextBar {
 	private el: HTMLElement;
+	/** The small "…" shown until the pointer comes near: the bar then opens in its place. */
+	private pill: HTMLElement;
+	private expanded = false;
+	private selKey = '';
+	private hasControls = false;
+	private collapseTimer: number | null = null;
+	private offMove: () => void;
 
 	constructor(
 		private board: BoardViewport,
@@ -48,19 +59,79 @@ export class ContextBar {
 		private alignActions: readonly (readonly [AlignMode, string, string])[],
 	) {
 		this.el = host.createDiv({ cls: 'pw-context-bar is-hidden' });
+		this.pill = host.createEl('button', { cls: 'pw-context-pill is-hidden', attr: { 'aria-label': 'Actions for the selection' } });
+		setIcon(this.pill, 'more-horizontal');
 		// The board listens for pointers, wheel and keys on its root: none of that may reach it from here.
-		for (const type of ['pointerdown', 'dblclick', 'contextmenu', 'wheel', 'keydown', 'keyup']) this.el.addEventListener(type, (e) => e.stopPropagation());
+		for (const el of [this.el, this.pill]) for (const type of ['pointerdown', 'dblclick', 'contextmenu', 'wheel', 'keydown', 'keyup']) el.addEventListener(type, (e) => e.stopPropagation());
+		// Hovering (or clicking, or tabbing to) the pill opens the bar.
+		this.pill.addEventListener('pointerenter', () => this.expand());
+		this.pill.addEventListener('click', () => this.expand());
+		this.pill.addEventListener('focus', () => this.expand());
+		const doc = host.doc;
+		const onMove = (e: PointerEvent) => this.pointerMoved(e);
+		doc.addEventListener('pointermove', onMove);
+		this.offMove = () => doc.removeEventListener('pointermove', onMove);
 	}
 
+	/** The visible part (bar or pill) in pixels relative to the board host; null when nothing is shown. */
 	get rect(): Rect | null {
-		if (this.el.hasClass('is-hidden')) return null;
-		const r = this.el.getBoundingClientRect();
+		const el = this.expanded ? this.el : this.pill;
+		if (el.hasClass('is-hidden')) return null;
+		const r = el.getBoundingClientRect();
 		const h = this.host.getBoundingClientRect();
 		return { x: r.left - h.left, y: r.top - h.top, w: r.width, h: r.height };
 	}
 
 	destroy() {
+		this.offMove();
+		if (this.collapseTimer !== null) window.clearTimeout(this.collapseTimer);
 		this.el.remove();
+		this.pill.remove();
+	}
+
+	/** Open the bar in place of the pill. */
+	expand() {
+		if (this.collapseTimer !== null) {
+			window.clearTimeout(this.collapseTimer);
+			this.collapseTimer = null;
+		}
+		if (this.expanded || this.pill.hasClass('is-hidden')) return;
+		this.expanded = true;
+		this.show();
+	}
+
+	private collapse() {
+		this.collapseTimer = null;
+		if (!this.expanded || this.keepOpen()) return;
+		this.expanded = false;
+		this.show();
+	}
+
+	/** Stay open while something on the bar is in use: a menu, a focused field, the properties popover. */
+	private keepOpen(): boolean {
+		const doc = this.host.doc;
+		return !!doc.querySelector('.menu') || (this.el.contains(doc.activeElement) && doc.activeElement instanceof HTMLInputElement) || this.board.propertiesOpen;
+	}
+
+	/** Close again once the pointer has been away from the bar for a moment. */
+	private pointerMoved(e: PointerEvent) {
+		if (!this.expanded || this.el.hasClass('is-hidden')) return;
+		const r = this.el.getBoundingClientRect();
+		const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+		const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+		if (Math.hypot(dx, dy) <= NEAR_PX || this.keepOpen()) {
+			if (this.collapseTimer !== null) {
+				window.clearTimeout(this.collapseTimer);
+				this.collapseTimer = null;
+			}
+		} else if (this.collapseTimer === null) this.collapseTimer = window.setTimeout(() => this.collapse(), COLLAPSE_MS);
+	}
+
+	/** Show the bar or the pill, whichever applies, and put it in place. */
+	private show() {
+		this.el.toggleClass('is-hidden', !this.expanded || !this.hasControls);
+		this.pill.toggleClass('is-hidden', this.expanded || !this.hasControls);
+		this.reposition();
 	}
 
 	/** Rebuild for the current selection. */
@@ -68,24 +139,27 @@ export class ContextBar {
 		// Typing in the name field is a model change too: keep the field (and the caret) as it is.
 		if (this.el.contains(this.el.doc.activeElement) && this.el.doc.activeElement instanceof HTMLInputElement) return this.reposition();
 		const controls = this.controls();
-		this.el.empty();
-		if (!controls.length || this.board.boardStore.readOnly) {
-			this.el.addClass('is-hidden');
-			return;
+		this.hasControls = controls.length > 0 && !this.board.boardStore.readOnly;
+		// A different selection starts collapsed again.
+		const key = this.board.selectedItems.map((it) => `${it.pageId}/${it.moduleId ?? ''}`).join('|');
+		if (key !== this.selKey) {
+			this.selKey = key;
+			this.expanded = false;
 		}
-		for (const c of controls) this.render(c);
-		this.el.removeClass('is-hidden');
-		this.reposition();
+		this.el.empty();
+		if (this.hasControls) for (const c of controls) this.render(c);
+		this.show();
 	}
 
 	/** Above the selection, or below it when there is no room; inside the visible board. */
 	reposition() {
-		if (this.el.hasClass('is-hidden')) return;
+		const shown = this.expanded ? this.el : this.pill;
+		if (shown.hasClass('is-hidden')) return;
 		const sel = this.board.selectionScreenRect();
 		const host = this.host.getBoundingClientRect();
-		if (!sel) return this.el.addClass('is-hidden');
-		const w = this.el.offsetWidth;
-		const h = this.el.offsetHeight;
+		if (!sel) return shown.addClass('is-hidden');
+		const w = shown.offsetWidth;
+		const h = shown.offsetHeight;
 		const gap = 10;
 		const top = this.board.topInset;
 		// Work with the part of the selection that is on screen, so the bar stays reachable for big pages.
@@ -93,14 +167,14 @@ export class ContextBar {
 		const vx1 = Math.min(sel.x + sel.w, host.width);
 		const vy0 = Math.max(sel.y, top);
 		const vy1 = Math.min(sel.y + sel.h, host.height);
-		if (vx1 <= vx0 || vy1 <= vy0) return this.el.addClass('pw-offscreen');
-		this.el.removeClass('pw-offscreen');
+		if (vx1 <= vx0 || vy1 <= vy0) return shown.addClass('pw-offscreen');
+		shown.removeClass('pw-offscreen');
 		let y = vy0 - h - gap;
 		if (y < top) y = vy1 + gap;
 		if (y + h > host.height - gap) y = Math.max(top, vy0 + gap);
 		let x = (vx0 + vx1) / 2 - w / 2;
 		x = Math.min(Math.max(gap, x), Math.max(gap, host.width - w - gap));
-		this.el.setCssProps({ '--pw-cb-x': `${Math.round(x)}px`, '--pw-cb-y': `${Math.round(y)}px` });
+		shown.setCssProps({ '--pw-cb-x': `${Math.round(x)}px`, '--pw-cb-y': `${Math.round(y)}px` });
 	}
 
 	private render(c: Ctl) {

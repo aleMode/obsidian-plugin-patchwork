@@ -331,6 +331,10 @@ export class BoardViewport implements BoardSurface {
 		return this.contextBar.rect;
 	}
 
+	get propertiesOpen(): boolean {
+		return this.popover.isOpen;
+	}
+
 	/** The properties popover for the selection (a page or one module), on a tab. */
 	showProperties(tab?: PropertiesSection) {
 		this.popover.show(tab);

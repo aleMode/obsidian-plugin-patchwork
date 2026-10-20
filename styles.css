@@ -1188,9 +1188,44 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 
 /* Out of the way while an item is dragged; back when it lands. */
 .pw-board.is-dragging ~ .pw-context-bar,
+.pw-board.is-dragging ~ .pw-context-pill,
 .pw-board.is-dragging ~ .pw-popover {
 	opacity: 0;
 	pointer-events: none;
+}
+
+/* The collapsed bar: a small pill that opens the bar when the pointer arrives. */
+.pw-context-pill {
+	position: absolute;
+	left: var(--pw-cb-x, 0);
+	top: var(--pw-cb-y, 0);
+	z-index: 4;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 18px;
+	padding: 0;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 9px;
+	background: var(--background-secondary);
+	box-shadow: var(--shadow-s);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.pw-context-pill:hover {
+	color: var(--text-normal);
+}
+
+.pw-context-pill svg {
+	width: 14px;
+	height: 14px;
+}
+
+.pw-context-pill.is-hidden,
+.pw-context-pill.pw-offscreen {
+	display: none;
 }
 
 .pw-cb-btn {
@@ -1312,6 +1347,7 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 }
 
 /* The bar would sit on the text being typed. */
-.pw-surface-host:has(.pw-module.is-editing) .pw-context-bar {
+.pw-surface-host:has(.pw-module.is-editing) .pw-context-bar,
+.pw-surface-host:has(.pw-module.is-editing) .pw-context-pill {
 	display: none;
 }

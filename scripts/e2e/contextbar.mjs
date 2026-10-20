@@ -9,7 +9,8 @@ const check = (name, ok, detail) => results.push({ name, ok: !!ok, ...(ok ? {} :
 const V = `const L = app.workspace.getLeavesOfType('patchwork-board').find((l) => l.view.file?.path.startsWith('_e2e/')); const v = L.view; const s = v.surface; const mod = (id) => v.store.file.pages[0].modules.find((m) => m.id === id);`;
 const ev = (body) => cdp.evaluate(`${V} ${body}`);
 const wait = (ms) => `await new Promise((r) => setTimeout(r, ${ms}));`;
-const select = (id) => ev(`s.select(${id ? `{ pageId: 'a', moduleId: '${id}' }` : `{ pageId: 'a' }`}); ${wait(450)}`);
+const expand = `document.querySelector('.pw-context-pill')?.click();`;
+const select = (id) => ev(`s.select(${id ? `{ pageId: 'a', moduleId: '${id}' }` : `{ pageId: 'a' }`}); ${wait(450)} ${expand} ${wait(150)}`);
 const barText = () => ev(`const b = document.querySelector('.pw-context-bar'); return !b || b.classList.contains('is-hidden') ? 'hidden' : [...b.querySelectorAll('.pw-cb-btn, .pw-cb-label')].map((e) => e.textContent).join('|');`);
 const clickBar = (tip) => ev(`document.querySelector('.pw-context-bar [aria-label^="${tip}"]').click(); ${wait(250)}`);
 const pick = (title) =>
@@ -17,6 +18,15 @@ const pick = (title) =>
 const tabs = () => ev(`const p = document.querySelector('.pw-popover'); return !p || p.classList.contains('is-hidden') ? 'closed' : [...p.querySelectorAll('.pw-tabs .pw-tab')].map((t) => t.textContent).join('|');`);
 const rows = () => ev(`return [...document.querySelectorAll('.pw-popover .pw-prop-section:not(.is-hidden) .setting-item:not(.setting-item-heading) .setting-item-name')].map((e) => e.textContent).join('|');`);
 const openMore = () => clickBar('More settings');
+/** Poll until `fn` is true (timers are throttled in a hidden window). */
+const until = async (fn, ms = 20000) => {
+	const t = Date.now();
+	while (Date.now() - t < ms) {
+		if (await fn()) return true;
+		await new Promise((r) => setTimeout(r, 300));
+	}
+	return false;
+};
 const tab = (name) => ev(`[...document.querySelectorAll('.pw-popover .pw-tab')].find((t) => t.textContent === '${name}').click(); ${wait(250)}`);
 
 try {
@@ -37,6 +47,23 @@ try {
 			{ id: 'im', type: 'image', file: 'Images/Map.png', x: 110, y: 90, w: 60, h: 50 },
 			{ id: 'toc', type: 'toc', x: 10, y: 150, w: 80, h: 40 }] }] }));
 		s.zoomToFit(); await new Promise((r) => setTimeout(r, 1000));`);
+
+	// The collapsed bar: a small pill that opens on hover and closes when the pointer leaves
+	await ev(`s.select({ pageId: 'a', moduleId: 'n' }); ${wait(500)}`);
+	const state = () => ev(`const pill = document.querySelector('.pw-context-pill'); const bar = document.querySelector('.pw-context-bar'); return JSON.stringify({ pill: !pill.classList.contains('is-hidden'), bar: !bar.classList.contains('is-hidden') })`);
+	check('a new selection shows only the small pill', (await state()) === '{"pill":true,"bar":false}', await state());
+	await ev(`document.querySelector('.pw-context-pill').dispatchEvent(new PointerEvent('pointerenter')); ${wait(300)}`);
+	check('hovering the pill opens the bar in its place', (await state()) === '{"pill":false,"bar":true}', await state());
+	await ev(`const b = document.querySelector('.pw-context-bar').getBoundingClientRect(); document.dispatchEvent(new PointerEvent('pointermove', { clientX: b.left + 5, clientY: b.top + 5 }));`);
+	check('it stays open while the pointer is on it', await until(async () => (await state()) === '{"pill":false,"bar":true}', 1500));
+	await ev(`document.dispatchEvent(new PointerEvent('pointermove', { clientX: 2, clientY: 2 }));`);
+	check('and closes again when the pointer moves away', await until(async () => (await state()) === '{"pill":true,"bar":false}', 30000), await state());
+	await ev(`document.querySelector('.pw-context-pill').click(); ${wait(300)}`);
+	await clickBar('More settings');
+	await ev(`document.dispatchEvent(new PointerEvent('pointermove', { clientX: 2, clientY: 2 })); ${wait(1500)}`);
+	check('it stays open while the popover is open', (await state()) === '{"pill":false,"bar":true}', await state());
+	await ev(`document.querySelector('.pw-board').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); ${wait(400)}`);
+	check('Escape closes the popover even with the focus on the board', (await tabs()) === 'closed', await tabs());
 
 	// What each kind of selection gets
 	await select(null);
@@ -141,7 +168,7 @@ try {
 	check('popover never covers the item or the bar and stays inside the board', placement.every((p) => !p.overItem && !p.overBar && p.inside), placement);
 
 	// Several items
-	await ev(`s.setItems([{ pageId: 'a', moduleId: 'n' }, { pageId: 'a', moduleId: 't' }, { pageId: 'a', moduleId: 'tr' }]); ${wait(500)}`);
+	await ev(`s.setItems([{ pageId: 'a', moduleId: 'n' }, { pageId: 'a', moduleId: 't' }, { pageId: 'a', moduleId: 'tr' }]); ${wait(500)} ${expand} ${wait(150)}`);
 	check('several modules: align, distribute, lock, delete', (await barText()).startsWith('Align▾|Distribute▾|Lock'), await barText());
 	await clickBar('Align');
 	check('align menu has the six alignments', (await ev(`return document.querySelectorAll('.menu .menu-item').length`)) >= 6);

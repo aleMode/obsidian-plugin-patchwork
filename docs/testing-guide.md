@@ -12,10 +12,14 @@ What to try by hand, in the order that gives the most signal. Everything here is
 Everything here is also described in `docs/ui-reorganisation.md`.
 
 ### Context bar and properties popover
-- Select a page or an item: a small bar floats above it. Page: name, size, orientation, background, master. Note: section ▾, overflow ▾, Freeze, Open. PDF: Crop, page ‹ n ›, fit ▾, invert. Text: Edit. Image: Change, fit ▾. Tracker: kind ▾, Edit, print blank. Linked frame: "Frame 2 of 3", Next frame. Table of contents: Heading. Several items: Align ▾, Distribute ▾, Lock, Delete.
+- Select a page or an item: a small **⋯** pill appears above it; hover it (or click it) and it opens into the bar, which stays open while you are near it, while a menu or the popover is open or a field has focus, and closes shortly after you move away. Page: name, size, orientation, background, master. Note: section ▾, overflow ▾, Freeze, Open. PDF: Crop, page ‹ n ›, fit ▾, invert. Text: Edit. Image: Change, fit ▾. Tracker: kind ▾, Edit, print blank. Linked frame: "Frame 2 of 3", Next frame. Table of contents: Heading. Several items: Align ▾, Distribute ▾, Lock, Delete.
 - The `⋯` button opens the **properties popover** next to the item: tabs *Content / Layout / Style / Advanced* (a page: *Page / Layout / Numbers*). Typing in it edits live; Escape or a click on the board closes it. It should never sit on top of the item you are editing.
 - Check: the bar follows the item while you pan and zoom, hides while you drag, comes back where the item lands, and stays reachable for a page bigger than the screen. Typing Delete or the arrow keys in a popover field must not delete or move the item.
 - Adding text, a tracker or a table of contents opens the popover on it. The sidebar inspector no longer opens by itself: **View → Inspector and outline** if you want the dock.
+
+### Where settings live
+- **Toolbar → Settings** is for the whole patchwork only (units, grid, numbering, header and footer, appearance, title).
+- **Right-click a page** → Page settings, Size and position, Page numbers, header and footer. **Right-click an item** → Item settings, Size and position, Style. They open the same popover as the ⋯ button, on the right tab.
 
 ### Editing in place
 - Double-click a text box or a note (or select it and press **Enter**, or press **Edit** on the bar): a text area with the raw markdown opens over it, in the module's own padding and border; the rendered text is hidden meanwhile. **Escape** or clicking elsewhere finishes. (Ctrl+Enter is not used: Obsidian's own hotkeys take it.)
