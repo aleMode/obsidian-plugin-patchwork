@@ -7,6 +7,33 @@ What to try by hand, in the order that gives the most signal. Everything here is
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
+## Test list (since the interface pass)
+
+Tick these off; details for each are in the sections below.
+
+**Export (the bug you found)**
+- [ ] Your `Untitled patchwork`: export again. The note shows its own text (sharp, selectable), not the PDF page.
+- [ ] A note module showing just the `## PDF embed` section of `Spells/Spell list.md`: the page appears in the note on the board, sharpens a moment after zooming in, and exports sharp with selectable text (best quality) or as a picture (small quality).
+
+**Use mode**
+- [ ] `Dashboard/Dashboard.patchwork` opens in Use: no rulers, grid, labels or handles; faint panels; coloured cards. Try light and dark themes.
+- [ ] Arrange | Use switch: reopen the file, it keeps the mode; Ctrl+Z doesn't switch back.
+- [ ] Nothing moves: drags on text select text, drags elsewhere pan; right-click, double-click, Delete, arrows do nothing.
+- [ ] Links open in one side pane, reused by the next link; Ctrl/Cmd-click opens a new tab; Ctrl/Cmd-hover previews.
+- [ ] Checkboxes: note tasks tick in `Dashboard/Session.md`; text-box tasks tick and undo; a frozen note refuses.
+- [ ] Colours: palette on the context bar (Arrange) and Style tab → Colour / Custom colour; tinted cards in a PDF export.
+- [ ] Plugins (enable Dataview, Tasks, Buttons, Meta Bind; Bases in core plugins): `Dashboard/Plugin blocks.patchwork`, every block responds; Bases links open to the side.
+
+**Smaller changes**
+- [ ] Opening a patchwork always fits it to the view (it sometimes opened at 2 % zoom).
+- [ ] Words: "Freeze text", "Warn if this PDF changes", "Text frame" in menus, the bar and the properties.
+- [ ] 16:9 slide pages show "16:9 slide" as their size, not "Custom".
+- [ ] Ruler numbers use the interface font (small, crisp).
+- [ ] Properties popover open while dragging an item: smooth, values update.
+- [ ] Editing a text box in place: the formatting bar follows the box when you pan or zoom (Ctrl+wheel).
+- [ ] PNG export of several pages writes every image (now written one at a time).
+- [ ] Close every patchwork, wait a minute: Obsidian's memory drops (render cache freed); reopening re-renders.
+
 ## New: Use mode (a patchwork as a dashboard)
 
 Plan and decisions: `docs/use-mode-plan.md`. Open `Dashboard/Dashboard.patchwork` in the test vault: it opens in Use mode.
