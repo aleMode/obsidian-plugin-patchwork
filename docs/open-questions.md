@@ -44,6 +44,7 @@ Questions raised while building, each with the recommended answer we are proceed
 ### Q9. PDF embeds inside note modules
 - `![[file.pdf#page=2]]` inside a note renders Obsidian's full PDF viewer (heavy, interactive, scrolls).
 - **Recommendation:** on the board, replace PDF embeds inside note modules with a static render of that page through our own PDF pipeline (shared cache), or a placeholder linking to "convert to PDF module". Decide in M1.
+- **Resolved 2026-10-20** (after a user report: the viewer collapsed to zero height, covered the whole note and exported as a blurry picture with a misplaced text layer). PDF embeds are swapped for a placeholder before rendering (`model/pdfEmbeds.ts`) and drawn by Patchwork as a static page at the note's width (`modules/pdfEmbed.ts`), through the shared documents and render queue. Exports at best quality place the page as vector in stage 2, clipped to what the note shows (selectable, sharp); small quality and ink saver print it as a picture at the export DPI.
 
 ### Q10. Mermaid guard
 - Obsidian 1.14 asks per vault before rendering Mermaid; until allowed, the guard box renders in its place.

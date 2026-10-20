@@ -39,6 +39,19 @@ export interface PrintOptions {
 	flow: FlowContext;
 	/** Board font for notes and text (CSS font-family), if set. */
 	font?: string;
+	/** PDF embeds in notes become vector in stage 2 (their boxes print empty); otherwise pictures at `dpi`. */
+	vectorEmbeds?: boolean;
+}
+
+/** A PDF embed inside a note, as laid out on a printed page, for stage 2 to draw as vector. */
+export interface PrintedEmbed {
+	/** Index of the page within this batch. */
+	page: number;
+	/** The part of the embedded page that is visible (mm, page coordinates), and which part of the page that is (0–1). */
+	rect: Rect;
+	crop: [number, number, number, number];
+	file: string;
+	pdfPage: number;
 }
 
 /** A clickable area on a printed page (mm, page coordinates) leading to another page. */
@@ -53,6 +66,7 @@ export interface PrintResult {
 	bytes: Uint8Array;
 	problems: string[];
 	links: PrintedLink[];
+	embeds: PrintedEmbed[];
 }
 
 /** Quiet period with no DOM changes before printing; async plugins (Dataview, Mermaid) render late. */
@@ -124,6 +138,34 @@ function findLinks(host: HTMLElement): PrintedLink[] {
 	return links;
 }
 
+/**
+ * Drawn PDF embeds, measured on the final layout: the visible part of each (a note clips at its box) and
+ * which part of the PDF page that is.
+ */
+function findEmbeds(host: HTMLElement): PrintedEmbed[] {
+	const out: PrintedEmbed[] = [];
+	host.querySelectorAll<HTMLElement>('.pw-sheet-page').forEach((pageEl, page) => {
+		const origin = pageEl.getBoundingClientRect();
+		pageEl.querySelectorAll<HTMLElement>('.pw-pdf-embed[data-pw-pdf-file]').forEach((el) => {
+			const e = el.getBoundingClientRect();
+			const box = el.closest('.pw-module-body')?.getBoundingClientRect();
+			if (!box || !e.width || !e.height) return;
+			const x0 = Math.max(e.left, box.left), y0 = Math.max(e.top, box.top);
+			const x1 = Math.min(e.right, box.right), y1 = Math.min(e.bottom, box.bottom);
+			if (x1 <= x0 || y1 <= y0) return;
+			const mm = (px: number) => px / PX_PER_MM_CSS;
+			out.push({
+				page,
+				rect: { x: mm(x0 - origin.left), y: mm(y0 - origin.top), w: mm(x1 - x0), h: mm(y1 - y0) },
+				crop: [(x0 - e.left) / e.width, (y0 - e.top) / e.height, (x1 - e.left) / e.width, (y1 - e.top) / e.height],
+				file: el.dataset.pwPdfFile!,
+				pdfPage: Number(el.dataset.pwPdfPage),
+			});
+		});
+	});
+	return out;
+}
+
 /** Things that would print wrongly, reported to the user instead of silently exported. */
 function findProblems(host: HTMLElement): string[] {
 	const problems: string[] = [];
@@ -138,7 +180,8 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	const doc = activeDocument;
 	const component = new Component();
 	o.parent.addChild(component);
-	const ctx: ModuleContext = { ...o.ctx, component, flow: o.flow };
+	// Renderers that follow the zoom on screen (PDF embeds in notes) draw at the export's DPI here.
+	const ctx: ModuleContext = { ...o.ctx, component, flow: o.flow, resolution: () => o.dpi / 25.4, pdfEmbedsAsVector: !!o.vectorEmbeds };
 	const sheet = new (doc.defaultView ?? window).CSSStyleSheet();
 	const bleed = o.bleed ?? 0;
 	sheet.replaceSync(pageRules(pages, bleed));
@@ -179,7 +222,8 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 		const problems = findProblems(host);
 		if (!settled) problems.push('Some content was still changing after 10 s and may be incomplete.');
 		const links = findLinks(host);
-		return { bytes: await printWindowToPdf(), problems, links };
+		const embeds = o.vectorEmbeds ? findEmbeds(host) : [];
+		return { bytes: await printWindowToPdf(), problems, links, embeds };
 	} finally {
 		renderers.forEach((r) => r.destroy());
 		host.remove();

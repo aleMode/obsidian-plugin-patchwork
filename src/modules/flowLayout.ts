@@ -3,6 +3,9 @@ import { type Block, chainSignature, fitCount, type FlowInfo, type FlowMember, s
 import type { NoteModule, TextModule } from '../model/schema';
 import { contentBox, textScale } from '../model/style';
 import { loadNoteContent } from '../sources/markdownSource';
+import type { PdfDocCache } from '../sources/pdfSource';
+import { extractPdfEmbeds } from '../model/pdfEmbeds';
+import { renderPdfEmbeds } from './pdfEmbed';
 
 // Measures how a linked-frame chain's text splits across its frames (SPEC 4 M5): each block is
 // rendered offscreen at the frame's width, exactly as the frame will show it, until one overflows.
@@ -43,6 +46,8 @@ export class FlowLayout {
 		private boardPath: () => string,
 		/** Board font, which changes how much text fits. */
 		private font: () => string | undefined = () => undefined,
+		/** For PDF embeds in the text, measured at the page's real shape. */
+		private pdfDocs?: PdfDocCache,
 	) {}
 
 	async layout(chain: readonly FlowMember[]): Promise<FlowOutcome> {
@@ -103,7 +108,10 @@ export class FlowLayout {
 				const bottoms: number[] = [];
 				for (let i = start; i < blocks.length; i++) {
 					const wrap = md.createDiv({ cls: 'pw-flow-block' });
-					await MarkdownRenderer.render(this.app, blocks[i]!.text, wrap, sourcePath, component);
+					// Same markup the frame will show: PDF embeds as Patchwork's own boxes, sized to their page.
+					const { markdown, embeds } = extractPdfEmbeds(blocks[i]!.text);
+					await MarkdownRenderer.render(this.app, markdown, wrap, sourcePath, component);
+					if (embeds.length && this.pdfDocs) await renderPdfEmbeds(wrap, embeds, { app: this.app, pdfDocs: this.pdfDocs, sizeOnly: true }, sourcePath, () => true);
 					const bottom = (wrap.getBoundingClientRect().bottom - top) / PX_PER_MM_CSS;
 					bottoms.push(bottom);
 					// One block past the edge is all fitCount needs.

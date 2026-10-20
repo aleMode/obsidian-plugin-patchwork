@@ -6,11 +6,11 @@ import { tocEntries } from '../model/toc';
 import { flowChains } from '../model/flow';
 import { FlowLayout } from '../modules/flowLayout';
 import { outputPages, resolvePage } from '../model/masters';
-import type { PatchworkFile } from '../model/schema';
+import type { PatchworkFile, PdfModule } from '../model/schema';
 import { formatLength } from '../model/units';
 import { type PdfDocCache, readPdfBytes } from '../sources/pdfSource';
 import { appendPrinted, assemble, createPrinted, type PageLink } from './assemble';
-import { printPages } from './printHost';
+import { type PrintedEmbed, printPages } from './printHost';
 
 export interface ExportOptions {
 	quality: 'best' | 'small';
@@ -61,6 +61,8 @@ export async function exportBoardPdf(
 	const booklet = opts.layout === 'booklet';
 	const bleed = booklet ? 0 : Math.max(0, opts.bleed ?? 0);
 	const vector = new Set(pages.flatMap((p) => [...vectorModules(p, opts.quality, !!opts.inkSaver)]));
+	// PDF embeds in notes follow the same rule as PDF modules: vector unless the export asks for small or ink saver.
+	const vectorEmbeds = opts.quality === 'best' && !opts.inkSaver;
 	const title = board.meta?.title ?? boardPath.replace(/^.*\//, '').replace(/\.patchwork$/, '');
 	const furniture = pageFurniture(board, { title, date: opts.date });
 	const printed = await createPrinted();
@@ -70,7 +72,7 @@ export async function exportBoardPdf(
 	// Chains span the whole board, also pages outside the exported range.
 	const chains = flowChains(board);
 	const font = board.board.fontFamily;
-	const flow = { info: (id: string) => chains.get(id), layout: new FlowLayout(env.app, () => boardPath, () => font) };
+	const flow = { info: (id: string) => chains.get(id), layout: new FlowLayout(env.app, () => boardPath, () => font, env.pdfDocs) };
 	const groups = batches(pages, PAGES_PER_BATCH);
 	for (const [i, group] of groups.entries()) {
 		progress(`Rendering pages ${i * PAGES_PER_BATCH + 1}–${i * PAGES_PER_BATCH + group.length} of ${pages.length}…`);
@@ -88,6 +90,7 @@ export async function exportBoardPdf(
 			tocEntries: (pageId) => tocEntries(board, pageId),
 			flow,
 			...(font ? { font } : {}),
+			vectorEmbeds,
 		});
 		await appendPrinted(printed, r.bytes);
 		problems.push(...r.problems);
@@ -96,6 +99,12 @@ export async function exportBoardPdf(
 			const target = indexOf.get(l.targetPageId);
 			if (target !== undefined) links.push({ page: i * PAGES_PER_BATCH + l.page, rect: l.rect, target });
 		}
+		r.embeds.forEach((e, n) => {
+			const at = i * PAGES_PER_BATCH + e.page;
+			const m = embedModule(`~embed${i}-${n}`, e);
+			pages[at] = { ...pages[at]!, modules: [...pages[at]!.modules, m] };
+			vector.add(m.id);
+		});
 	}
 
 	progress(vector.size ? `Placing ${vector.size} PDF region(s) as vector…` : 'Assembling…');
@@ -121,6 +130,14 @@ export async function exportBoardPdf(
 		pageNames: pages.map((p) => furniture.get(p.id)?.pageToken ?? ''),
 	});
 	return { bytes: out.bytes, pageCount: pages.length, problems: [...new Set([...problems, ...out.problems])] };
+}
+
+/**
+ * A PDF embed in a note, placed like a PDF module of its own so stage 2 draws it as vector. Embeds are
+ * drawn last, over the page: content stacked above the note (rare) is covered by them.
+ */
+function embedModule(id: string, e: PrintedEmbed): PdfModule {
+	return { id, type: 'pdf', ...e.rect, file: e.file, page: e.pdfPage, crop: e.crop, fit: 'stretch' };
 }
 
 /** Page labels for an exported subset: each page keeps the label it has in the full board. */

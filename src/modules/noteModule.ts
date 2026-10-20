@@ -2,6 +2,8 @@ import { Component, MarkdownRenderer } from 'obsidian';
 import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import { loadNoteContent, noteCssClasses, noteDependencies } from '../sources/markdownSource';
 import { snapshotChanged } from '../model/freshness';
+import { extractPdfEmbeds, type PdfEmbed } from '../model/pdfEmbeds';
+import { releasePdfEmbeds, renderPdfEmbeds } from './pdfEmbed';
 import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setBadge } from './types';
 
 /** Renders markdown with Obsidian's renderer; each render gets its own child component for cleanup. */
@@ -12,6 +14,9 @@ abstract class MarkdownModule implements ModuleRenderer {
 	protected done: Promise<void> = Promise.resolve();
 	/** What `show` last rendered (see ModuleRenderer.shownMarkdown). */
 	private shown: string | undefined;
+	/** PDF pages drawn in this render, to redraw them when the zoom changes (see resolutionChanged). */
+	private embedSets: { target: HTMLElement; embeds: PdfEmbed[]; sourcePath: string; generation: number }[] = [];
+	private embedPxPerMm = 0;
 
 	constructor(protected el: HTMLElement, protected ctx: ModuleContext) {}
 
@@ -34,20 +39,45 @@ abstract class MarkdownModule implements ModuleRenderer {
 		const target = this.begin(generation, classes);
 		if (!target) return;
 		this.shown = markdown;
-		await MarkdownRenderer.render(this.ctx.app, markdown, target, sourcePath, this.child!);
+		await this.renderMarkdown(markdown, target, sourcePath, generation);
+	}
+
+	/** Obsidian's renderer, except PDF embeds: those are drawn by Patchwork (see model/pdfEmbeds). */
+	private async renderMarkdown(markdown: string, target: HTMLElement, sourcePath: string, generation: number) {
+		const { markdown: md, embeds } = extractPdfEmbeds(markdown);
+		await MarkdownRenderer.render(this.ctx.app, md, target, sourcePath, this.child!);
+		if (!embeds.length) return;
+		this.embedSets.push({ target, embeds, sourcePath, generation });
+		this.embedPxPerMm = this.ctx.resolution?.() ?? 0;
+		await this.drawEmbeds(target, embeds, sourcePath, generation);
+	}
+
+	private drawEmbeds(target: HTMLElement, embeds: PdfEmbed[], sourcePath: string, generation: number) {
+		const { app, pdfDocs, resolution, pdfEmbedsAsVector } = this.ctx;
+		return renderPdfEmbeds(target, embeds, { app, pdfDocs, ...(resolution ? { resolution } : {}), sizeOnly: !!pdfEmbedsAsVector }, sourcePath, () => this.isCurrent(generation));
+	}
+
+	/** Same thresholds as PDF modules: redraw when the pages are well under, or far over, what the zoom needs. */
+	resolutionChanged(pxPerMm: number) {
+		if (!this.embedSets.length || this.ctx.pdfEmbedsAsVector) return;
+		if (this.embedPxPerMm >= pxPerMm * 0.7 && this.embedPxPerMm <= pxPerMm * 2.5) return;
+		this.embedPxPerMm = pxPerMm;
+		for (const s of this.embedSets) void this.drawEmbeds(s.target, s.embeds, s.sourcePath, s.generation);
 	}
 
 	/** Render blocks one wrapper each, the same structure FlowLayout measured. */
 	protected async showBlocks(blocks: readonly string[], sourcePath: string, generation: number, classes: readonly string[] = []) {
 		const target = this.begin(generation, classes);
 		if (!target) return;
-		for (const b of blocks) await MarkdownRenderer.render(this.ctx.app, b, target.createDiv({ cls: 'pw-flow-block' }), sourcePath, this.child!);
+		for (const b of blocks) await this.renderMarkdown(b, target.createDiv({ cls: 'pw-flow-block' }), sourcePath, generation);
 	}
 
 	private begin(generation: number, classes: readonly string[]): HTMLElement | null {
 		if (generation !== this.generation) return null;
 		this.shown = undefined;
+		this.embedSets = [];
 		this.clearChild();
+		releasePdfEmbeds(this.el);
 		const child = new Component();
 		this.ctx.component.addChild(child);
 		this.child = child;
@@ -82,6 +112,7 @@ abstract class MarkdownModule implements ModuleRenderer {
 	destroy() {
 		this.generation++;
 		this.clearChild();
+		releasePdfEmbeds(this.el);
 		this.el.empty();
 	}
 }

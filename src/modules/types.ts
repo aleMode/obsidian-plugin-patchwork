@@ -19,6 +19,8 @@ export interface ModuleContext {
 	resolution?: () => number;
 	/** Linked text frames (M5). */
 	flow?: FlowContext;
+	/** Export placing PDF embeds in notes as vector (stage 2): their boxes are sized, not drawn. */
+	pdfEmbedsAsVector?: boolean;
 	/** Offer to pick another file for a module whose source is missing (board only, not export). */
 	replaceSource?: (moduleId: string) => void;
 }
@@ -32,6 +34,8 @@ export interface ModuleRenderer {
 	 * checkbox is the n-th task of this text. Undefined when ticking isn't supported (linked frames).
 	 */
 	shownMarkdown?(): string | undefined;
+	/** The zoom settled at `pxPerMm`: redraw pixel content that is now too soft or needlessly large. */
+	resolutionChanged?(pxPerMm: number): void;
 	/** Paths whose modification should trigger a re-render. */
 	dependencies(): ReadonlySet<string>;
 	/** Resolves when the latest render has finished (content or placeholder). Export waits on it. */

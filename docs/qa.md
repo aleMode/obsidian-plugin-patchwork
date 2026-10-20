@@ -40,3 +40,11 @@ Manual:
   - Bases: the table renders; its links (spans, with Bases' own handler) now open to the side instead of replacing the dashboard.
   - With Tasks loaded, Patchwork's own checkbox write-back still changes exactly one character (usemode.mjs 19/19).
 - [ ] A PDF export of a patchwork with tinted modules: light tints, coloured edges.
+
+## PDF embeds in notes (2026-10-20, Q9)
+
+Automated: `scripts/e2e/pdfembed.js` (8 checks: no Obsidian viewer, page drawn at its shape, text after it laid out, sharper after zooming in, vector at best quality in the right place, picture at small quality).
+
+Manual:
+- [ ] A note with `![[some.pdf#page=N]]` in a note module: the note's text shows, the page appears where the embed is, crisp a moment after zooming in (redrawn when the zoom settles, like PDF modules).
+- [ ] Export at best quality: the embedded page is sharp and its text selectable in a PDF viewer; at small quality it is a picture.

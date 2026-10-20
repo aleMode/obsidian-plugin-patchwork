@@ -495,3 +495,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
 - **v0.11 · 2026-10-20 (Use mode; docs/use-mode-plan.md)**
   - Live Preview editing (Q18) is dropped in favour of **Arrange / Use modes** (section 5.7): Use is a dashboard with live links, checkboxes and plugin content, app-theme pages as faint panels, and no editing chrome. New fields `board.mode` and `style.tint` (Canvas colour palette).
   - Opening a patchwork no longer fits the pages to a pane that is still being laid out (it could open at 2 % zoom).
+  - PDF embeds inside notes (`![[book.pdf#page=2]]`, Q9) are drawn by Patchwork as a static page instead of Obsidian's PDF viewer, which collapsed inside modules, covered the note and exported blurry. Exports place them as vector at best quality (like PDF modules, drawn over the page), as a picture at small quality or with the ink saver.

@@ -84,7 +84,7 @@ export class ModuleHost {
 	private unmounting = new Set<string>();
 
 	constructor(private o: ModuleHostOptions) {
-		const layout = new FlowLayout(o.ctx.app, o.boardPath, () => o.store.file.board.fontFamily);
+		const layout = new FlowLayout(o.ctx.app, o.boardPath, () => o.store.file.board.fontFamily, o.ctx.pdfDocs);
 		const replace = o.replaceSource;
 		this.ctx = {
 			...o.ctx,
@@ -140,10 +140,12 @@ export class ModuleHost {
 		this.sync();
 	}
 
-	/** After a zoom settles: re-render PDF modules whose canvas no longer matches the zoom. */
+	/** After a zoom settles: re-render PDF modules (and PDF pages embedded in notes) that no longer match the zoom. */
 	resolutionChanged(pxPerMm: number) {
 		for (const m of this.mounted.values()) {
-			if (m.renderer instanceof PdfModuleRenderer && m.renderer.wantsResolution(pxPerMm)) this.renderContent(m);
+			if (m.renderer instanceof PdfModuleRenderer) {
+				if (m.renderer.wantsResolution(pxPerMm)) this.renderContent(m);
+			} else if (!this.editing.has(m.module.id)) m.renderer?.resolutionChanged?.(pxPerMm);
 		}
 	}
 

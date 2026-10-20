@@ -1595,3 +1595,27 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	background: var(--pw-swatch);
 	vertical-align: -0.05em;
 }
+
+/* PDF embeds inside notes (model/pdfEmbeds.ts): a static picture of the page, as wide as the text. */
+.pw-pdf-embed {
+	display: block;
+	width: 100%;
+	aspect-ratio: var(--pw-embed-ratio, 210 / 297);
+	margin: var(--p-spacing, 1em) 0;
+	background: #fff;
+	box-shadow: 0 0 0 1px var(--background-modifier-border);
+}
+
+.pw-pdf-embed.is-missing {
+	aspect-ratio: auto;
+	padding: 0.5em;
+	background: none;
+	color: var(--text-muted);
+	font-size: 0.85em;
+}
+
+.pw-pdf-embed-canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}

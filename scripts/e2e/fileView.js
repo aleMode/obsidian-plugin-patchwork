@@ -17,6 +17,8 @@ const closeAll = () => app.workspace.getLeavesOfType('patchwork-board').forEach(
 	await new Promise((r) => setTimeout(r, 400)); // let pending saves finish before deleting their files
 
 await cleanup();
+// Closing every board must not leave the main area without a tab group (opening a leaf then fails).
+if (!app.workspace.getLeavesOfType('markdown').length) await app.workspace.getLeaf(true).openFile(vault.getAbstractFileByPath('README.md'));
 await vault.createFolder(DIR);
 try {
 	// 1. New board command creates and opens a board.
