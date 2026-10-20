@@ -14,15 +14,16 @@ export function drawOrder(modules: readonly AnyModule[]): AnyModule[] {
 /**
  * Which PDF modules are drawn as vector in stage 2. Vector content is drawn after the HTML layer,
  * so it lands on top of everything; a module with anything stacked above it falls back to raster.
+ * Colour filters (a module's `invert`, the ink saver) only work on pixels, so they force raster too.
  */
-export function vectorModules(page: Page, quality: 'best' | 'small'): Set<string> {
+export function vectorModules(page: Page, quality: 'best' | 'small', inkSaver = false): Set<string> {
 	const out = new Set<string>();
-	if (quality === 'small') return out;
+	if (quality === 'small' || inkSaver) return out;
 	const ordered = drawOrder(page.modules);
 	ordered.forEach((m, i) => {
 		if (m.type !== 'pdf') return;
 		const mode = (m as PdfModule).render ?? 'auto';
-		if (mode === 'raster') return;
+		if (mode === 'raster' || (m as PdfModule).invert) return;
 		const covered = ordered.slice(i + 1).some((above) => intersects(m, above));
 		if (mode === 'vector' || !covered) out.add(m.id);
 	});

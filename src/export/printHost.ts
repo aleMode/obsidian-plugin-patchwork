@@ -25,6 +25,7 @@ export interface PrintOptions {
 	boardPath: string;
 	furniture: Map<string, PageFurniture>;
 	numberPosition: NumberPosition;
+	inkSaver?: boolean;
 }
 
 export interface PrintResult {
@@ -92,7 +93,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	sheet.replaceSync(pageRules(pages));
 	doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
 	// Obsidian's print CSS hides `body > :not(.print)`; its own PDF export uses the same class.
-	const host = doc.body.createDiv({ cls: 'pw-print-host print' });
+	const host = doc.body.createDiv({ cls: o.inkSaver ? 'pw-print-host print pw-ink-saver' : 'pw-print-host print' });
 	doc.body.addClass('pw-printing');
 	const renderers: ModuleRenderer[] = [];
 	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule }[] = [];

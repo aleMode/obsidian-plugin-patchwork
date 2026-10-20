@@ -61,6 +61,7 @@ function checkBoard(board: Json, is: Issues) {
 	is.optional(board, 'order', p, oneOf('reading', 'manual'), '"reading" or "manual"');
 	is.optional(board, 'pageOrder', p, (v) => Array.isArray(v) && v.every(isStr), 'a list of page IDs');
 	is.optional(board, 'useAppTheme', p, isBool, 'true/false');
+	is.optional(board, 'pdfDarkMode', p, isBool, 'true/false');
 	is.optional(board, 'defaultSafeArea', p, isInsets, 'insets {top,right,bottom,left} ≥ 0');
 	for (const k of ['header', 'footer', 'fontFamily']) is.optional(board, k, p, isStr, 'text');
 
@@ -87,6 +88,7 @@ function checkBoard(board: Json, is: Issues) {
 		is.optional(e, 'quality', ep, oneOf('best', 'small'), '"best" or "small"');
 		is.optional(e, 'fitSmallPages', ep, isBool, 'true/false');
 		is.optional(e, 'tileLabels', ep, isBool, 'true/false');
+		is.optional(e, 'inkSaver', ep, isBool, 'true/false');
 	}
 }
 
@@ -115,6 +117,7 @@ function checkModule(m: Json, path: string, is: Issues) {
 			is.optional(m, 'rotation', path, oneOf(0, 90, 180, 270), '0, 90, 180 or 270');
 			is.optional(m, 'renderDpi', path, positive, 'a positive number');
 			is.optional(m, 'render', path, oneOf('auto', 'vector', 'raster'), '"auto", "vector" or "raster"');
+			is.optional(m, 'invert', path, isBool, 'true/false');
 			break;
 		case 'note':
 			is.required(m, 'file', path, isStr, 'a vault path');

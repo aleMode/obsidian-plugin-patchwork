@@ -81,3 +81,11 @@ describe('vectorTarget with style', () => {
 		expect(clip.y).toBeCloseTo(H - mmToPt(20 + 5 + 90));
 	});
 });
+
+describe('vectorModules with colour filters', () => {
+	it('inverted modules and the ink saver force raster', () => {
+		const p = page([pdf('inv', 0, { invert: true }), pdf('plain', 100)]);
+		expect([...vectorModules(p, 'best')]).toEqual(['plain']);
+		expect(vectorModules(p, 'best', true).size).toBe(0);
+	});
+});

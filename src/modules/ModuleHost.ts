@@ -11,7 +11,7 @@ import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
 /** Fields that change what a module shows. Anything else (position, label, …) is layout only. */
 const CONTENT_KEYS: Record<string, readonly string[]> = {
 	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow'],
-	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'w', 'h', 'style'],
+	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'invert', 'w', 'h', 'style'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
 };

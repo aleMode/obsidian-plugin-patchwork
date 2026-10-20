@@ -14,6 +14,7 @@ export interface ExportChoices {
 	overlap: number;
 	fitSmallPages: boolean;
 	tileLabels: boolean;
+	inkSaver: boolean;
 	quality: 'best' | 'small';
 	dpi: number;
 	open: boolean;
@@ -139,6 +140,10 @@ export class ExportModal extends Modal {
 					.setValue(c.quality)
 					.onChange((v) => (c.quality = v as 'best' | 'small')),
 			);
+		new Setting(el)
+			.setName('Ink saver')
+			.setDesc('PDF regions and images print grayscale and lighter (as images). Notes and text are unchanged.')
+			.addToggle((t) => t.setValue(c.inkSaver).onChange((v) => (c.inkSaver = v)));
 		new Setting(el)
 			.setName('Image resolution')
 			.setDesc(c.format === 'png' ? 'Dots per inch of the PNG images (and of PDF regions exported as images).' : 'Dots per inch for PDF regions exported as images.')

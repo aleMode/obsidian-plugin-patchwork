@@ -74,7 +74,7 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		const layout = this.layout(page, m);
 		const key = this.cacheKey(m, layout);
 		const cached = key ? this.ctx.bitmaps?.take(key) : undefined;
-		if (cached && key) return this.show(cached, key, layout);
+		if (cached && key) return this.show(cached, key, layout, !!m.invert);
 		// Rendering waits for a free slot; a newer render may have started meanwhile.
 		await this.ctx.pdfDocs.schedule(async () => {
 			if (gen !== this.generation) return;
@@ -85,7 +85,7 @@ export class PdfModuleRenderer implements ModuleRenderer {
 					return;
 				}
 				const owned = key && this.ctx.bitmaps?.put(key, canvas) ? key : null;
-				this.show(canvas, owned, layout);
+				this.show(canvas, owned, layout, !!m.invert);
 			} finally {
 				// PDF.js keeps a page's decoded images until cleanup(); on an illustrated rulebook that is
 				// tens of MB per page (perf probe: 5 GB for 100 pages without this).
@@ -144,9 +144,11 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		return canvas;
 	}
 
-	private show(canvas: HTMLCanvasElement, key: string | null, l: Layout) {
+	private show(canvas: HTMLCanvasElement, key: string | null, l: Layout, invert: boolean) {
 		this.clearShown();
 		this.el.empty();
+		// Colour inversion is a CSS filter (screen and raster export), so the cached pixels stay neutral.
+		canvas.toggleClass('is-inverted', invert);
 		canvas.setCssProps({
 			'--pw-x': `${l.placed.x + (l.placed.w - l.unrotated.w) / 2}mm`,
 			'--pw-y': `${l.placed.y + (l.placed.h - l.unrotated.h) / 2}mm`,

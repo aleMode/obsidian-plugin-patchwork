@@ -152,6 +152,7 @@ export interface BoardSettings {
   defaultSafeArea?: Insets;              // mm
   header?: string; footer?: string;      // tokens allowed
   useAppTheme: boolean;                  // default false
+  pdfDarkMode?: boolean;                 // M4, viewing only: invert PDF regions in a dark theme
   fontFamily?: string;
   export: ExportDefaults;
 }
@@ -181,7 +182,7 @@ export interface PdfModule extends BaseModule {
   crop?: [number, number, number, number];      // normalized x0,y0,x1,y1
   fit?: "contain" | "cover" | "stretch";
   rotation?: 0 | 90 | 180 | 270;
-  invert?: boolean;                              // M4
+  invert?: boolean;                              // M4: invert colours on screen and in exports (forces raster)
   renderDpi?: number;
   render?: "auto" | "vector" | "raster";        // export rendering, default "auto" (section 9.1)
 }
@@ -219,6 +220,7 @@ export interface ExportDefaults {
   quality: "best" | "small";                     // "small" forces raster PDF modules; default "best"
   fitSmallPages?: boolean;                       // pages smaller than the sheet: scale to fit (default: actual size)
   tileLabels?: boolean;                          // print "B3"-style labels on tiles
+  inkSaver?: boolean;                            // M4: PDF regions and images grayscale + lighter (raster)
 }
 ```
 

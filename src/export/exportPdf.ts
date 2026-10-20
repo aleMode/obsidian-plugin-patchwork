@@ -19,6 +19,7 @@ export interface ExportOptions {
 	overlap: number;
 	fitSmallPages: boolean;
 	tileLabels: boolean;
+	inkSaver?: boolean;
 	/** Indices into the pages in output order; absent means all. Numbers stay as in the full board. */
 	pageIndices?: number[];
 }
@@ -49,7 +50,7 @@ export async function exportBoardPdf(
 		throw new Error(`Pages larger than 5080 mm per side can't be a single PDF page: ${list}. Choose a sheet size (e.g. A4) to tile them.`);
 	}
 
-	const vector = new Set(pages.flatMap((p) => [...vectorModules(p, opts.quality)]));
+	const vector = new Set(pages.flatMap((p) => [...vectorModules(p, opts.quality, !!opts.inkSaver)]));
 	const title = board.meta?.title ?? boardPath.replace(/^.*\//, '').replace(/\.patchwork$/, '');
 	const furniture = pageFurniture(board, { title, date: opts.date });
 	const printed: Uint8Array[] = [];
@@ -66,6 +67,7 @@ export async function exportBoardPdf(
 			boardPath,
 			furniture,
 			numberPosition: board.board.numbering.position,
+			inkSaver: !!opts.inkSaver,
 		});
 		printed.push(r.bytes);
 		problems.push(...r.problems);

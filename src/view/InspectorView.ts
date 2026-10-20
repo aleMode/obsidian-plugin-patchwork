@@ -201,6 +201,7 @@ export class InspectorView extends ItemView {
 		form.toggle('Snap to grid', file.board.grid.snap, (v) => setBoard('snap', { grid: { ...board.boardStore.file.board.grid, snap: v } }));
 		form.toggle('Show grid', file.board.grid.visible, (v) => setBoard('visible', { grid: { ...board.boardStore.file.board.grid, visible: v } }));
 		form.toggle('Use app theme for pages', file.board.useAppTheme, (v) => setBoard('theme', { useAppTheme: v }), 'Off: pages look like white paper, also in dark mode and in exports.');
+		form.toggle('Dark PDFs in dark mode', !!file.board.pdfDarkMode, (v) => setBoard('pdfDark', withField(file.board, 'pdfDarkMode', v ? true : undefined)), 'Viewing only: PDF regions are shown colour-inverted while Obsidian uses a dark theme. Exports are unchanged.');
 		const n = file.board.numbering;
 		const setNum = (field: string, patch: Partial<BoardSettings['numbering']>) => setBoard(`num.${field}`, { numbering: { ...board.boardStore.file.board.numbering, ...patch } });
 		form.heading('Page numbers');
@@ -359,6 +360,7 @@ export class InspectorView extends ItemView {
 		form.dropdown('Fit', FIT, m.fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
 		form.dropdown('Rotation', { '0': '0°', '90': '90°', '180': '180°', '270': '270°' }, String(m.rotation ?? 0), (v) => set('rotation', (x) => withField(x, 'rotation', v === '0' ? undefined : Number(v))));
 		form.dropdown('In exports', { auto: 'Automatic', vector: 'Vector (sharp)', raster: 'Image (smaller)' }, m.render ?? 'auto', (v) => set('render', (x) => withField(x, 'render', v === 'auto' ? undefined : v)));
+		form.toggle('Invert colours', !!m.invert, (v) => set('invert', (x) => withField(x, 'invert', v ? true : undefined)), 'For dark-background pages: light on screen and in print (exported as an image).');
 	}
 
 	private renderStyle(form: Form, m: AnyModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {

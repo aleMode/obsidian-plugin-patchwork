@@ -22,13 +22,13 @@ const MODULE_KEYS: Record<string, readonly string[]> = {
 const MODULE_BASE = ['id', 'type', 'x', 'y', 'w', 'h', 'z', 'locked', 'label'];
 
 const BOARD: Shape = {
-	keys: ['grid', 'displayUnit', 'order', 'pageOrder', 'numbering', 'defaultSafeArea', 'header', 'footer', 'useAppTheme', 'fontFamily', 'export'],
+	keys: ['grid', 'displayUnit', 'order', 'pageOrder', 'numbering', 'defaultSafeArea', 'header', 'footer', 'useAppTheme', 'pdfDarkMode', 'fontFamily', 'export'],
 	children: {
 		grid: { keys: ['size', 'snap', 'visible'] },
 		numbering: { keys: ['enabled', 'start', 'format', 'position', 'skipFirst'] },
 		defaultSafeArea: INSETS,
 		export: {
-			keys: ['format', 'sheet', 'orientation', 'tileOverlap', 'cropMarks', 'dpi', 'quality', 'fitSmallPages', 'tileLabels'],
+			keys: ['format', 'sheet', 'orientation', 'tileOverlap', 'cropMarks', 'dpi', 'quality', 'fitSmallPages', 'tileLabels', 'inkSaver'],
 			children: { sheet: { keys: ['w', 'h'] } },
 		},
 	},

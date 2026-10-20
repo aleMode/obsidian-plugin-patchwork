@@ -48,6 +48,8 @@ export interface BoardSettings {
 	header?: string;
 	footer?: string;
 	useAppTheme: boolean;
+	/** Viewing only: show PDF regions colour-inverted when Obsidian uses a dark theme (M4). */
+	pdfDarkMode?: boolean;
 	fontFamily?: string;
 	export: ExportDefaults;
 	[extra: string]: unknown;
@@ -165,5 +167,7 @@ export interface ExportDefaults {
 	fitSmallPages?: boolean;
 	/** Print a row/column label ("B3") on each tile. */
 	tileLabels?: boolean;
+	/** Ink saver (M4): PDF regions and images print grayscale and lightened (as images). */
+	inkSaver?: boolean;
 	[extra: string]: unknown;
 }

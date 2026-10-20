@@ -207,6 +207,7 @@ export class BoardViewport implements BoardSurface {
 		}
 		this.syncLabels();
 		this.modules.selectedModules = new Set(this.items.flatMap((it) => (it.moduleId ? [it.moduleId] : [])));
+		this.root.toggleClass('pw-pdf-dark', !!file.board.pdfDarkMode);
 		this.renderSelectionBox();
 		this.renderGrid();
 		this.renderRulers();
@@ -442,6 +443,7 @@ export class BoardViewport implements BoardSurface {
 			overlap: e.tileOverlap,
 			fitSmallPages: !!e.fitSmallPages,
 			tileLabels: !!e.tileLabels,
+			inkSaver: !!e.inkSaver,
 			quality: e.quality,
 			dpi: e.dpi,
 			open: true,
@@ -483,7 +485,7 @@ export class BoardViewport implements BoardSurface {
 		// Remember the choices in the board, like other export defaults (SPEC 6).
 		this.store.update((f) => {
 			const e = f.board.export;
-			const next = { ...e, format: choices.format, sheet: choices.sheet, orientation: choices.orientation, tileOverlap: choices.overlap, quality: choices.quality, dpi: choices.dpi, fitSmallPages: choices.fitSmallPages || undefined, tileLabels: choices.tileLabels || undefined };
+			const next = { ...e, format: choices.format, sheet: choices.sheet, orientation: choices.orientation, tileOverlap: choices.overlap, quality: choices.quality, dpi: choices.dpi, fitSmallPages: choices.fitSmallPages || undefined, tileLabels: choices.tileLabels || undefined, inkSaver: choices.inkSaver || undefined };
 			return JSON.stringify(next) === JSON.stringify(e) ? f : { ...f, board: { ...f.board, export: next } };
 		});
 		const pageIndices =
