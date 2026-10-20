@@ -52,7 +52,7 @@ try {
 	check('no exception', false, String(e.stack ?? e));
 } finally {
 	await cdp
-		.evaluate(`document.querySelectorAll('.modal-close-button').forEach((b) => b.click()); app.workspace.getLeavesOfType('patchwork-board').forEach((l) => l.detach());
+		.evaluate(`for (let k = 0; k < 20 && document.querySelector('.modal-container'); k++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise((r) => setTimeout(r, 50)); } app.workspace.getLeavesOfType('patchwork-board').forEach((l) => l.detach());
 	await new Promise((r) => setTimeout(r, 400)); // let pending saves finish before deleting their files
 		const d = app.vault.getAbstractFileByPath('_e2e'); if (d) await app.vault.delete(d, true);`)
 		.catch(() => {});

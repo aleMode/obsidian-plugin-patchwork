@@ -3,6 +3,7 @@ import { newBoardFile } from './model/defaults';
 import { presetById } from './model/presets';
 import { serializeBoard } from './model/serialize';
 import { generateStressBoard, type StressSources } from './model/stress';
+import { CropModal } from './ui/CropModal';
 import { StressBoardModal } from './ui/StressBoardModal';
 import { BitmapCache } from './render/bitmapCache';
 import { DEFAULT_SETTINGS, type PatchworkSettings, PatchworkSettingTab } from './settings';
@@ -102,6 +103,7 @@ export default class PatchworkPlugin extends Plugin {
 	}
 
 	onunload() {
+		CropModal.closeAll();
 		removePaperScope();
 		this.pdfDocs.destroyAll();
 		this.bitmaps.clear();

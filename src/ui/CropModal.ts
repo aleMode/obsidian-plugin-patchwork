@@ -1,8 +1,8 @@
 import { App, Modal, Setting } from 'obsidian';
 import { type Handle, resizeRect } from '../model/geometry';
-import { cropFromPoints, FULL_PAGE, moveCrop, tidyCrop } from '../model/pdfGeometry';
+import { cropAroundHit, cropFromPoints, FULL_PAGE, moveCrop, tidyCrop } from '../model/pdfGeometry';
 import type { Crop } from '../model/schema';
-import type { PdfDocCache, PdfDocument } from '../sources/pdfSource';
+import { type PdfDocCache, type PdfDocument, pdfOutline, searchPdf } from '../sources/pdfSource';
 
 export interface CropResult {
 	page: number;
@@ -18,15 +18,22 @@ type Gesture =
 	| { kind: 'move'; from: { x: number; y: number }; start: Crop }
 	| { kind: 'resize'; handle: Handle; from: { x: number; y: number }; start: Crop };
 
-/** Largest preview, in CSS px; the page is fitted inside. */
+/** Largest preview, in CSS px; the page is fitted inside, leaving room for the tools and buttons. */
 const MAX_W = 720;
-const MAX_H_VH = 0.62;
+const MAX_H_VH = 0.5;
 
 /**
  * Pick a page and drag a crop rectangle over it (SPEC 5.3). Draw a new rectangle on empty space,
  * drag inside it to move, drag a corner to resize. Coordinates are normalized to the displayed page.
  */
 export class CropModal extends Modal {
+	/** Open editors, closed when the plugin unloads: their PDF documents are destroyed with it. */
+	private static open = new Set<CropModal>();
+
+	static closeAll() {
+		for (const m of [...CropModal.open]) m.close();
+	}
+
 	private page: number;
 	private crop: Crop;
 	private pdfDoc: PdfDocument | null = null;
@@ -36,6 +43,8 @@ export class CropModal extends Modal {
 	private canvas: HTMLCanvasElement | null = null;
 	private box!: HTMLElement;
 	private pageLabel!: HTMLElement;
+	private contents!: HTMLElement;
+	private results!: HTMLElement;
 	private gesture: Gesture | null = null;
 	private resizeModule = true;
 
@@ -52,6 +61,7 @@ export class CropModal extends Modal {
 	}
 
 	async onOpen() {
+		CropModal.open.add(this);
 		this.modalEl.addClass('pw-crop-modal');
 		this.setTitle(`Crop: ${this.path.replace(/^.*\//, '')}`);
 		const nav = this.contentEl.createDiv({ cls: 'pw-crop-nav' });
@@ -59,6 +69,9 @@ export class CropModal extends Modal {
 		this.pageLabel = nav.createSpan({ cls: 'pw-crop-page' });
 		nav.createEl('button', { text: 'Next' }, (b) => b.addEventListener('click', () => void this.goTo(this.page + 1)));
 		nav.createEl('button', { text: 'Full page' }, (b) => b.addEventListener('click', () => this.setCrop(FULL_PAGE)));
+		this.contents = this.contentEl.createDiv({ cls: 'pw-crop-tools' });
+		this.buildSearch(this.contents);
+		this.results = this.contentEl.createDiv({ cls: 'pw-crop-results' });
 		this.stage = this.contentEl.createDiv({ cls: 'pw-crop-stage' });
 		this.box = this.stage.createDiv({ cls: 'pw-crop-box' });
 		for (const h of ['nw', 'ne', 'se', 'sw']) this.box.createDiv({ cls: `pw-crop-handle pw-handle-${h}`, attr: { 'data-handle': h } });
@@ -72,6 +85,7 @@ export class CropModal extends Modal {
 			this.pdfDoc = await this.pdfDocs.acquire(this.path);
 			this.pageCount = this.pdfDoc.numPages;
 			await this.goTo(this.page);
+			void this.buildContents(this.pdfDoc);
 		} catch (e) {
 			this.stage.setText(`Could not open ${this.path}: ${e instanceof Error ? e.message : String(e)}`);
 		}
@@ -108,6 +122,55 @@ export class CropModal extends Modal {
 		this.stage.prepend(canvas);
 		this.stage.setCssProps({ '--pw-crop-w': `${cssW}px`, '--pw-crop-h': `${cssW / this.pageAspect}px` });
 		this.setCrop(this.crop);
+	}
+
+	/** Jump by bookmark instead of paging (SPEC 4 M3: pick a PDF section from its outline). */
+	private async buildContents(doc: PdfDocument) {
+		const entries = await pdfOutline(doc).catch(() => []);
+		if (!entries.length || this.pdfDoc !== doc) return;
+		const select = this.contents.createEl('select', { cls: 'dropdown pw-crop-contents', attr: { 'aria-label': 'Contents' } });
+		select.createEl('option', { text: 'Contents…', value: '' });
+		for (const e of entries) select.createEl('option', { text: `${'\u2003'.repeat(e.depth)}${e.title} (p. ${e.page})`, value: String(e.page) });
+		select.addEventListener('change', () => {
+			if (select.value) void this.goTo(Number(select.value));
+		});
+		this.contents.prepend(select);
+	}
+
+	/** Search the whole PDF and propose a crop around a hit (SPEC 4 M3). */
+	private buildSearch(el: HTMLElement) {
+		const input = el.createEl('input', { type: 'search', cls: 'pw-crop-search', attr: { placeholder: 'Search this PDF…' } });
+		const run = async () => {
+			const doc = this.pdfDoc;
+			if (!doc) return;
+			this.results.empty();
+			const status = this.results.createDiv({ cls: 'pw-crop-status', text: 'Searching…' });
+			let hits: Awaited<ReturnType<typeof searchPdf>>;
+			try {
+				hits = await searchPdf(doc, input.value, 100, (n) => status.setText(`Searching page ${n} of ${doc.numPages}…`));
+			} catch (e) {
+				status.setText(`Search failed: ${e instanceof Error ? e.message : String(e)}`);
+				return;
+			}
+			if (this.pdfDoc !== doc) return;
+			status.setText(hits.length ? `${hits.length}${hits.length === 100 ? '+' : ''} matches` : 'No matches.');
+			for (const h of hits) {
+				const row = this.results.createDiv({ cls: 'pw-crop-hit' });
+				row.createSpan({ cls: 'pw-crop-hit-page', text: `p. ${h.page}` });
+				row.createSpan({ text: h.context });
+				row.addEventListener('click', () => {
+					void this.goTo(h.page).then(() => this.setCrop(cropAroundHit(h.rect)));
+					this.results.querySelectorAll('.is-active').forEach((r) => r.removeClass('is-active'));
+					row.addClass('is-active');
+				});
+			}
+		};
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				void run();
+			}
+		});
 	}
 
 	private setCrop(c: Crop) {
@@ -169,6 +232,7 @@ export class CropModal extends Modal {
 	}
 
 	onClose() {
+		CropModal.open.delete(this);
 		if (this.canvas) this.canvas.width = this.canvas.height = 0;
 		if (this.pdfDoc) this.pdfDocs.release(this.path);
 		this.pdfDoc = null;

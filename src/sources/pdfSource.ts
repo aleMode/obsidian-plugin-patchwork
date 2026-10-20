@@ -6,6 +6,20 @@ import { App, loadPdfJs, TFile } from 'obsidian';
 export interface PdfViewport {
 	width: number;
 	height: number;
+	/** PDF user space → viewport pixels (top-left origin, page rotation applied). */
+	convertToViewportPoint(x: number, y: number): number[];
+}
+export interface PdfTextItem {
+	str: string;
+	/** [a, b, c, d, e, f]: (e, f) is the baseline start in PDF user space. */
+	transform: number[];
+	width: number;
+	height: number;
+}
+export interface PdfOutlineItem {
+	title: string;
+	dest: string | unknown[] | null;
+	items: PdfOutlineItem[];
 }
 export interface PdfRenderTask {
 	promise: Promise<void>;
@@ -15,12 +29,85 @@ export interface PdfPage {
 	rotate: number;
 	getViewport(opts: { scale: number }): PdfViewport;
 	render(opts: { canvasContext: CanvasRenderingContext2D; canvas?: HTMLCanvasElement; viewport: PdfViewport; transform?: number[] }): PdfRenderTask;
+	getTextContent(): Promise<{ items: (PdfTextItem | { type: string })[] }>;
 	cleanup(): void;
 }
 export interface PdfDocument {
 	numPages: number;
 	getPage(n: number): Promise<PdfPage>;
+	getOutline(): Promise<PdfOutlineItem[] | null>;
+	getDestination(name: string): Promise<unknown[] | null>;
+	getPageIndex(ref: unknown): Promise<number>;
 	destroy(): Promise<void>;
+}
+
+/** The PDF's bookmarks, flattened with depth and resolved to 1-based page numbers (spike S3). */
+export async function pdfOutline(doc: PdfDocument): Promise<{ title: string; depth: number; page: number }[]> {
+	const out: { title: string; depth: number; page: number }[] = [];
+	const walk = async (items: PdfOutlineItem[], depth: number) => {
+		for (const item of items) {
+			try {
+				const dest = typeof item.dest === 'string' ? await doc.getDestination(item.dest) : item.dest;
+				if (dest?.[0] !== undefined) out.push({ title: item.title, depth, page: (await doc.getPageIndex(dest[0])) + 1 });
+			} catch {
+				// Broken bookmark: skip it, keep the rest.
+			}
+			if (item.items?.length) await walk(item.items, depth + 1);
+		}
+	};
+	await walk((await doc.getOutline()) ?? [], 0);
+	return out;
+}
+
+export interface TextHit {
+	page: number;
+	/** Normalized to the page as displayed (top-left origin). */
+	rect: { x0: number; y0: number; x1: number; y1: number };
+	context: string;
+}
+
+/** Find `term` (case-insensitive) in every page's text, in page order, up to `limit` hits. */
+export async function searchPdf(doc: PdfDocument, term: string, limit = 100, progress?: (page: number) => void): Promise<TextHit[]> {
+	const needle = term.trim().toLowerCase();
+	const hits: TextHit[] = [];
+	if (!needle) return hits;
+	for (let n = 1; n <= doc.numPages && hits.length < limit; n++) {
+		progress?.(n);
+		const page = await doc.getPage(n);
+		const vp = page.getViewport({ scale: 1 });
+		const text = await pageText(doc, n, page);
+		if (!text) continue;
+		const items = text.filter((i): i is PdfTextItem => 'str' in i);
+		for (const it of items) {
+			const at = it.str.toLowerCase().indexOf(needle);
+			if (at < 0) continue;
+			// Approximate the match's horizontal span from character positions within the item.
+			const len = Math.max(1, it.str.length);
+			const [bx, by] = vp.convertToViewportPoint(it.transform[4]! + (it.width * at) / len, it.transform[5]!);
+			const [ex] = vp.convertToViewportPoint(it.transform[4]! + (it.width * (at + needle.length)) / len, it.transform[5]!);
+			const h = it.height || Math.hypot(it.transform[2]!, it.transform[3]!);
+			hits.push({
+				page: n,
+				rect: { x0: Math.min(bx!, ex!) / vp.width, y0: (by! - h) / vp.height, x1: Math.max(bx!, ex!) / vp.width, y1: (by! + h * 0.25) / vp.height },
+				context: it.str.trim().slice(0, 90),
+			});
+			if (hits.length >= limit) break;
+		}
+		// No page.cleanup() here: page objects are shared with renderers, and text extraction decodes
+		// no images, so there is nothing worth freeing.
+	}
+	return hits;
+}
+
+/**
+ * A page's text items, or null if it can't be read. PDF.js shares one page object per page across
+ * all users; a renderer calling cleanup() on it mid-extraction can stall the text stream forever
+ * (seen in M3), so extraction is time-boxed and retried once on a fresh page object.
+ */
+async function pageText(doc: PdfDocument, n: number, page: PdfPage): Promise<(PdfTextItem | { type: string })[] | null> {
+	const attempt = (p: PdfPage) =>
+		Promise.race([p.getTextContent().then((t) => t.items), new Promise<null>((r) => window.setTimeout(() => r(null), 4000))]);
+	return (await attempt(page)) ?? (await attempt(await doc.getPage(n)));
 }
 export interface PdfJs {
 	getDocument(params: object): { promise: Promise<PdfDocument> };

@@ -102,3 +102,21 @@ describe('crop editing helpers', () => {
 		expect(tidyCrop([0.123456789, 0, 1 / 3, 1])).toEqual([0.12346, 0, 0.33333, 1]);
 	});
 });
+
+describe('cropAroundHit', () => {
+	it('centres a readable column on the hit and extends below it', async () => {
+		const { cropAroundHit } = await import('../../src/model/pdfGeometry');
+		// A centred heading in a box spanning 0.53–0.89 (the rulebook's "Rigged to Blow").
+		const c = cropAroundHit({ x0: 0.66, y0: 0.77, x1: 0.78, y1: 0.785 });
+		expect(c[0]).toBeLessThan(0.53);
+		expect(c[2]).toBeGreaterThan(0.89);
+		expect(c[1]).toBeCloseTo(0.75);
+		expect(c[3]).toBeCloseTo(1);
+	});
+
+	it('shifts back onto the page near the edges', async () => {
+		const { cropAroundHit } = await import('../../src/model/pdfGeometry');
+		expect(cropAroundHit({ x0: 0.8, y0: 0.9, x1: 0.99, y1: 0.95 })).toEqual([0.55, 0.88, 1, 1]);
+		expect(cropAroundHit({ x0: 0.01, y0: 0.1, x1: 0.1, y1: 0.12 })).toEqual([0, 0.08, 0.45, 0.37]);
+	});
+});

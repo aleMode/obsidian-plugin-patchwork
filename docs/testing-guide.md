@@ -1,13 +1,21 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 168 checks across 15 suites, all passing; `npm test`: 160 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 175 checks across 16 suites, all passing; `npm test`: 162 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
-## New in M2 (session 3, latest)
+## New in M3 (latest)
+
+### PDF contents and search, in the crop editor
+- Open the crop editor (add a PDF, double-click a PDF module, or right-click → *Edit crop…*).
+- **Contents…** lists the PDF's bookmarks (indented by level, with page numbers): pick one to jump there.
+- **Search this PDF…**: type a term and press Enter. Matches across the whole PDF are listed with their page and text; click one to go there with a crop proposed around it (a column centred on the match, extending below it). Adjust and *Apply*.
+- Try "Rigged to Blow" or "Agatha" in the big rulebook: the first result should frame the purple box.
+
+## New in M2 (session 3)
 
 ### Page numbers, headers, footers, safe area
 - Inspector with nothing selected → **Page numbers**: on/off, start at, format (1/i/a), position (6 options), skip first page. **Header / Footer** with tokens `{page}`, `{pages}`, `{title}`, `{date}`. **Safe area**: a dashed margin guide on every page (never printed).

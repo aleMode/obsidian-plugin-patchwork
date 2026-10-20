@@ -96,7 +96,7 @@ try {
 	check('no exception', false, String(e?.stack ?? e));
 } finally {
 	closeAll();
-	document.querySelectorAll('.modal-close-button').forEach((b) => b.click());
+	for (let k = 0; k < 20 && document.querySelector('.modal-container'); k++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise((r) => setTimeout(r, 50)); }
 	await cleanup();
 }
 return { passed: results.filter((r) => r.ok).length, failed: results.filter((r) => !r.ok) };

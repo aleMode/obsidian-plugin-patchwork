@@ -106,3 +106,18 @@ export function moveCrop(c: Crop, dx: number, dy: number): Crop {
 export function tidyCrop(c: Crop): Crop {
 	return c.map((v) => Number(v.toFixed(5))) as Crop;
 }
+
+/**
+ * A starting crop around a search hit (SPEC 4 M3: "search a PDF for a term and create a module from
+ * the matching region"): a readable column centred on the hit (headings are usually centred over
+ * their box or column), extended down to catch the paragraph or stat block that follows. Shifted
+ * back onto the page near edges. The user refines it in the editor.
+ */
+export function cropAroundHit(hit: { x0: number; y0: number; x1: number; y1: number }): Crop {
+	const width = Math.min(1, Math.max(hit.x1 - hit.x0 + 0.06, 0.45));
+	const centre = (hit.x0 + hit.x1) / 2;
+	const x0 = Math.min(1 - width, Math.max(0, centre - width / 2));
+	const y0 = clamp01(hit.y0 - 0.02);
+	const y1 = clamp01(Math.max(hit.y1 + 0.25, y0 + 0.1));
+	return tidyCrop([x0, y0, x0 + width, Math.max(y1, y0 + 0.01)]);
+}
