@@ -256,7 +256,7 @@ Rules:
 - **Corrupt file:** if parsing fails, show an error view with the raw text and a copy button. Never overwrite the file.
 - **External changes:** never silently overwrite a change made outside the view (Sync, git, another editor). Remember the text last loaded or saved; before writing, compare it with the file on disk. If they differ: reload from disk when there are no unsaved changes; otherwise write our version to a conflict copy next to the file (`Name (conflict YYYY-MM-DD HHmm).patchwork`), show the disk version, and offer "Use my version" (restores ours, deletes the copy). Nothing is lost either way. Reloading from disk clears the undo history. Obsidian's `TextFileView` both overwrites on save and reloads over pending edits (spike S6, M0), so the check runs in `save` and in `setViewData`.
 - **IDs:** short random strings, unique within the file.
-- **Paths:** vault-relative. On vault `rename`, rewrite references in every `.patchwork` file (use `vault.process` for atomic edits). On `delete`, keep the reference and mark the module missing.
+- **Paths:** vault-relative. On vault `rename`, rewrite references in every `.patchwork` file (use `vault.process` for atomic edits), including links written in text modules and frozen notes that pointed to the renamed file. On `delete`, keep the reference and mark the module missing.
 
 ## 7. Architecture
 
@@ -496,3 +496,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Live Preview editing (Q18) is dropped in favour of **Arrange / Use modes** (section 5.7): Use is a dashboard with live links, checkboxes and plugin content, app-theme pages as faint panels, and no editing chrome. New fields `board.mode` and `style.tint` (Canvas colour palette).
   - Opening a patchwork no longer fits the pages to a pane that is still being laid out (it could open at 2 % zoom).
   - PDF embeds inside notes (`![[book.pdf#page=2]]`, Q9) are drawn by Patchwork as a static page instead of Obsidian's PDF viewer, which collapsed inside modules, covered the note and exported blurry. Exports place them as vector at best quality (like PDF modules, drawn over the page), as a picture at small quality or with the ink saver.
+  - Rename tracking also rewrites links in text modules and frozen notes (`[[…]]`, `![[…]]`, `[…](…)`) that no longer resolve and pointed to the renamed file or folder. A board open in several panes is rewritten through one of them (the one with unsaved edits) and saved at once, so the others reload; open boards are matched by file, not path, so moving the folder that holds an open board no longer writes behind it. Saves of one view run one at a time, which removes conflict copies made by two overlapping saves.

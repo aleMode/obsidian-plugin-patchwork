@@ -5,8 +5,8 @@ Questions raised while building, each with the recommended answer we are proceed
 ## Pinned for review
 
 ### Q1. Note `lines`: relative to the section or the file?
-- **Current answer (provisional):** relative to the `subpath` section when one is set, otherwise to the whole note.
-- **Why it's pinned:** line numbers drift whenever the source note is edited above the range. Section-relative is less fragile but not immune. Revisit once the line-range picker exists (M1), possibly in favour of anchoring to a block ID or heading instead.
+- **Decided (2026-10-20): keep it.** Relative to the `subpath` section when one is set, otherwise to the whole note; no anchoring to block IDs or headings.
+- **Why it was pinned:** line numbers drift whenever the source note is edited above the range. Section-relative is less fragile but not immune. Revisit once the line-range picker exists (M1), possibly in favour of anchoring to a block ID or heading instead.
 
 ### Q2. Tiling tolerance (ε = 0.1 mm)
 - **Current answer:** tile count per axis is `max(1, ceil((page − overlap − ε) / (sheet − overlap)))` with ε = 0.1 mm, so float error like 297.0000001 mm never adds a near-empty tile. Overlap must be ≥ 0 and < sheet side.
@@ -40,6 +40,7 @@ Questions raised while building, each with the recommended answer we are proceed
 - **S6 found data loss:** an external change (Sync, git) arriving while our debounced save is pending gets overwritten silently.
 - **Recommendation:** remember the last loaded/saved text; before writing, compare with disk. If different: reload when we have no unsaved changes, otherwise show a conflict notice (keep ours / take theirs / save ours as a copy). Clear undo history when the model is reloaded from disk.
 - Rename rewrites: if the board is open, apply through its store (undoable); use `vault.process` only for closed files.
+- **Resolved 2026-10-20** (full check in the app): open boards in one or more panes and popout windows, closed boards, boards in background tabs not loaded yet, folder moves (including the board's own folder), case-only renames and non-ASCII names all follow. Fixed on the way: with two panes the rewrite could go to the wrong store and end in a conflict copy; a folder move could rewrite an open board on disk behind its view; two overlapping saves of one view made a conflict copy (our `saving`/`dirty` fields also shadowed TextFileView's own); links written in text modules and frozen notes were not rewritten. Covered by `scripts/e2e/links.js` and `tests/model/links.test.ts`.
 
 ### Q9. PDF embeds inside note modules
 - `![[file.pdf#page=2]]` inside a note renders Obsidian's full PDF viewer (heavy, interactive, scrolls).
@@ -67,11 +68,13 @@ Questions raised while building, each with the recommended answer we are proceed
 ### Q14. Master pages: separate list or flagged pages?
 - SPEC 6 planned a top-level `masters?: Master[]` with no shape defined. A separate list needs its own editing surface (every page tool would have to learn a second kind of page).
 - **Chosen (M4, SPEC v0.8):** a master is an ordinary page with `isMaster: true`; pages use it with `master: "<page id>"`. Masters sit on the board like other pages, are edited with the same tools, and are left out of export, numbering, page ranges and the outline's numbers. Inherited modules are drawn below the page's own and can't be selected there. One level only (a master can't use a master).
-- Easy to change while there are no users: a migration could move flagged pages into a `masters` list later. **Recommendation:** keep it unless you'd rather masters live off the board.
+- Easy to change while there are no users: a migration could move flagged pages into a `masters` list later.
+- **Confirmed (2026-10-20):** keep masters as flagged pages on the board.
 
 ### Q15. What "stale-source warnings and freeze" mean
 - SPEC 4 names the feature only. **Chosen (M4):** notes can be *frozen* (markdown snapshot stored in the board, badge flags later changes to the note). PDF crops remember which version of the PDF they were made on and warn when the file is replaced, since a new rulebook version can shift pages and crops.
-- Not built: freezing PDF crops or images (would need stored image snapshots, e.g. PNGs next to the board), and stale warnings for live (unfrozen) notes, which change on purpose. **Recommendation:** wait for a real need; the stored-PNG route is straightforward if it comes up.
+- Not built: freezing PDF crops or images (would need stored image snapshots, e.g. PNGs next to the board), and stale warnings for live (unfrozen) notes, which change on purpose.
+- **Confirmed (2026-10-20):** leave it as is until there is a real need.
 
 ### Q16. Interface layout: sidebar, context bar, dialogs
 - The inspector needs about 23 rows for a note or PDF module in a 300 px column, board settings live in four places (five of them duplicated), and several actions are only commands. Full inventory and proposal: `docs/ui-reorganisation.md` sections 1–3.

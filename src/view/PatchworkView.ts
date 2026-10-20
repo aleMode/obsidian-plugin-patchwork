@@ -20,16 +20,23 @@ export class PatchworkView extends TextFileView {
 	store: BoardStore | null = null;
 	/** Text last read from or written to disk. Basis for the external-change check. */
 	private lastDisk = '';
-	private dirty = false;
+	/** Edits not yet on disk. (Not `dirty` or `saving`: TextFileView uses those names internally.) */
+	private unsaved = false;
 	/** Set when the file failed to parse: the view must never write to it (hard rule 2). */
 	private broken = false;
 	surface: BoardSurface | null = null;
 	private unsubscribe: (() => void) | null = null;
+	/** The save in progress; saves run one at a time. */
+	private saveQueue: Promise<void> = Promise.resolve();
 
 	constructor(leaf: WorkspaceLeaf, private makeSurface: SurfaceFactory) {
 		super(leaf);
 		// Board shortcuts (e.g. Mod+D) must win over Obsidian's global hotkeys while the board is active.
 		this.scope = new Scope(this.app.scope);
+	}
+
+	get hasUnsavedEdits(): boolean {
+		return this.unsaved;
 	}
 
 	getViewType() {
@@ -53,7 +60,7 @@ export class PatchworkView extends TextFileView {
 		// Obsidian reloads the view on any outside change, even with unsaved edits pending, which
 		// would silently drop them. Keep ours in a conflict copy before loading the disk version.
 		const file = this.file;
-		const lostEdits = !clear && this.dirty && this.store && !this.broken && file && data !== this.lastDisk ? this.getViewData() : null;
+		const lostEdits = !clear && this.unsaved && this.store && !this.broken && file && data !== this.lastDisk ? this.getViewData() : null;
 		this.loadBoard(data);
 		if (lostEdits !== null && file) void this.keepConflictCopy(file, lostEdits, false);
 	}
@@ -61,7 +68,7 @@ export class PatchworkView extends TextFileView {
 	private loadBoard(data: string) {
 		this.teardown();
 		this.lastDisk = data;
-		this.dirty = false;
+		this.unsaved = false;
 		const result = parseBoard(data);
 		if (!result.ok) {
 			this.broken = true;
@@ -72,7 +79,7 @@ export class PatchworkView extends TextFileView {
 		// A reload from disk (external change) starts a fresh store, which also clears undo history.
 		this.store = new BoardStore(result.file, { readOnly: result.readOnly });
 		this.unsubscribe = this.store.subscribe(() => {
-			this.dirty = true;
+			this.unsaved = true;
 			this.requestSave();
 		});
 		this.contentEl.empty();
@@ -84,11 +91,21 @@ export class PatchworkView extends TextFileView {
 	clear(): void {
 		this.teardown();
 		this.lastDisk = '';
-		this.dirty = false;
+		this.unsaved = false;
 		this.broken = false;
 	}
 
-	async save(clear?: boolean): Promise<void> {
+	/**
+	 * Saves run one after another: two overlapping saves (the debounced one and an explicit one, e.g. a
+	 * rename rewrite) would each take the other's write for an outside change and make a conflict copy.
+	 */
+	save(clear?: boolean): Promise<void> {
+		const run = this.saveQueue.then(() => this.saveNow(clear));
+		this.saveQueue = run.catch(() => undefined);
+		return run;
+	}
+
+	private async saveNow(clear?: boolean): Promise<void> {
 		const file = this.file;
 		if (this.broken || !this.store || this.store.readOnly || !file) {
 			if (clear) this.clear();
@@ -107,11 +124,13 @@ export class PatchworkView extends TextFileView {
 			if (clear) this.clear();
 			return;
 		}
-		switch (decideSave(this.lastDisk, onDisk, this.dirty, ours)) {
+		switch (decideSave(this.lastDisk, onDisk, this.unsaved, ours)) {
 			case 'write':
 				await super.save(clear);
-				this.lastDisk = ours;
-				this.dirty = false;
+				// What was written (`data`), which includes any edit made while the file was being read.
+				this.lastDisk = this.data;
+				// An edit that arrived during the write is still unsaved.
+				this.unsaved = !clear && !!this.store && this.getViewData() !== this.data;
 				return;
 			case 'reload':
 				if (!clear) this.loadBoard(onDisk);
@@ -122,7 +141,7 @@ export class PatchworkView extends TextFileView {
 				break;
 			case 'none':
 				this.lastDisk = onDisk;
-				this.dirty = false;
+				this.unsaved = false;
 				break;
 		}
 		if (clear) this.clear();

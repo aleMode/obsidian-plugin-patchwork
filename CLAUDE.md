@@ -11,7 +11,7 @@ Patchwork is an Obsidian **desktop-only** plugin that composes boards of fixed-s
   - `npm test` — Vitest
   - `npm run lint` (lints the whole repo, tests and scripts included, like CI; do not lint `src` alone)
   - `npm run check` — build, lint and tests in one go, exactly what CI runs; run it before every push
-  - `npm run e2e` — end-to-end suites in `scripts/e2e/` against the dev Obsidian (needs `scripts/launchObsidian.sh` and a dev build); `npm run e2e board` runs one suite. Suites with real mouse input need the dev window restored (not minimised): a minimised window draws no frames and drags time out. Known to fail on the Windows dev machine before the interface pass: `fileView`, `masters`, `toc`
+  - `npm run e2e` — end-to-end suites in `scripts/e2e/` against the dev Obsidian (needs `scripts/launchObsidian.sh` and a dev build); `npm run e2e board` runs one suite. Suites with real mouse input need the dev window restored (not minimised): a minimised window draws no frames and drags time out.
   - `npm run fixtures` — regenerate the test vault's sample PDF and image (`scripts/makeFixtures.mjs`); add `-- --rulers` to draw mm rulers on the PDF pages (off by default)
   - `npm run spikes:build` — build the throwaway spike plugin (`spikes/`) into the test vault
   - `scripts/launchObsidian.sh` — start Obsidian on `./test-vault` with an isolated profile and remote debugging on port 9222
