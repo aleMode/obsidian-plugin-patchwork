@@ -8,7 +8,10 @@ import { BitmapCache } from './render/bitmapCache';
 import { DEFAULT_SETTINGS, type PatchworkSettings, PatchworkSettingTab } from './settings';
 import { onVaultRename } from './sources/linkTracker';
 import { PdfDocCache } from './sources/pdfSource';
+import { ActiveBoard } from './view/activeBoard';
 import { BoardViewport } from './view/BoardViewport';
+import { InspectorView, VIEW_TYPE_INSPECTOR } from './view/InspectorView';
+import { OutlineView, VIEW_TYPE_OUTLINE } from './view/OutlineView';
 import { refreshPaperScope, removePaperScope } from './view/paperScope';
 import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from './view/PatchworkView';
 
@@ -16,6 +19,7 @@ export default class PatchworkPlugin extends Plugin {
 	pdfDocs!: PdfDocCache;
 	bitmaps!: BitmapCache;
 	settings: PatchworkSettings = { ...DEFAULT_SETTINGS };
+	activeBoard = new ActiveBoard();
 
 	async onload() {
 		this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<PatchworkSettings> | null) };
@@ -25,8 +29,29 @@ export default class PatchworkPlugin extends Plugin {
 		this.registerEvent(this.app.vault.on('modify', (f) => this.bitmaps.invalidateFile(f.path)));
 		this.addSettingTab(new PatchworkSettingTab(this.app, this));
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => void onVaultRename(this.app, oldPath, file.path)));
-		const services = { pdfDocs: this.pdfDocs, bitmaps: this.bitmaps };
-		this.registerView(VIEW_TYPE_BOARD, (leaf) => new PatchworkView(leaf, (el, store, view) => new BoardViewport(el, store, view, services)));
+		const services = {
+			pdfDocs: this.pdfDocs,
+			bitmaps: this.bitmaps,
+			closed: (b: BoardViewport) => this.activeBoard.closed(b),
+			openPanels: () => void this.openPanels(),
+		};
+		this.registerView(VIEW_TYPE_BOARD, (leaf) =>
+			new PatchworkView(leaf, (el, store, view) => {
+				const board = new BoardViewport(el, store, view, services);
+				// A freshly loaded board is the one the user is looking at.
+				if (this.app.workspace.getActiveViewOfType(PatchworkView) === view || !this.activeBoard.get()) this.activeBoard.set(board);
+				return board;
+			}),
+		);
+		this.registerView(VIEW_TYPE_INSPECTOR, (leaf) => new InspectorView(leaf, this.activeBoard));
+		this.registerView(VIEW_TYPE_OUTLINE, (leaf) => new OutlineView(leaf, this.activeBoard));
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', (leaf) => {
+				const view = leaf?.view;
+				if (view instanceof PatchworkView && view.surface instanceof BoardViewport) this.activeBoard.set(view.surface);
+			}),
+		);
+		this.addCommand({ id: 'open-panels', name: 'Open inspector and outline', callback: () => void this.openPanels() });
 		this.registerExtensions([BOARD_EXTENSION], VIEW_TYPE_BOARD);
 
 		refreshPaperScope();
@@ -67,6 +92,21 @@ export default class PatchworkPlugin extends Plugin {
 		removePaperScope();
 		this.pdfDocs.destroyAll();
 		this.bitmaps.clear();
+	}
+
+	/** Show the inspector and outline in the right sidebar (creating them once). */
+	async openPanels() {
+		const ws = this.app.workspace;
+		// A collapsed sidebar would hide the panels even though they're open.
+		if ('expand' in ws.rightSplit && ws.rightSplit.collapsed) ws.rightSplit.expand();
+		for (const type of [VIEW_TYPE_INSPECTOR, VIEW_TYPE_OUTLINE]) {
+			let leaf = ws.getLeavesOfType(type)[0];
+			if (!leaf) {
+				leaf = ws.getRightLeaf(type === VIEW_TYPE_OUTLINE) ?? undefined;
+				await leaf?.setViewState({ type, active: false });
+			}
+			if (leaf) ws.setActiveLeaf(leaf, { focus: false });
+		}
 	}
 
 	async saveSettings() {

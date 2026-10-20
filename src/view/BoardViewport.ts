@@ -27,9 +27,12 @@ import type { BoardSurface, PatchworkView } from './PatchworkView';
 export interface BoardServices {
 	pdfDocs: PdfDocCache;
 	bitmaps: BitmapCache;
+	/** Called when this board goes away, so side panels stop following it. */
+	closed?: (board: BoardViewport) => void;
+	openPanels?: () => void;
 }
 
-type Selection = { pageId: string; moduleId?: string } | null;
+export type Selection = { pageId: string; moduleId?: string } | null;
 
 type Drag =
 	| { kind: 'pan'; last: Point }
@@ -64,6 +67,8 @@ export class BoardViewport implements BoardSurface {
 	private modules: ModuleHost;
 	private camera: Camera = { tx: 0, ty: 0, zoom: 1 };
 	private selection: Selection = null;
+	/** Panels (inspector, outline) listen here; the store has its own subscription for content. */
+	private selectionListeners = new Set<(sel: Selection) => void>();
 	private drag: Drag | null = null;
 	private spaceHeld = false;
 	private frame = 0;
@@ -113,6 +118,8 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	destroy() {
+		this.services.closed?.(this);
+		this.selectionListeners.clear();
 		this.root.win.cancelAnimationFrame(this.frame);
 		if (this.zoomTimer !== null) this.root.win.clearTimeout(this.zoomTimer);
 		this.cleanups.forEach((c) => c());
@@ -141,7 +148,10 @@ export class BoardViewport implements BoardSurface {
 			}
 		}
 		// A selection pointing at something deleted (e.g. by undo) is dropped.
-		if (this.selection && !this.findSelected()) this.selection = null;
+		if (this.selection && !this.findSelected()) {
+			this.selection = null;
+			this.emitSelection();
+		}
 		this.modules.selectedModule = this.selection?.moduleId ?? null;
 		this.renderSelectionBox();
 		this.renderGrid();
@@ -173,10 +183,40 @@ export class BoardViewport implements BoardSurface {
 		return this.selection?.moduleId ? page?.modules.find((m) => m.id === this.selection?.moduleId) : page;
 	}
 
-	private select(sel: Selection) {
+	select(sel: Selection) {
 		if (sel?.pageId === this.selection?.pageId && sel?.moduleId === this.selection?.moduleId) return;
 		this.selection = sel;
 		this.render();
+		this.emitSelection();
+	}
+
+	get selected(): Selection {
+		return this.selection;
+	}
+
+	get boardStore(): BoardStore {
+		return this.store;
+	}
+
+	onSelectionChange(listener: (sel: Selection) => void): () => void {
+		this.selectionListeners.add(listener);
+		return () => this.selectionListeners.delete(listener);
+	}
+
+	private emitSelection() {
+		for (const l of this.selectionListeners) l(this.selection);
+	}
+
+	/** Centre the camera on the selection, keeping the zoom unless it would not fit. */
+	revealSelection() {
+		const sel = this.selectedRect();
+		const vp = this.viewportSize();
+		if (!sel || vp.w === 0) return;
+		const fit = fitCamera(sel.rect, vp, 60);
+		const zoom = Math.min(this.camera.zoom, fit.zoom);
+		const k = PX_PER_MM * zoom;
+		const r = sel.rect;
+		this.setCamera({ zoom, tx: vp.w / 2 - (r.x + r.w / 2) * k, ty: vp.h / 2 - (r.y + r.h / 2) * k });
 	}
 
 	// ---------- adding things ----------
@@ -839,6 +879,7 @@ export class BoardViewport implements BoardSurface {
 		}
 		button('file-output', 'Export to PDF', () => this.showExport());
 		if (!this.store.readOnly) button('settings-2', 'Board settings', () => this.showBoardSettings());
+		if (this.services.openPanels) button('panel-right', 'Inspector and outline', () => this.services.openPanels?.());
 		sep();
 		button('zoom-out', 'Zoom out', () => this.zoomBy(1 / 1.25));
 		this.zoomLabel = bar.createDiv({ cls: 'pw-zoom-label', text: '100%' });

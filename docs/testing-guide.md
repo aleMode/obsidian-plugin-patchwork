@@ -1,6 +1,6 @@
-# Testing guide (state as of 2026-10-20, 00:45)
+# Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 120 checks across 10 suites, all passing; `npm test`: 135 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 135 checks across 11 suites, all passing; `npm test`: 140 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -19,6 +19,13 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - **Ctrl+D** duplicates the selected module (offset 5 mm) or page (placed to the right, modules included). Also in the right-click menu.
 - **Arrow keys** move the selection 1 mm; **Shift+arrow** 10 mm. A burst of presses undoes as one step.
 - Right-click a module → **Lock**: no handles, can't be dragged or nudged. **Unlock** restores.
+
+### 1a. Inspector and outline panels (new, session 3)
+- Toolbar *panel* icon, or **Patchwork: Open inspector and outline**: both open in the right sidebar and follow the last board you clicked.
+- **Inspector:** nothing selected → board settings and title; a page → name, position, size, size preset, orientation, background; a module → label, position, size, lock, arrange, its own options (note: file, section, include heading, **line range**, overflow, scale; PDF: file, page, crop with *Edit crop…*, fit, rotation, vector/image in exports; text: markdown; image: file, fit) and **style** (padding, border width/colour/radius, background, opacity, text scale, CSS class).
+- Lengths are in the board's display unit, but you can type any unit ("5 cm", "2 in"). Typing in a field updates live and undoes as one step.
+- **Outline:** pages in output order with their modules; click one to select it and centre the board on it.
+- Check: styles (padding, border, background) look the same on the board and in an exported PDF, including on PDF crops.
 
 ### 1b. Rulers (new)
 - Top and left rulers in the board's display unit (mm by default; change it in **Board settings**, below).
@@ -79,7 +86,6 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ## Known gaps (not bugs, not built yet)
 
-- No inspector or outline panel yet (positions, sizes and options are set by dragging, the crop editor, or editing the `.patchwork` JSON).
 - No multi-select or align/distribute yet.
 - Page numbers, headers/footers, tiled export, PNG export are M2.
 
