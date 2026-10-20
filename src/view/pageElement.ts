@@ -1,4 +1,6 @@
-import type { Page } from '../model/schema';
+import type { PageFurniture } from '../model/numbering';
+import type { Insets, NumberPosition, Page } from '../model/schema';
+import { renderFurniture } from './furniture';
 import { formatLength } from '../model/units';
 import type { DisplayUnit } from '../model/schema';
 
@@ -16,7 +18,9 @@ export class PageElement {
 		this.paper = this.el.createDiv({ cls: 'pw-page-paper' });
 	}
 
-	update(page: Page, opts: { appTheme: boolean; unit: DisplayUnit; selected: boolean }) {
+	update(page: Page, opts: { appTheme: boolean; unit: DisplayUnit; selected: boolean; furniture?: PageFurniture; position: NumberPosition; safeArea?: Insets }) {
+		renderFurniture(this.paper, opts.furniture, opts.position);
+		this.renderSafeArea(page.safeArea ?? opts.safeArea);
 		const prev = this.page;
 		this.page = page;
 		this.el.dataset.pageId = page.id;
@@ -29,6 +33,17 @@ export class PageElement {
 		this.paper.setCssProps({ '--pw-page-bg': page.background ?? '' });
 		this.el.toggleClass('is-selected', opts.selected);
 		this.label.setText(`${page.name ?? 'Untitled page'} · ${formatLength(page.w, opts.unit)} × ${formatLength(page.h, opts.unit)}`);
+	}
+
+	/** Dashed margin guide (SPEC 5.2): on the board only, never printed, never constraining modules. */
+	private renderSafeArea(i: Insets | undefined) {
+		let el = this.paper.querySelector<HTMLElement>(':scope > .pw-safe-area');
+		if (!i || (i.top <= 0 && i.right <= 0 && i.bottom <= 0 && i.left <= 0)) {
+			el?.remove();
+			return;
+		}
+		if (!el) el = this.paper.createDiv({ cls: 'pw-safe-area' });
+		el.setCssProps({ '--pw-safe-t': `${i.top}mm`, '--pw-safe-r': `${i.right}mm`, '--pw-safe-b': `${i.bottom}mm`, '--pw-safe-l': `${i.left}mm` });
 	}
 
 	remove() {

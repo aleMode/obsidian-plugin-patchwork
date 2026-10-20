@@ -462,6 +462,79 @@
 	width: 200000mm;
 }
 
+.pw-safe-area {
+	position: absolute;
+	top: var(--pw-safe-t);
+	right: var(--pw-safe-r);
+	bottom: var(--pw-safe-b);
+	left: var(--pw-safe-l);
+	border: calc(1px / var(--pw-zoom)) dashed rgba(70, 130, 220, 0.6);
+	pointer-events: none;
+	z-index: 999;
+}
+
+/* Page number, header and footer (SPEC 5.4): same on screen and in print. */
+.pw-furniture {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	z-index: 1000;
+	font-size: 8pt;
+	color: #555;
+}
+
+.pw-furniture > div {
+	position: absolute;
+	white-space: nowrap;
+}
+
+.pw-furniture-header {
+	top: 6mm;
+	left: 0;
+	right: 0;
+	text-align: center;
+}
+
+.pw-furniture-footer {
+	bottom: 6mm;
+	left: 0;
+	right: 0;
+	text-align: center;
+}
+
+.pw-page-number.pw-pos-bottom-center,
+.pw-page-number.pw-pos-top-center {
+	left: 50%;
+	transform: translateX(-50%);
+}
+
+.pw-page-number.pw-pos-bottom-left,
+.pw-page-number.pw-pos-top-left {
+	left: 10mm;
+}
+
+.pw-page-number.pw-pos-bottom-right,
+.pw-page-number.pw-pos-top-right {
+	right: 10mm;
+}
+
+.pw-page-number[class*='pw-pos-bottom'] {
+	bottom: 6mm;
+}
+
+.pw-page-number[class*='pw-pos-top'] {
+	top: 6mm;
+}
+
+/* A centred number and footer would overlap: lift the number above the footer. */
+.pw-furniture-footer ~ .pw-page-number.pw-pos-bottom-center {
+	bottom: 10.5mm;
+}
+
+.pw-furniture-header ~ .pw-page-number.pw-pos-top-center {
+	top: 10.5mm;
+}
+
 .pw-skeletons {
 	position: absolute;
 	inset: 0;

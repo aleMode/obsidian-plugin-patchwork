@@ -8,6 +8,7 @@ import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
+import { pageFurniture } from '../model/numbering';
 import { rulerTicks } from '../model/rulers';
 import { snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
@@ -149,6 +150,11 @@ export class BoardViewport implements BoardSurface {
 
 	// ---------- rendering ----------
 
+	/** {title}: the board's title, else its file name. */
+	boardTitle(): string {
+		return this.store.file.meta?.title ?? this.view.file?.basename ?? '';
+	}
+
 	private get selection(): Selection {
 		return this.items[this.items.length - 1] ?? null;
 	}
@@ -162,6 +168,7 @@ export class BoardViewport implements BoardSurface {
 			this.emitSelection();
 		}
 		const seen = new Set<string>();
+		const furniture = pageFurniture(file, { title: this.boardTitle(), date: today() });
 		for (const page of file.pages) {
 			seen.add(page.id);
 			let el = this.pages.get(page.id);
@@ -170,7 +177,7 @@ export class BoardViewport implements BoardSurface {
 				this.pages.set(page.id, el);
 			}
 			const selected = this.items.some((it) => it.pageId === page.id && !it.moduleId);
-			el.update(page, { appTheme: file.board.useAppTheme, unit: file.board.displayUnit, selected });
+			el.update(page, { appTheme: file.board.useAppTheme, unit: file.board.displayUnit, selected, furniture: furniture.get(page.id), position: file.board.numbering.position, safeArea: file.board.defaultSafeArea });
 		}
 		for (const [id, el] of this.pages) {
 			if (!seen.has(id)) {
@@ -426,7 +433,7 @@ export class BoardViewport implements BoardSurface {
 				{ app, pdfDocs: this.services.pdfDocs, parent: this.view },
 				this.store.file,
 				this.view.file?.path ?? '',
-				{ quality: choices.quality, dpi: choices.dpi },
+				{ quality: choices.quality, dpi: choices.dpi, date: today() },
 				(msg) => notice.setMessage(msg),
 			);
 			const out = await writeBinary(app, choices.path, result.bytes);
@@ -1113,4 +1120,11 @@ export class BoardViewport implements BoardSurface {
 /** Height that gives `rect` the content's aspect ratio at its current width, kept within `maxH`. */
 function fitHeight(rect: { w: number }, aspect: number, maxH: number): { h: number } {
 	return { h: Math.max(5, Math.min(maxH, Number((rect.w / aspect).toFixed(3)))) };
+}
+
+/** {date}: today's local date as YYYY-MM-DD (exports use the export day). */
+export function today(): string {
+	const d = new Date();
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }

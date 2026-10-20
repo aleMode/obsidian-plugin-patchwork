@@ -1,13 +1,20 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 145 checks across 12 suites, all passing; `npm test`: 143 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 151 checks across 13 suites, all passing; `npm test`: 150 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
-## New since M0 (please focus here)
+## New in M2 (session 3, latest)
+
+### Page numbers, headers, footers, safe area
+- Inspector with nothing selected → **Page numbers**: on/off, start at, format (1/i/a), position (6 options), skip first page. **Header / Footer** with tokens `{page}`, `{pages}`, `{title}`, `{date}`. **Safe area**: a dashed margin guide on every page (never printed).
+- Select a page → **Page furniture**: number Automatic / Custom (e.g. "Cover") / None, header and footer Board default / Custom / None, and a per-page safe area.
+- Export: numbers, headers and footers print exactly as on screen; the PDF viewer's page box shows the same numbers (try roman with a custom "Cover" first page).
+
+## New since M0
 
 ### 1. Resize handles
 - Click a module: 8 square handles appear. Drag a corner or an edge. Sizes snap to the 5 mm grid; **Alt** places freely; **Shift** on a corner keeps proportions.

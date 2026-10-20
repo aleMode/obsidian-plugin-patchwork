@@ -1,6 +1,7 @@
 import { clip, degrees, endPath, PDFDocument, PDFHexString, PDFName, type PDFPage, popGraphicsState, pushGraphicsState, rectangle } from '@cantoo/pdf-lib';
 import { drawOrder, vectorTarget } from '../model/exportPlan';
 import { cropToUserBox, drawPlacement, FULL_PAGE } from '../model/pdfGeometry';
+import type { PdfPageLabel } from '../model/numbering';
 import type { Page, PdfModule } from '../model/schema';
 
 // Stage 2 of export (SPEC 9.1, spike S8): merge the printed batches, draw vector PDF modules clipped
@@ -12,6 +13,7 @@ export interface AssembleInput {
 	vector: ReadonlySet<string>;
 	readSource: (path: string) => Promise<Uint8Array>;
 	title: string;
+	pageLabels?: PdfPageLabel[] | null;
 }
 
 export interface AssembleResult {
@@ -67,6 +69,19 @@ function addOutline(doc: PDFDocument, entries: { title: string; pageIndex: numbe
 	doc.catalog.set(PDFName.of('Outlines'), root);
 }
 
+/** /PageLabels so viewers show our page numbers (iii, Cover, …) in their page box. */
+function addPageLabels(doc: PDFDocument, labels: PdfPageLabel[]) {
+	const nums: unknown[] = [];
+	labels.slice(0, doc.getPageCount()).forEach((l, i) => {
+		const dict: Record<string, unknown> = {};
+		if (l.style) dict.S = l.style;
+		if (l.start !== undefined) dict.St = l.start;
+		if (l.prefix !== undefined) dict.P = PDFHexString.fromText(l.prefix);
+		nums.push(i, dict);
+	});
+	doc.catalog.set(PDFName.of('PageLabels'), doc.context.obj({ Nums: nums } as Parameters<typeof doc.context.obj>[0]));
+}
+
 export async function assemble(input: AssembleInput): Promise<AssembleResult> {
 	const out = await PDFDocument.create();
 	for (const bytes of input.printed) {
@@ -95,6 +110,7 @@ export async function assemble(input: AssembleInput): Promise<AssembleResult> {
 	}
 
 	addOutline(out, input.pages.flatMap((p, i) => (p.name ? [{ title: p.name, pageIndex: i }] : [])));
+	if (input.pageLabels) addPageLabels(out, input.pageLabels);
 	out.setTitle(input.title);
 	out.setCreator('Patchwork for Obsidian');
 	return { bytes: await out.save(), problems };

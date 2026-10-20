@@ -1,6 +1,6 @@
 import { ItemView, setIcon, Setting, TFile, WorkspaceLeaf } from 'obsidian';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, TextModule } from '../model/schema';
+import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule } from '../model/schema';
 import { formatLength, parseLength } from '../model/units';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
@@ -11,6 +11,18 @@ import { moduleTitle } from './OutlineView';
 export const VIEW_TYPE_INSPECTOR = 'patchwork-inspector';
 
 const FIT = { contain: 'Contain', cover: 'Cover (crop to fill)', stretch: 'Stretch' };
+const POSITIONS: Record<NumberPosition, string> = {
+	'bottom-center': 'Bottom centre',
+	'bottom-left': 'Bottom left',
+	'bottom-right': 'Bottom right',
+	'top-center': 'Top centre',
+	'top-left': 'Top left',
+	'top-right': 'Top right',
+};
+
+const insets = (mm: number): Insets => ({ top: mm, right: mm, bottom: mm, left: mm });
+/** The inspector edits one inset for all sides; uneven insets (from the file) show their smallest side. */
+const uniformInset = (i: Insets | undefined) => (i ? Math.min(i.top, i.right, i.bottom, i.left) : 0);
 
 /** Copy of `o` with `key` set, or removed when `value` is undefined (absent keys stay absent in the file). */
 function withField<T extends object>(o: T, key: string, value: unknown): T {
@@ -189,7 +201,26 @@ export class InspectorView extends ItemView {
 		form.toggle('Snap to grid', file.board.grid.snap, (v) => setBoard('snap', { grid: { ...board.boardStore.file.board.grid, snap: v } }));
 		form.toggle('Show grid', file.board.grid.visible, (v) => setBoard('visible', { grid: { ...board.boardStore.file.board.grid, visible: v } }));
 		form.toggle('Use app theme for pages', file.board.useAppTheme, (v) => setBoard('theme', { useAppTheme: v }), 'Off: pages look like white paper, also in dark mode and in exports.');
-		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: `${file.pages.length} page(s). Select a page or module to edit it.` });
+		const n = file.board.numbering;
+		const setNum = (field: string, patch: Partial<BoardSettings['numbering']>) => setBoard(`num.${field}`, { numbering: { ...board.boardStore.file.board.numbering, ...patch } });
+		form.heading('Page numbers');
+		form.toggle('Show page numbers', n.enabled, (v) => {
+			setNum('enabled', { enabled: v });
+			this.render();
+		});
+		if (n.enabled) {
+			form.number('Start at', n.start, (v) => v !== undefined && Number.isInteger(v) && setNum('start', { start: v }));
+			form.dropdown('Format', { arabic: '1, 2, 3', roman: 'i, ii, iii', alpha: 'a, b, c' }, n.format, (v) => setNum('format', { format: v as NumberFormat }));
+			form.dropdown('Position', POSITIONS, n.position, (v) => setNum('position', { position: v as NumberPosition }));
+			form.toggle('Skip first page', n.skipFirst, (v) => setNum('skipFirst', { skipFirst: v }), 'The first page still counts.');
+		}
+		form.heading('Header and footer');
+		form.text('Header', file.board.header, (v) => setBoard('header', withField(file.board, 'header', v)), '{title}');
+		form.text('Footer', file.board.footer, (v) => setBoard('footer', withField(file.board, 'footer', v)), '{page} / {pages}');
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Tokens: {page}, {pages}, {title}, {date}. Pages can override these.' });
+		form.heading('Guides');
+		form.length('Safe area', uniformInset(file.board.defaultSafeArea), (mm) => setBoard('safe', withField(file.board, 'defaultSafeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: `A dashed margin guide on every page; never printed. ${file.pages.length} page(s) on this board.` });
 	}
 
 	// ---------- page ----------
@@ -218,6 +249,29 @@ export class InspectorView extends ItemView {
 			this.render();
 		});
 		form.color('Background', page.background, (v) => setPage('background', (p) => withField(p, 'background', v)));
+		form.heading('Page furniture');
+		this.overrideRow('Number', page.numberLabel === false ? 'none' : page.numberLabel, (v) => setPage('numberLabel', (p) => withField(p, 'numberLabel', v === 'none' ? false : v)), 'Automatic');
+		this.overrideRow('Header', page.header === '' ? 'none' : page.header, (v) => setPage('header', (p) => withField(p, 'header', v === 'none' ? '' : v)), 'Board default');
+		this.overrideRow('Footer', page.footer === '' ? 'none' : page.footer, (v) => setPage('footer', (p) => withField(p, 'footer', v === 'none' ? '' : v)), 'Board default');
+		form.length('Safe area', uniformInset(page.safeArea), (mm) => setPage('safe', (p) => withField(p, 'safeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
+	}
+
+	/**
+	 * Automatic (absent) / custom text / none, for per-page overrides. `value` is undefined for
+	 * automatic, 'none' for none, else the custom text.
+	 */
+	private overrideRow(name: string, value: string | undefined, set: (v: string | undefined) => void, automatic: string) {
+		const mode = value === undefined ? 'auto' : value === 'none' ? 'none' : 'custom';
+		const s = new Setting(this.contentEl).setName(name).addDropdown((d) =>
+			d
+				.addOptions({ auto: automatic, custom: 'Custom', none: 'None' })
+				.setValue(mode)
+				.onChange((v) => {
+					set(v === 'auto' ? undefined : v === 'none' ? 'none' : (value && value !== 'none' ? value : name));
+					this.render();
+				}),
+		);
+		if (mode === 'custom') s.addText((t) => t.setValue(value ?? '').onChange((v) => set(v === '' ? undefined : v)));
 	}
 
 	// ---------- module ----------

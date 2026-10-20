@@ -106,6 +106,8 @@ PDF module rules:
 - Board-level numbering: enabled, start offset, format (`arabic`, `roman`, `alpha`), position (6 presets), skip-first-page. Per-page override via `page.numberLabel`: a custom string printed instead of the number, or `false` to hide it. Pages with a custom or hidden number (including the first page under skip-first-page) still count: numbering continues normally on the next page and they are included in `{pages}`.
 - Header/footer text per page and board default, with tokens `{page}`, `{pages}`, `{title}`, `{date}`.
 - `{page}` and `{pages}` count **board pages**, not output sheets. A page split into tiles keeps one page number; individual tiles are identified by their row/col label (section 9.2).
+- `{page}` is the page's number (or its custom label); `{pages}` is the **last** page's number, so "page {page} of {pages}" stays right with a start offset. `{title}` is the board's title, else its file name; `{date}` is the export (or viewing) day as YYYY-MM-DD. A page's own `header`/`footer` replaces the board's; an empty string removes it on that page.
+- Exported PDFs carry `/PageLabels` matching the numbering, so viewers show the same numbers.
 
 ### 5.5 Theming
 - Export and on-screen "paper" always use a **light scope** by default (CSS variable overrides) so dark-mode vaults do not produce white-on-white pages. Board setting `useAppTheme` opts out.

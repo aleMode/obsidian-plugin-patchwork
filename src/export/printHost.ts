@@ -1,5 +1,8 @@
 import { Component } from 'obsidian';
 import { drawOrder } from '../model/exportPlan';
+import type { PageFurniture } from '../model/numbering';
+import type { NumberPosition } from '../model/schema';
+import { renderFurniture } from '../view/furniture';
 import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
 import { ImageModuleRenderer } from '../modules/imageModule';
 import { NoteModuleRenderer, TextModuleRenderer } from '../modules/noteModule';
@@ -20,6 +23,8 @@ export interface PrintOptions {
 	dpi: number;
 	appTheme: boolean;
 	boardPath: string;
+	furniture: Map<string, PageFurniture>;
+	numberPosition: NumberPosition;
 }
 
 export interface PrintResult {
@@ -96,6 +101,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 			const el = host.createDiv({ cls: o.appTheme ? 'pw-sheet' : 'pw-sheet pw-paper theme-light', attr: { 'data-sheet': String(i) } });
 			el.setCssProps({ '--pw-w': `${page.w}mm`, '--pw-h': `${page.h}mm`, '--pw-page-bg': page.background ?? '' });
 			el.toggleClass('has-background', !!page.background);
+			renderFurniture(el, o.furniture.get(page.id), o.numberPosition);
 			drawOrder(page.modules).forEach((m, rank) => {
 				const mod = el.createDiv({ cls: 'pw-module' });
 				mod.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });

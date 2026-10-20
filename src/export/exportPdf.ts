@@ -1,5 +1,6 @@
 import type { App, Component } from 'obsidian';
 import { batches, oversizedPages, vectorModules } from '../model/exportPlan';
+import { pageFurniture, pdfPageLabels } from '../model/numbering';
 import { orderedPages } from '../model/ordering';
 import type { PatchworkFile } from '../model/schema';
 import { formatLength } from '../model/units';
@@ -10,6 +11,8 @@ import { printPages } from './printHost';
 export interface ExportOptions {
 	quality: 'best' | 'small';
 	dpi: number;
+	/** {date} in headers and footers. */
+	date: string;
 }
 
 export interface ExportResult {
@@ -37,6 +40,8 @@ export async function exportBoardPdf(
 	}
 
 	const vector = new Set(pages.flatMap((p) => [...vectorModules(p, opts.quality)]));
+	const title = board.meta?.title ?? boardPath.replace(/^.*\//, '').replace(/\.patchwork$/, '');
+	const furniture = pageFurniture(board, { title, date: opts.date });
 	const printed: Uint8Array[] = [];
 	const problems: string[] = [];
 	const groups = batches(pages, PAGES_PER_BATCH);
@@ -49,6 +54,8 @@ export async function exportBoardPdf(
 			dpi: opts.dpi,
 			appTheme: board.board.useAppTheme,
 			boardPath,
+			furniture,
+			numberPosition: board.board.numbering.position,
 		});
 		printed.push(r.bytes);
 		problems.push(...r.problems);
@@ -60,7 +67,8 @@ export async function exportBoardPdf(
 		pages,
 		vector,
 		readSource: (path) => readPdfBytes(env.app, path),
-		title: board.meta?.title ?? boardPath.replace(/^.*\//, '').replace(/\.patchwork$/, ''),
+		title,
+		pageLabels: pdfPageLabels(board),
 	});
 	return { bytes: out.bytes, pageCount: pages.length, problems: [...new Set([...problems, ...out.problems])] };
 }
