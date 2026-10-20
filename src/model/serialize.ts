@@ -11,7 +11,7 @@ const INSETS: Shape = { keys: ['top', 'right', 'bottom', 'left'] };
 const FROZEN: Shape = { keys: ['at', 'markdown'] };
 const ITEM: Shape = { keys: ['text', 'done'] };
 const STYLE: Shape = {
-	keys: ['padding', 'border', 'background', 'opacity', 'fontScale', 'color', 'align', 'fontFamily', 'cssClass'],
+	keys: ['padding', 'border', 'background', 'tint', 'opacity', 'fontScale', 'color', 'align', 'fontFamily', 'cssClass'],
 	children: { border: { keys: ['width', 'color', 'radius'] } },
 };
 
@@ -27,7 +27,7 @@ const MODULE_KEYS: Record<string, readonly string[]> = {
 const MODULE_BASE = ['id', 'type', 'x', 'y', 'w', 'h', 'z', 'locked', 'label'];
 
 const BOARD: Shape = {
-	keys: ['grid', 'displayUnit', 'order', 'pageOrder', 'numbering', 'defaultSafeArea', 'header', 'footer', 'useAppTheme', 'pdfDarkMode', 'fontFamily', 'export'],
+	keys: ['grid', 'displayUnit', 'order', 'pageOrder', 'numbering', 'defaultSafeArea', 'header', 'footer', 'useAppTheme', 'pdfDarkMode', 'fontFamily', 'mode', 'export'],
 	children: {
 		grid: { keys: ['size', 'snap', 'visible'] },
 		numbering: { keys: ['enabled', 'start', 'format', 'position', 'skipFirst'] },

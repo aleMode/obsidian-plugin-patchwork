@@ -23,6 +23,7 @@ const FULL = {
 		footer: '{page}/{pages}',
 		useAppTheme: false,
 		fontFamily: 'Georgia',
+		mode: 'use',
 		export: { format: 'pdf', sheet: { w: 100, h: 150 }, orientation: 'auto', tileOverlap: 5, cropMarks: false, dpi: 300, quality: 'small' },
 		boardExtra: 42,
 	},
@@ -31,7 +32,7 @@ const FULL = {
 			id: 'p1', name: 'Front', x: 0, y: 0, w: 210, h: 297, numberLabel: false, pageExtra: null,
 			modules: [
 				{ id: 'm1', type: 'pdf', x: 10, y: 10, w: 90, h: 80, file: 'PDFs/Book.pdf', page: 40, crop: [0.1, 0.2, 0.5, 0.6], fit: 'cover', rotation: 90, render: 'vector', moduleExtra: 'keep' },
-				{ id: 'm2', type: 'note', x: 110, y: 10, w: 90, h: 200, file: 'Rules/Combat.md', subpath: '#Prone', lines: [1, 4], includeHeading: false, overflow: 'fit', scale: 0.8, style: { padding: 2, border: { width: 0.5, color: '#333', borderExtra: 1 }, styleExtra: 'y' } },
+				{ id: 'm2', type: 'note', x: 110, y: 10, w: 90, h: 200, file: 'Rules/Combat.md', subpath: '#Prone', lines: [1, 4], includeHeading: false, overflow: 'fit', scale: 0.8, style: { padding: 2, border: { width: 0.5, color: '#333', borderExtra: 1 }, tint: '4', styleExtra: 'y' } },
 				{ id: 'm3', type: 'text', x: 10, y: 100, w: 50, h: 20, markdown: '**hi**' },
 				{ id: 'm4', type: 'image', x: 10, y: 130, w: 50, h: 40, file: 'Images/Map.png', fit: 'stretch', z: 2, locked: true, label: 'map' },
 				{ type: 'hologram', id: 'm5', x: 1, y: 1, w: 1, h: 1, beam: { colour: 'blue' } },

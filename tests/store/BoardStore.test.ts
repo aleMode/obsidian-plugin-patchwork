@@ -24,6 +24,20 @@ describe('BoardStore', () => {
 		expect(seen).toHaveBeenCalledTimes(3);
 	});
 
+	it('changes outside the history are not undo steps and survive undo and redo', () => {
+		const { store, id } = storeWithPage();
+		store.update((f) => movePage(f, id, 50, 60));
+		store.updateOutsideHistory((f) => ({ ...f, board: { ...f.board, mode: 'use' } }));
+		expect(store.canUndo).toBe(true);
+		store.undo();
+		expect(store.file.pages[0]).toMatchObject({ x: 0, y: 0 });
+		expect(store.file.board.mode).toBe('use');
+		store.redo();
+		expect(store.file.board.mode).toBe('use');
+		store.undo();
+		expect(store.canUndo).toBe(false);
+	});
+
 	it('does not record no-op changes', () => {
 		const { store, id } = storeWithPage();
 		store.update((f) => movePage(f, id, 0, 0));

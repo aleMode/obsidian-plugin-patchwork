@@ -51,6 +51,11 @@ export interface BoardSettings {
 	/** Viewing only: show PDF regions colour-inverted when Obsidian uses a dark theme (M4). */
 	pdfDarkMode?: boolean;
 	fontFamily?: string;
+	/**
+	 * The mode the patchwork opens in: "use" (a dashboard: live content, nothing moves). Anything else,
+	 * absent included, opens in arrange; not validated, so a newer mode never makes a file unreadable.
+	 */
+	mode?: string;
 	export: ExportDefaults;
 	[extra: string]: unknown;
 }
@@ -206,6 +211,8 @@ export interface ModuleStyle {
 	align?: 'left' | 'center' | 'right' | 'justify';
 	/** CSS font-family for the module's content; absent: the page's font. */
 	fontFamily?: string;
+	/** Card colour: Canvas preset "1"–"6" (follows the theme) or "#rrggbb". See model/tint.ts. */
+	tint?: string;
 	cssClass?: string;
 	[extra: string]: unknown;
 }

@@ -48,6 +48,19 @@ export class BoardStore {
 		this.set(next);
 	}
 
+	/**
+	 * A change that is not an undo step (a viewing choice such as the mode). It is applied to the undo
+	 * history as well, so undoing an earlier edit never flips it back.
+	 */
+	updateOutsideHistory(recipe: (file: PatchworkFile) => PatchworkFile) {
+		if (this.readOnly) return;
+		const next = recipe(this.current);
+		if (next === this.current) return;
+		this.past = this.past.map(recipe);
+		this.future = this.future.map(recipe);
+		this.set(next);
+	}
+
 	endCoalesce() {
 		this.openGroup = null;
 	}
