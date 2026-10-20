@@ -76,7 +76,8 @@ try {
 	// Dragging empty board space pans and deselects.
 	await inView('s.zoomToFit(); await new Promise((r) => setTimeout(r, 100));');
 	const board = await inView('const r = s.root.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height };');
-	const empty = { x: board.x + board.w - 30, y: board.y + board.h - 30 };
+	// Bottom-left: clear of the rulers (top, left) and the minimap (bottom right).
+	const empty = { x: board.x + 60, y: board.y + board.h - 30 };
 	const camA = await inView('return { ...s.camera };');
 	await cdp.drag(empty, { x: empty.x - 100, y: empty.y - 50 });
 	await sleep(100);
