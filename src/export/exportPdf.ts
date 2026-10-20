@@ -20,6 +20,10 @@ export interface ExportOptions {
 	fitSmallPages: boolean;
 	tileLabels: boolean;
 	inkSaver?: boolean;
+	layout?: 'single' | 'booklet';
+	/** Bleed (mm) around each page; single layout only. */
+	bleed?: number;
+	cropMarks?: boolean;
 	/** Indices into the pages in output order; absent means all. Numbers stay as in the full board. */
 	pageIndices?: number[];
 }
@@ -50,6 +54,8 @@ export async function exportBoardPdf(
 		throw new Error(`Pages larger than 5080 mm per side can't be a single PDF page: ${list}. Choose a sheet size (e.g. A4) to tile them.`);
 	}
 
+	const booklet = opts.layout === 'booklet';
+	const bleed = booklet ? 0 : Math.max(0, opts.bleed ?? 0);
 	const vector = new Set(pages.flatMap((p) => [...vectorModules(p, opts.quality, !!opts.inkSaver)]));
 	const title = board.meta?.title ?? boardPath.replace(/^.*\//, '').replace(/\.patchwork$/, '');
 	const furniture = pageFurniture(board, { title, date: opts.date });
@@ -68,6 +74,7 @@ export async function exportBoardPdf(
 			furniture,
 			numberPosition: board.board.numbering.position,
 			inkSaver: !!opts.inkSaver,
+			bleed,
 		});
 		printed.push(r.bytes);
 		problems.push(...r.problems);
@@ -81,7 +88,16 @@ export async function exportBoardPdf(
 		readSource: (path) => readPdfBytes(env.app, path),
 		title,
 		pageLabels: selectLabels(pdfPageLabels(board), all, pages),
-		sheets: planSheets(pages, { sheet: opts.sheet, orientation: opts.orientation, overlap: opts.overlap, fitSmallPages: opts.fitSmallPages }),
+		sheets: planSheets(pages, {
+			sheet: opts.sheet,
+			orientation: opts.orientation,
+			overlap: opts.overlap,
+			fitSmallPages: opts.fitSmallPages,
+			layout: opts.layout,
+			bleed,
+			cropMarks: !booklet && !!opts.cropMarks,
+		}),
+		bleed,
 		tileLabels: opts.tileLabels,
 		pageNames: pages.map((p) => furniture.get(p.id)?.pageToken ?? ''),
 	});

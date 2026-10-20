@@ -26,6 +26,8 @@ export interface PrintOptions {
 	furniture: Map<string, PageFurniture>;
 	numberPosition: NumberPosition;
 	inkSaver?: boolean;
+	/** Bleed (mm): each sheet is printed this much larger on every side. */
+	bleed?: number;
 }
 
 export interface PrintResult {
@@ -38,8 +40,10 @@ const QUIET_MS = 300;
 const SETTLE_TIMEOUT_MS = 10_000;
 
 /** @page sizes differ per sheet, so the rules are generated: one named page per sheet (spike S5). */
-function pageRules(pages: readonly Page[]): string {
-	return pages.map((p, i) => `@page pw-sheet-${i} { size: ${p.w}mm ${p.h}mm; margin: 0; } .pw-sheet[data-sheet="${i}"] { page: pw-sheet-${i}; }`).join('\n');
+function pageRules(pages: readonly Page[], bleed: number): string {
+	return pages
+		.map((p, i) => `@page pw-sheet-${i} { size: ${p.w + 2 * bleed}mm ${p.h + 2 * bleed}mm; margin: 0; } .pw-sheet[data-sheet="${i}"] { page: pw-sheet-${i}; }`)
+		.join('\n');
 }
 
 function createRenderer(m: AnyModule, body: HTMLElement, ctx: ModuleContext, o: PrintOptions): ModuleRenderer | null {
@@ -90,7 +94,8 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	o.parent.addChild(component);
 	const ctx: ModuleContext = { ...o.ctx, component };
 	const sheet = new (doc.defaultView ?? window).CSSStyleSheet();
-	sheet.replaceSync(pageRules(pages));
+	const bleed = o.bleed ?? 0;
+	sheet.replaceSync(pageRules(pages, bleed));
 	doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
 	// Obsidian's print CSS hides `body > :not(.print)`; its own PDF export uses the same class.
 	const host = doc.body.createDiv({ cls: o.inkSaver ? 'pw-print-host print pw-ink-saver' : 'pw-print-host print' });
@@ -99,9 +104,12 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule }[] = [];
 	try {
 		pages.forEach((page, i) => {
-			const el = host.createDiv({ cls: o.appTheme ? 'pw-sheet' : 'pw-sheet pw-paper theme-light', attr: { 'data-sheet': String(i) } });
-			el.setCssProps({ '--pw-w': `${page.w}mm`, '--pw-h': `${page.h}mm`, '--pw-page-bg': page.background ?? '' });
-			el.toggleClass('has-background', !!page.background);
+			const sheetEl = host.createDiv({ cls: o.appTheme ? 'pw-sheet' : 'pw-sheet pw-paper theme-light', attr: { 'data-sheet': String(i) } });
+			sheetEl.setCssProps({ '--pw-w': `${page.w + 2 * bleed}mm`, '--pw-h': `${page.h + 2 * bleed}mm`, '--pw-page-bg': page.background ?? '' });
+			sheetEl.toggleClass('has-background', !!page.background);
+			// The page sits inside the bleed; its background and modules crossing its edge extend into it.
+			const el = sheetEl.createDiv({ cls: 'pw-sheet-page' });
+			el.setCssProps({ '--pw-w': `${page.w}mm`, '--pw-h': `${page.h}mm`, '--pw-bleed': `${bleed}mm` });
 			renderFurniture(el, o.furniture.get(page.id), o.numberPosition);
 			drawOrder(page.modules).forEach((m, rank) => {
 				const mod = el.createDiv({ cls: 'pw-module' });

@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 188 checks across 18 suites, all passing; `npm test`: 165 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 201 checks across 19 suites, all passing; `npm test`: 171 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -13,6 +13,11 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Inspector (nothing selected) → **Dark PDFs in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.
 - Select a PDF module → **Invert colours**: for rulebook pages with dark backgrounds. Applies on screen and in exports (such modules export as images).
 - Export dialog → **Ink saver**: PDF regions and images print grayscale and lighter. Notes and text are unchanged.
+
+### Booklets, bleed, crop marks
+- Export dialog → **Layout: Booklet (fold in half)** with sheet size A4 on a board of A5 pages: each side of a landscape A4 sheet carries two pages in folding order (8|1, 2|7, …; blanks pad to a multiple of 4). Print double-sided, flip on the short edge, fold: the pages should read in order. Worth one real print if you can.
+- Layout *One page per sheet* → **Bleed** 3 mm and **Crop marks** on: give a page a background colour and a module poking past its edge. The colour and the module should extend 3 mm past the trim, with thin corner marks outside it. With *Each page at its own size* the sheet grows by 26 mm per side pair; with A4 the page is centred.
+- Re-check tiles with a vector PDF region on them (A4 sheets, big page): the region used to vanish from tiled and scaled exports. Fixed now.
 
 ## New in M3
 

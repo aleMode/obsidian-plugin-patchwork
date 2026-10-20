@@ -169,5 +169,9 @@ export interface ExportDefaults {
 	tileLabels?: boolean;
 	/** Ink saver (M4): PDF regions and images print grayscale and lightened (as images). */
 	inkSaver?: boolean;
+	/** Booklet (M4): saddle-stitch imposition, two pages per sheet side. */
+	layout?: 'single' | 'booklet';
+	/** Bleed (mm) printed beyond each page edge (M4); backgrounds and modules crossing the edge extend into it. */
+	bleed?: number;
 	[extra: string]: unknown;
 }

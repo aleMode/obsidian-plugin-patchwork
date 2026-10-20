@@ -15,10 +15,16 @@ export interface ExportChoices {
 	fitSmallPages: boolean;
 	tileLabels: boolean;
 	inkSaver: boolean;
+	layout: 'single' | 'booklet';
+	bleed: number;
+	cropMarks: boolean;
 	quality: 'best' | 'small';
 	dpi: number;
 	open: boolean;
 }
+
+/** More than this is never bleed; it would push crop marks off a normal sheet. */
+const MAX_BLEED_MM = 10;
 
 /** The export dialog (SPEC 9): format, pages, sheet size and tiling, quality. */
 export class ExportModal extends Modal {
@@ -130,6 +136,7 @@ export class ExportModal extends Modal {
 				);
 			new Setting(el).setName('Tile labels').setDesc('Print a row and column label in a corner of each tile.').addToggle((t) => t.setValue(c.tileLabels).onChange((v) => (c.tileLabels = v)));
 		}
+		this.renderPrintShop(el);
 		new Setting(el)
 			.setName('Quality')
 			.setDesc('Best quality keeps PDF regions as sharp, selectable vector content (larger files). Smallest file turns them into images.')
@@ -158,6 +165,41 @@ export class ExportModal extends Modal {
 				.setCta()
 				.onClick(() => this.submit()),
 		);
+	}
+
+	/** Booklet imposition, bleed and crop marks (M4). */
+	private renderPrintShop(el: HTMLElement) {
+		const c = this.c;
+		new Setting(el)
+			.setName('Layout')
+			.setDesc(
+				c.layout === 'booklet'
+					? 'Two pages per side of each sheet, in folding order. Print double-sided, flipping on the short edge, then fold the stack in half.'
+					: 'One page per sheet (or tiles of it).',
+			)
+			.addDropdown((d) =>
+				d
+					.addOptions({ single: 'One page per sheet', booklet: 'Booklet (fold in half)' })
+					.setValue(c.layout)
+					.onChange((v) => {
+						c.layout = v as ExportChoices['layout'];
+						this.render();
+					}),
+			);
+		if (c.layout === 'booklet') return;
+		new Setting(el)
+			.setName('Bleed')
+			.setDesc('Extra margin printed around each page, for trimming. Backgrounds and modules crossing the edge extend into it. Not applied to tiles.')
+			.addText((t) =>
+				t.setValue(formatLength(c.bleed, this.ctx.unit)).onChange((v) => {
+					const mm = parseLength(v, this.ctx.unit);
+					if (mm !== null && mm >= 0 && mm <= MAX_BLEED_MM) c.bleed = mm;
+				}),
+			);
+		new Setting(el)
+			.setName('Crop marks')
+			.setDesc('Corner marks showing where to cut. The sheet grows to make room unless a sheet size is chosen.')
+			.addToggle((t) => t.setValue(c.cropMarks).onChange((v) => (c.cropMarks = v)));
 	}
 
 	private target(): string {

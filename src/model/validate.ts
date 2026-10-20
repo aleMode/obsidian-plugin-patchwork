@@ -89,6 +89,8 @@ function checkBoard(board: Json, is: Issues) {
 		is.optional(e, 'fitSmallPages', ep, isBool, 'true/false');
 		is.optional(e, 'tileLabels', ep, isBool, 'true/false');
 		is.optional(e, 'inkSaver', ep, isBool, 'true/false');
+		is.optional(e, 'layout', ep, oneOf('single', 'booklet'), '"single" or "booklet"');
+		is.optional(e, 'bleed', ep, nonNegative, 'a number ≥ 0');
 	}
 }
 

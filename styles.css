@@ -667,6 +667,14 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	break-after: page;
 }
 
+.pw-sheet-page {
+	position: absolute;
+	left: var(--pw-bleed, 0);
+	top: var(--pw-bleed, 0);
+	width: var(--pw-w);
+	height: var(--pw-h);
+}
+
 .pw-sheet.has-background {
 	background: var(--pw-page-bg);
 }

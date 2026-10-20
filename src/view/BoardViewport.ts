@@ -444,6 +444,9 @@ export class BoardViewport implements BoardSurface {
 			fitSmallPages: !!e.fitSmallPages,
 			tileLabels: !!e.tileLabels,
 			inkSaver: !!e.inkSaver,
+			layout: e.layout ?? 'single',
+			bleed: e.bleed ?? 0,
+			cropMarks: e.cropMarks,
 			quality: e.quality,
 			dpi: e.dpi,
 			open: true,
@@ -485,7 +488,7 @@ export class BoardViewport implements BoardSurface {
 		// Remember the choices in the board, like other export defaults (SPEC 6).
 		this.store.update((f) => {
 			const e = f.board.export;
-			const next = { ...e, format: choices.format, sheet: choices.sheet, orientation: choices.orientation, tileOverlap: choices.overlap, quality: choices.quality, dpi: choices.dpi, fitSmallPages: choices.fitSmallPages || undefined, tileLabels: choices.tileLabels || undefined, inkSaver: choices.inkSaver || undefined };
+			const next = { ...e, format: choices.format, sheet: choices.sheet, orientation: choices.orientation, tileOverlap: choices.overlap, quality: choices.quality, dpi: choices.dpi, fitSmallPages: choices.fitSmallPages || undefined, tileLabels: choices.tileLabels || undefined, inkSaver: choices.inkSaver || undefined, layout: choices.layout === 'booklet' ? choices.layout : undefined, bleed: choices.bleed || undefined, cropMarks: choices.cropMarks };
 			return JSON.stringify(next) === JSON.stringify(e) ? f : { ...f, board: { ...f.board, export: next } };
 		});
 		const pageIndices =

@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.7 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.8 · 2026-10-20 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -221,6 +221,8 @@ export interface ExportDefaults {
   fitSmallPages?: boolean;                       // pages smaller than the sheet: scale to fit (default: actual size)
   tileLabels?: boolean;                          // print "B3"-style labels on tiles
   inkSaver?: boolean;                            // M4: PDF regions and images grayscale + lighter (raster)
+  layout?: "single" | "booklet";                 // M4: booklet = saddle-stitch, two pages per sheet side
+  bleed?: number;                                // M4: mm printed beyond each page edge (single layout, whole pages)
 }
 ```
 
@@ -406,6 +408,11 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - PNG export rasterizes the final PDF; sheets above 8192 px per side become several files (`-r1c1`, …), resolving Q11 with option (a).
   - Export dialog adds page selection (all / selected / range) and remembers its choices in `board.export` (new optional `fitSmallPages`, `tileLabels`).
   - Auto-arrange keeps the first page in place and lays pages out in output order (row, or a grid of ⌈√n⌉ columns).
+- **v0.8 · 2026-10-20** (M3 complete, M4 in progress)
+  - Saved views live in the board file (`views`). Dark-mode PDF viewing (`board.pdfDarkMode`) is viewing only; per-module `invert` and the `inkSaver` export option force raster for the affected modules.
+  - Booklet imposition: pages pad with blanks to a multiple of 4 and are placed two per side of a landscape sheet in saddle-stitch order (native sheet = two pages wide). Pages scale down to fit a half; "scale to fit" also scales them up. No bleed or crop marks in booklets.
+  - Bleed is printed by Chromium (each page printed larger, its background and edge-crossing modules extending into it); crop marks, TrimBox and BleedBox are added in the pdf-lib stage. Marks need a 10 mm margin around the bleed: native sheets grow, fixed sheets centre the page. Tiles never get bleed or marks.
+  - Fixed: vector PDF regions were missing from any export that re-lays pages onto sheets (tiles, scaled pages); pdf-lib embeds lazily, so the printed pages are flushed first.
 - **v0.6 · 2026-10-20** (M1 complete)
   - Drag from the file explorer reads the `obsidian://open?…&file=…` URIs Obsidian puts on the drag (no internals).
   - Shift-drag draws a marquee (also when starting on a page's paper); plain drag on empty board pans. Shift-click toggles; selections never mix pages and modules.

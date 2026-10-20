@@ -2,8 +2,8 @@ import type { Rect } from './geometry';
 import type { ExportDefaults, SheetPreset } from './schema';
 import { chooseSheet, TILE_EPSILON_MM, tileGrid, type Size } from './tiling';
 
-// Which output sheets an export produces, and what part of which board page goes where (SPEC 9.2).
-// Pure: the pdf-lib stage just executes this plan.
+// Which output sheets an export produces, and which part of which board page goes where (SPEC 9.2,
+// M4 booklet and print marks). Pure: the pdf-lib stage just executes this plan.
 
 export const SHEET_SIZES: Record<SheetPreset, Size> = {
 	A4: { w: 210, h: 297 },
@@ -14,20 +14,42 @@ export const SHEET_SIZES: Record<SheetPreset, Size> = {
 	Tabloid: { w: 279.4, h: 431.8 },
 };
 
+/** Room around the trim box for crop marks (mm). */
+export const MARK_MARGIN_MM = 10;
+
 export interface SheetPart {
 	/** Index into the exported pages (output order). */
 	page: number;
-	/** Output sheet size, mm. */
-	sheet: Size;
-	/** Region of the board page shown (mm, top-left origin). */
+	/** Region of the board page (mm, page top-left origin; negative = bleed area). */
 	src: Rect;
-	/** Where it lands on the sheet (mm from the sheet's top-left) and its scale. */
+	/** Where its top-left lands on the sheet (mm from the sheet's top-left) and its scale. */
 	dest: { x: number; y: number; scale: number };
-	/** Row/column label for tiles ("B3"), absent otherwise. */
+}
+
+export interface OutputSheet {
+	size: Size;
+	parts: SheetPart[];
+	/** Row/column label for tiles ("B3"). */
 	tile?: string;
+	/** The page's trim box on the sheet (mm), when crop marks or bleed are used. */
+	trim?: Rect;
+	/** Bleed beyond the trim box (mm), for the PDF BleedBox. */
+	bleed?: number;
+	cropMarks?: boolean;
 }
 
 export type SheetSetting = ExportDefaults['sheet'];
+
+export interface PlanOptions {
+	sheet: SheetSetting;
+	orientation: 'auto' | 'portrait' | 'landscape';
+	overlap: number;
+	fitSmallPages: boolean;
+	layout?: 'single' | 'booklet';
+	/** Bleed (mm) printed beyond each page edge; single layout, whole pages only. */
+	bleed?: number;
+	cropMarks?: boolean;
+}
 
 export function sheetSize(sheet: Exclude<SheetSetting, 'native'>): Size {
 	return typeof sheet === 'string' ? SHEET_SIZES[sheet] : { w: sheet.w, h: sheet.h };
@@ -35,29 +57,79 @@ export function sheetSize(sheet: Exclude<SheetSetting, 'native'>): Size {
 
 const fits = (page: Size, sheet: Size) => page.w <= sheet.w + TILE_EPSILON_MM && page.h <= sheet.h + TILE_EPSILON_MM;
 
-export function planSheets(
-	pages: readonly Size[],
-	opts: { sheet: SheetSetting; orientation: 'auto' | 'portrait' | 'landscape'; overlap: number; fitSmallPages: boolean },
-): SheetPart[] {
-	const out: SheetPart[] = [];
+export function planSheets(pages: readonly Size[], opts: PlanOptions): OutputSheet[] {
+	return opts.layout === 'booklet' ? planBooklet(pages, opts) : planSingle(pages, opts);
+}
+
+function planSingle(pages: readonly Size[], opts: PlanOptions): OutputSheet[] {
+	const out: OutputSheet[] = [];
+	const bleed = Math.max(0, opts.bleed ?? 0);
+	const marks = !!opts.cropMarks;
 	for (const [i, page] of pages.entries()) {
-		const full = { x: 0, y: 0, w: page.w, h: page.h };
+		// The page plus its bleed, and the margin for crop marks around that.
+		const withBleed = { w: page.w + 2 * bleed, h: page.h + 2 * bleed };
+		const margin = marks ? MARK_MARGIN_MM : 0;
+		const src = { x: -bleed, y: -bleed, ...withBleed };
+		const finish = (sheet: Size, x: number, y: number, scale: number): OutputSheet => ({
+			size: sheet,
+			parts: [{ page: i, src, dest: { x, y, scale } }],
+			...(bleed || marks ? { trim: { x: x + bleed * scale, y: y + bleed * scale, w: page.w * scale, h: page.h * scale }, bleed: bleed * scale, cropMarks: marks } : {}),
+		});
 		if (opts.sheet === 'native') {
-			out.push({ page: i, sheet: { w: page.w, h: page.h }, src: full, dest: { x: 0, y: 0, scale: 1 } });
+			out.push(finish({ w: withBleed.w + 2 * margin, h: withBleed.h + 2 * margin }, margin, margin, 1));
 			continue;
 		}
-		const sheet = chooseSheet(page, sheetSize(opts.sheet), opts.orientation, opts.overlap);
-		if (fits(page, sheet)) {
+		const needed = { w: withBleed.w + 2 * margin, h: withBleed.h + 2 * margin };
+		const sheet = chooseSheet(needed, sheetSize(opts.sheet), opts.orientation, opts.overlap);
+		if (fits(needed, sheet)) {
 			// Smaller than the sheet: centred, at actual size or scaled up to fill it.
-			const scale = opts.fitSmallPages ? Math.min(sheet.w / page.w, sheet.h / page.h) : 1;
-			out.push({ page: i, sheet, src: full, dest: { x: (sheet.w - page.w * scale) / 2, y: (sheet.h - page.h * scale) / 2, scale } });
+			const scale = opts.fitSmallPages ? Math.min(sheet.w / needed.w, sheet.h / needed.h) : 1;
+			out.push(finish(sheet, (sheet.w - withBleed.w * scale) / 2, (sheet.h - withBleed.h * scale) / 2, scale));
 			continue;
 		}
+		// Larger than the sheet: regular tiles of the page itself (no bleed or marks on tiles).
 		for (const t of tileGrid(page, sheet, opts.overlap).tiles) {
-			out.push({ page: i, sheet, src: { x: t.x, y: t.y, w: t.w, h: t.h }, dest: { x: 0, y: 0, scale: 1 }, tile: t.label });
+			out.push({ size: sheet, parts: [{ page: i, src: { x: t.x, y: t.y, w: t.w, h: t.h }, dest: { x: 0, y: 0, scale: 1 } }], tile: t.label });
 		}
 	}
 	return out;
+}
+
+/**
+ * Saddle-stitch order for `n` pages: padded with blanks (null) to a multiple of 4, as sheet sides
+ * of [left, right]. Printed double-sided, stacked and folded, the pages read 1…n.
+ */
+export function bookletOrder(n: number): [number | null, number | null][] {
+	const total = Math.max(4, Math.ceil(n / 4) * 4);
+	const at = (i: number) => (i < n ? i : null);
+	const sides: [number | null, number | null][] = [];
+	for (let k = 0; k < total / 2; k++) {
+		const outer = total - 1 - k;
+		// Even sides (fronts) have the higher page on the left; odd sides (backs) the reverse.
+		sides.push(k % 2 === 0 ? [at(outer), at(k)] : [at(k), at(outer)]);
+	}
+	return sides;
+}
+
+/** Booklet: two pages side by side per sheet side, each centred and scaled to fit its half. */
+function planBooklet(pages: readonly Size[], opts: PlanOptions): OutputSheet[] {
+	if (!pages.length) return [];
+	const cell = { w: Math.max(...pages.map((p) => p.w)), h: Math.max(...pages.map((p) => p.h)) };
+	// Native: two cells side by side. A chosen sheet is used landscape, split in two halves.
+	const size = opts.sheet === 'native' ? { w: cell.w * 2, h: cell.h } : (() => {
+		const s = sheetSize(opts.sheet);
+		return { w: Math.max(s.w, s.h), h: Math.min(s.w, s.h) };
+	})();
+	const half = { w: size.w / 2, h: size.h };
+	return bookletOrder(pages.length).map(([left, right]) => ({
+		size,
+		parts: [left, right].flatMap((idx, side) => {
+			if (idx === null) return [];
+			const p = pages[idx]!;
+			const scale = Math.min(half.w / p.w, half.h / p.h, opts.sheet === 'native' || opts.fitSmallPages ? Infinity : 1);
+			return [{ page: idx, src: { x: 0, y: 0, w: p.w, h: p.h }, dest: { x: side * half.w + (half.w - p.w * scale) / 2, y: (half.h - p.h * scale) / 2, scale } }];
+		}),
+	}));
 }
 
 /**
