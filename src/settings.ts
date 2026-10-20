@@ -6,11 +6,19 @@ export interface PatchworkSettings {
 	bitmapBudgetMB: number;
 	/** The red dashed line on a box whose text doesn't fit. Screen only; never exported. */
 	showOverflowMarker: boolean;
+	/** The floating outline and views panel: open or not, and where it was dragged to (pixels, relative to the board). */
+	outlineOpen: boolean;
+	outlinePos: { x: number; y: number } | null;
+	/** The minimap in the corner of the board. */
+	showMinimap: boolean;
 }
 
 export const DEFAULT_SETTINGS: PatchworkSettings = {
 	bitmapBudgetMB: 512,
 	showOverflowMarker: true,
+	outlineOpen: false,
+	outlinePos: null,
+	showMinimap: true,
 };
 
 export class PatchworkSettingTab extends PluginSettingTab {

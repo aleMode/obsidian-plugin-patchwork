@@ -18,7 +18,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - Adding text, a tracker or a table of contents opens the popover on it. The sidebar inspector no longer opens by itself: **View → Inspector and outline** if you want the dock.
 
 ### Outline and views panel
-- Toolbar **View → Outline and views** (or the command *Toggle outline and views panel*) opens a floating panel at the left of the board: saved **Views** (+ saves the current camera, click goes back, hover for rename and delete) and the **Pages** with their items. Click a row to select it; Shift-click adds to the selection. The panel is only as big as its list needs; drag it by its title (double-click the title to put it back). Selecting a row brings the item into the comfortable middle of the view: an item already there does not move the view, one near the edge or under the panel is moved just enough, one off screen is brought in. It updates as you edit and is remembered per device. The sidebar dock still exists under **View → Inspector and outline in the sidebar**.
+- Toolbar **View → Outline and views** (or the command *Toggle outline and views panel*) opens a floating panel at the left of the board: saved **Views** (+ saves the current camera, click goes back, hover for rename and delete) and the **Pages** with their items. Click a row to select it; Shift-click adds to the selection. The panel is only as big as its list needs; drag it by its title (double-click the title to put it back). Selecting a row brings the item into the comfortable middle of the view: an item already there does not move the view, one near the edge or under the panel is moved just enough, one off screen is brought in. It updates as you edit. Whether it is open, and where you put it, is kept in the plugin settings of the vault, so it comes back after restarting Obsidian however you start it. The sidebar dock still exists under **View → Inspector and outline in the sidebar**.
 
 ### Where settings live
 - **Toolbar → Settings** is for the whole patchwork only (units, grid, numbering, header and footer, appearance, title).
@@ -94,7 +94,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 
 ### Saved views and minimap
 - **Views** (top of the outline panel): *+* saves the current camera position under a name; click a view to jump back; hover for rename and delete. Also: **Patchwork: Save current view…**, **Go to view…**. Views are stored in the board file.
-- **Minimap** (bottom right; toolbar **View** → Minimap, or **Toggle minimap**): all pages and the visible area; click or drag in it to move around. Whether it's shown is remembered on this device.
+- **Minimap** (bottom right; toolbar **View** → Minimap, or **Toggle minimap**): all pages and the visible area; click or drag in it to move around. Whether it's shown is kept in the plugin settings of the vault.
 
 ## New in M2 (session 3)
 

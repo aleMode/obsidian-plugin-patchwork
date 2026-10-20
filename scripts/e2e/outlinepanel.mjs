@@ -22,7 +22,8 @@ const rows = () => ev(`return [...document.querySelectorAll('.pw-outline-panel .
 try {
 	await cdp.evaluate(`
 		const vv = app.vault;
-		localStorage.removeItem('patchwork-outline');
+		const pl = app.plugins.plugins.patchwork;
+		pl.settings.outlineOpen = false; pl.settings.outlinePos = null; await pl.saveSettings();
 		for (const l of app.workspace.getLeavesOfType('patchwork-board')) l.detach();
 		await new Promise((r) => setTimeout(r, 400));
 		if (vv.getAbstractFileByPath('_e2e')) await vv.delete(vv.getAbstractFileByPath('_e2e'), true);
@@ -47,7 +48,8 @@ try {
 	const sections = await ev(`return [...document.querySelectorAll('.pw-outline-panel .pw-outline-section')].map((e) => e.textContent).join('|')`);
 	check('it lists the views section, the pages and their modules', sections.includes('Views') && sections.includes('Pages') && list.includes('1. Front') && list.includes('2. Back') && list.includes('hello world') && list.includes('HP'), list);
 	check('it sits below the toolbar and inside the board', await ev(`const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); const h = document.querySelector('.pw-surface-host').getBoundingClientRect(); const t = document.querySelector('.pw-toolbar').getBoundingClientRect(); return p.top >= t.bottom && p.left >= h.left && p.bottom <= h.bottom`));
-	check('the choice is remembered', (await ev(`return localStorage.getItem('patchwork-outline')`)) === 'on');
+	check('the choice is remembered in the plugin settings', (await ev(`return app.plugins.plugins.patchwork.settings.outlineOpen`)) === true);
+	check('and written to the plugin data file in the vault, not just to browser storage', await until(async () => JSON.parse(await cdp.evaluate(`return await app.vault.adapter.read('.obsidian/plugins/patchwork/data.json')`)).outlineOpen === true));
 
 	// selecting from it
 	await ev(`[...document.querySelectorAll('.pw-outline-panel .pw-outline-module')].find((r) => r.textContent.includes('HP')).click(); ${wait(400)}`);
@@ -70,11 +72,11 @@ try {
 	await ev(`${wait(300)}`);
 	const moved = JSON.parse(await ev(`const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); return JSON.stringify({ px: p.left, py: p.top })`));
 	check('dragging the title moves the panel', Math.abs(moved.px - head.px - 60) <= 3 && Math.abs(moved.py - head.py - 90) <= 3, { head, moved });
-	check('and the position is remembered', (await ev(`return !!localStorage.getItem('patchwork-outline-pos')`)));
+	check('and the position is remembered', (await ev(`const p = app.plugins.plugins.patchwork.settings.outlinePos; return !!p && Number.isFinite(p.x) && Number.isFinite(p.y)`)));
 	await ev(`const h = document.querySelector('.pw-outline-panel-head'); h.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); ${wait(300)}`);
 	const reset = JSON.parse(await ev(`const p = document.querySelector('.pw-outline-panel').getBoundingClientRect(); return JSON.stringify({ px: p.left, py: p.top })`));
 	// (the toolbar may have settled since the first measurement, so the height gets a little room)
-	check('double-clicking the title puts it back', Math.abs(reset.px - head.px) <= 3 && Math.abs(reset.py - head.py) <= 14 && (await ev(`return !localStorage.getItem('patchwork-outline-pos')`)), { reset, head });
+	check('double-clicking the title puts it back', Math.abs(reset.px - head.px) <= 3 && Math.abs(reset.py - head.py) <= 14 && (await ev(`return app.plugins.plugins.patchwork.settings.outlinePos === null`)), { reset, head });
 
 	// revealing from the outline: not re-centred when comfortable, brought out from under the panel
 	await ev(`s.zoomToFit(); ${wait(500)}`);
@@ -101,7 +103,7 @@ try {
 	// close and remember
 	await ev(`document.querySelector('.pw-outline-panel [aria-label^="Close"]').click(); ${wait(300)}`);
 	check('the close button hides it', !(await open()));
-	check('and the choice is remembered', (await ev(`return localStorage.getItem('patchwork-outline')`)) === 'off');
+	check('and the choice is remembered', (await ev(`return app.plugins.plugins.patchwork.settings.outlineOpen`)) === false);
 	await ev(`document.querySelector('.pw-toolbar [aria-label^="Outline and views"]').click(); ${wait(300)}`);
 	await ev(`const it = [...document.querySelectorAll('.menu .menu-item')].find((e) => e.querySelector('.menu-item-title')?.textContent === 'Outline and views'); it.dispatchEvent(new MouseEvent('click', { bubbles: true })); ${wait(400)}`);
 	check('the View menu entry opens it again', await open());
@@ -109,7 +111,7 @@ try {
 	check('no exception', false, String(e.stack ?? e));
 } finally {
 	await cdp
-		.evaluate(`localStorage.removeItem('patchwork-outline');
+		.evaluate(`const pl = app.plugins.plugins.patchwork; pl.settings.outlineOpen = false; pl.settings.outlinePos = null; await pl.saveSettings();
 			for (let k = 0; k < 10 && (document.querySelector('.menu') || document.querySelector('.modal-container')); k++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise((r) => setTimeout(r, 80)); }
 			for (const l of app.workspace.getLeavesOfType('patchwork-board')) if (l.view.file?.path.startsWith('_e2e/')) l.detach();
 			await new Promise((r) => setTimeout(r, 500));

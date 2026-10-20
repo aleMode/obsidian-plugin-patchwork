@@ -4,32 +4,19 @@ import { OutlineRenderer } from './OutlineRenderer';
 
 type Pos = { x: number; y: number };
 
-/** Where the panel was dragged to, remembered per device (storage may be unavailable). */
-const POS_KEY = 'patchwork-outline-pos';
+/** What the panel remembers between sessions; the plugin keeps it in its saved settings. */
+export interface OutlinePrefs {
+	setOpen(open: boolean): void;
+	pos(): Pos | null;
+	setPos(pos: Pos | null): void;
+}
+
 const GAP = 28;
-
-function savedPos(): Pos | null {
-	try {
-		const p = JSON.parse(window.localStorage.getItem(POS_KEY) ?? 'null') as Partial<Pos> | null;
-		return p && Number.isFinite(p.x) && Number.isFinite(p.y) ? { x: p.x!, y: p.y! } : null;
-	} catch {
-		return null;
-	}
-}
-
-function rememberPos(pos: Pos | null) {
-	try {
-		if (pos) window.localStorage.setItem(POS_KEY, JSON.stringify(pos));
-		else window.localStorage.removeItem(POS_KEY);
-	} catch {
-		// Not remembered; the panel still works.
-	}
-}
 
 /**
  * The outline and saved views as a floating panel on the board, so nothing has to live in a sidebar.
  * Closed by default; it is as big as its content needs, can be dragged by its title, and both the
- * on/off choice and its position are remembered on this device.
+ * on/off choice and its position are remembered (in the plugin's settings, so they follow the vault).
  */
 export class OutlinePanel {
 	private el: HTMLElement;
@@ -37,9 +24,10 @@ export class OutlinePanel {
 	private outline: OutlineRenderer;
 	private frame = 0;
 	/** Where the user put it, relative to the board host; null: the default spot at the top left. */
-	private pos: Pos | null = savedPos();
+	private pos: Pos | null;
 
-	constructor(private board: BoardViewport, private host: HTMLElement, app: App, private remember: (open: boolean) => void) {
+	constructor(private board: BoardViewport, private host: HTMLElement, app: App, private prefs: OutlinePrefs) {
+		this.pos = prefs.pos();
 		this.el = host.createDiv({ cls: 'pw-outline-panel is-hidden' });
 		const head = this.el.createDiv({ cls: 'pw-outline-panel-head', attr: { 'aria-label': 'Drag to move; double-click to put it back' } });
 		head.createSpan({ text: 'Outline and views' });
@@ -53,7 +41,7 @@ export class OutlinePanel {
 		this.bindDrag(head);
 		head.addEventListener('dblclick', () => {
 			this.pos = null;
-			rememberPos(null);
+			this.prefs.setPos(null);
 			this.place();
 		});
 	}
@@ -74,12 +62,12 @@ export class OutlinePanel {
 		this.el.removeClass('is-hidden');
 		this.outline.render();
 		this.place();
-		this.remember(true);
+		this.prefs.setOpen(true);
 	}
 
 	close() {
 		this.el.addClass('is-hidden');
-		this.remember(false);
+		this.prefs.setOpen(false);
 	}
 
 	toggle() {
@@ -123,7 +111,7 @@ export class OutlinePanel {
 				const r = this.rect();
 				if (r) {
 					this.pos = { x: r.x, y: r.y };
-					rememberPos(this.pos);
+					this.prefs.setPos(this.pos);
 				}
 			};
 			head.addEventListener('pointermove', move);

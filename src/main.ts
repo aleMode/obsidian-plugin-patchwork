@@ -46,6 +46,14 @@ export default class PatchworkPlugin extends Plugin {
 			closed: (b: BoardViewport) => this.activeBoard.closed(b),
 			openPanels: () => void this.openPanels(),
 			overflowMarker: { shown: () => this.settings.showOverflowMarker, set: (show: boolean) => void this.setOverflowMarker(show) },
+			ui: {
+				outlineOpen: () => this.settings.outlineOpen,
+				setOutlineOpen: (open: boolean) => this.remember('outlineOpen', open),
+				outlinePos: () => this.settings.outlinePos,
+				setOutlinePos: (pos: { x: number; y: number } | null) => this.remember('outlinePos', pos),
+				minimap: () => this.settings.showMinimap,
+				setMinimap: (show: boolean) => this.remember('showMinimap', show),
+			},
 		};
 		this.registerView(VIEW_TYPE_BOARD, (leaf) =>
 			new PatchworkView(leaf, (el, store, view) => {
@@ -146,6 +154,13 @@ export default class PatchworkPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	/** Remember an interface choice in the saved settings (only writes when it actually changed). */
+	private remember<K extends 'outlineOpen' | 'outlinePos' | 'showMinimap'>(key: K, value: PatchworkSettings[K]) {
+		if (JSON.stringify(this.settings[key]) === JSON.stringify(value)) return;
+		this.settings[key] = value;
+		void this.saveSettings();
 	}
 
 	/** One body class hides the marker on every open board at once; the CSS does the rest. */

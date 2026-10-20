@@ -51,6 +51,18 @@ export interface BoardServices {
 	openPanels?: () => void;
 	/** The device-wide preference for the red "text does not fit" line. */
 	overflowMarker?: { shown: () => boolean; set: (show: boolean) => void };
+	/** Interface choices that should survive a restart, kept in the plugin's own saved settings. */
+	ui?: BoardUi;
+}
+
+export interface BoardUi {
+	outlineOpen(): boolean;
+	setOutlineOpen(open: boolean): void;
+	/** Where the floating outline was dragged to, in pixels relative to the board; null: the default spot. */
+	outlinePos(): { x: number; y: number } | null;
+	setOutlinePos(pos: { x: number; y: number } | null): void;
+	minimap(): boolean;
+	setMinimap(show: boolean): void;
 }
 
 export type Selection = { pageId: string; moduleId?: string } | null;
@@ -161,7 +173,7 @@ export class BoardViewport implements BoardSurface {
 		};
 		const corner = container.createDiv({ cls: 'pw-ruler-corner' });
 		this.minimap = container.createEl('canvas', { cls: 'pw-minimap' });
-		this.minimap.toggleClass('is-hidden', !minimapPreferred());
+		this.minimap.toggleClass('is-hidden', !(services.ui?.minimap() ?? true));
 		this.bindMinimap();
 		this.cleanups.push(() => {
 			this.rulers.top.remove();
@@ -172,8 +184,12 @@ export class BoardViewport implements BoardSurface {
 		this.buildToolbar(container);
 		this.contextBar = new ContextBar(this, container, ALIGN_ACTIONS);
 		this.popover = new PropertiesPopover(this, container, view.app);
-		this.outlinePanel = new OutlinePanel(this, container, view.app, rememberOutline);
-		if (outlinePreferred()) this.outlinePanel.open();
+		this.outlinePanel = new OutlinePanel(this, container, view.app, {
+			setOpen: (open) => services.ui?.setOutlineOpen(open),
+			pos: () => services.ui?.outlinePos() ?? null,
+			setPos: (pos) => services.ui?.setOutlinePos(pos),
+		});
+		if (services.ui?.outlineOpen()) this.outlinePanel.open();
 		this.cleanups.push(() => this.contextBar.destroy(), () => this.popover.destroy(), () => this.outlinePanel.destroy());
 		this.cleanups.push(store.subscribe(() => this.render()));
 		this.bindInput();
@@ -1035,7 +1051,7 @@ export class BoardViewport implements BoardSurface {
 	toggleMinimap() {
 		const show = this.minimap.hasClass('is-hidden');
 		this.minimap.toggleClass('is-hidden', !show);
-		rememberMinimap(show);
+		this.services.ui?.setMinimap(show);
 		this.renderMinimap();
 	}
 
@@ -1783,36 +1799,3 @@ export function today(): string {
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** Whether the outline panel is shown: a per-viewer convenience, like the minimap (storage may be unavailable). */
-function outlinePreferred(): boolean {
-	try {
-		return window.localStorage.getItem('patchwork-outline') === 'on';
-	} catch {
-		return false;
-	}
-}
-
-function rememberOutline(show: boolean) {
-	try {
-		window.localStorage.setItem('patchwork-outline', show ? 'on' : 'off');
-	} catch {
-		// Not remembered; the panel still works.
-	}
-}
-
-/** Whether the minimap is shown: a per-viewer convenience, so browser storage (may be unavailable). */
-function minimapPreferred(): boolean {
-	try {
-		return window.localStorage.getItem('patchwork-minimap') !== 'off';
-	} catch {
-		return true;
-	}
-}
-
-function rememberMinimap(show: boolean) {
-	try {
-		window.localStorage.setItem('patchwork-minimap', show ? 'on' : 'off');
-	} catch {
-		// Storage blocked: the choice just isn't remembered.
-	}
-}
