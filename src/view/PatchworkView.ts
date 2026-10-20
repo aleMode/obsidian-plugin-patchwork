@@ -1,4 +1,4 @@
-import { Modal, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from 'obsidian';
+import { Menu, Modal, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from 'obsidian';
 import { serializeBoard } from '../model/serialize';
 import { parseBoard } from '../model/validate';
 import { BoardStore } from '../store/BoardStore';
@@ -11,6 +11,8 @@ export const BOARD_EXTENSION = 'patchwork';
 /** Something that draws the board inside the view; the view owns file I/O, the surface owns pixels. */
 export interface BoardSurface {
 	destroy(): void;
+	/** Entries for the view's ⋮ menu (export and the like), so they are not only reachable as commands. */
+	addViewMenuItems?(menu: Menu): void;
 }
 export type SurfaceFactory = (container: HTMLElement, store: BoardStore, view: PatchworkView) => BoardSurface;
 
@@ -147,6 +149,11 @@ export class PatchworkView extends TextFileView {
 
 	private async reloadFromDisk() {
 		if (this.file) this.loadBoard(await this.app.vault.read(this.file));
+	}
+
+	onPaneMenu(menu: Menu, source: string) {
+		super.onPaneMenu(menu, source);
+		if (source === 'more-options') this.surface?.addViewMenuItems?.(menu);
 	}
 
 	private showWarnings(warnings: string[], readOnly: boolean) {

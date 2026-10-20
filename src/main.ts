@@ -79,7 +79,7 @@ export default class PatchworkPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'new-board',
-			name: 'New board',
+			name: 'New patchwork',
 			callback: () => void this.createBoard(this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? '')),
 		});
 		this.addBoardCommand('add-page', 'Add page', (v) => v.showAddPageMenu(), true);
@@ -112,7 +112,7 @@ export default class PatchworkPlugin extends Plugin {
 				if (!(file instanceof TFolder)) return;
 				menu.addItem((item) =>
 					item
-						.setTitle('New board')
+						.setTitle('New patchwork')
 						.setIcon('layout-dashboard')
 						.onClick(() => void this.createBoard(file)),
 				);

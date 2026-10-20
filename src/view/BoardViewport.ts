@@ -625,6 +625,11 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** One-way, lossy export to a .canvas next to the board (SPEC 9.3). */
+	addViewMenuItems(menu: Menu) {
+		menu.addItem((i) => i.setTitle('Export as PDF or PNG…').setIcon('file-output').onClick(() => this.showExport()));
+		menu.addItem((i) => i.setTitle('Export to canvas').setIcon('layout-dashboard').onClick(() => void this.exportCanvas()));
+	}
+
 	async exportCanvas() {
 		const file = this.view.file;
 		if (!file) return;
@@ -1527,7 +1532,7 @@ export class BoardViewport implements BoardSurface {
 			button('list-checks', 'Add tracker', (e) => this.showTrackerMenu(e));
 			sep();
 		}
-		button('file-output', 'Export to PDF', () => this.showExport());
+		button('file-output', 'Export as PDF or PNG', () => this.showExport());
 		if (!this.store.readOnly) button('settings-2', 'Board settings', () => this.showBoardSettings());
 		if (this.services.openPanels) button('panel-right', 'Inspector and outline', () => this.services.openPanels?.());
 		sep();
