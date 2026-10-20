@@ -1,5 +1,7 @@
 import { Menu, Notice, setIcon, TFile } from 'obsidian';
 import { exportBoardPdf } from '../export/exportPdf';
+import { pdfToPngs } from '../export/exportPng';
+import { parseRange } from '../model/sheetPlan';
 import { allIds } from '../model/defaults';
 import { bounds, containsPoint, type Handle, inset, intersects, type Point, type Rect, resizeRect } from '../model/geometry';
 import { newId } from '../model/ids';
@@ -20,7 +22,7 @@ import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { CropModal, type CropResult } from '../ui/CropModal';
-import { ExportModal, writeBinary } from '../ui/ExportModal';
+import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
 import { type Camera, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
 import { PageElement } from './pageElement';
@@ -409,39 +411,58 @@ export class BoardViewport implements BoardSurface {
 	showExport() {
 		const file = this.view.file;
 		if (!file) return;
-		const board = this.store.file;
-		const initial = {
-			path: file.path.replace(/\.patchwork$/, '.pdf'),
-			quality: board.board.export.quality,
-			dpi: board.board.export.dpi,
+		const e = this.store.file.board.export;
+		const initial: ExportChoices = {
+			base: file.path.replace(/\.patchwork$/, ''),
+			format: e.format,
+			pages: 'all',
+			range: '',
+			sheet: typeof e.sheet === 'object' ? { w: e.sheet.w, h: e.sheet.h } : e.sheet,
+			orientation: e.orientation,
+			overlap: e.tileOverlap,
+			fitSmallPages: !!e.fitSmallPages,
+			tileLabels: !!e.tileLabels,
+			quality: e.quality,
+			dpi: e.dpi,
 			open: true,
 		};
-		new ExportModal(this.view.app, initial, (choices) => void this.runExport(choices)).open();
+		const ctx = { pageCount: this.store.file.pages.length, selectedCount: this.selectedPageIndices().length, unit: this.store.file.board.displayUnit };
+		new ExportModal(this.view.app, initial, ctx, (choices) => void this.runExport(choices)).open();
 	}
 
-	private async runExport(choices: { path: string; quality: 'best' | 'small'; dpi: number; open: boolean }) {
+	/** Pages of the current selection (pages, or the pages of selected modules), as output-order indices. */
+	private selectedPageIndices(): number[] {
+		const ids = new Set(this.items.map((it) => it.pageId));
+		return orderedPages(this.store.file).flatMap((p, i) => (ids.has(p.id) ? [i] : []));
+	}
+
+	async runExport(choices: ExportChoices) {
 		const app = this.view.app;
 		// Remember the choices in the board, like other export defaults (SPEC 6).
-		this.store.update((f) =>
-			f.board.export.quality === choices.quality && f.board.export.dpi === choices.dpi
-				? f
-				: { ...f, board: { ...f.board, export: { ...f.board.export, quality: choices.quality, dpi: choices.dpi } } },
-		);
+		this.store.update((f) => {
+			const e = f.board.export;
+			const next = { ...e, format: choices.format, sheet: choices.sheet, orientation: choices.orientation, tileOverlap: choices.overlap, quality: choices.quality, dpi: choices.dpi, fitSmallPages: choices.fitSmallPages || undefined, tileLabels: choices.tileLabels || undefined };
+			return JSON.stringify(next) === JSON.stringify(e) ? f : { ...f, board: { ...f.board, export: next } };
+		});
+		const pageIndices =
+			choices.pages === 'selected' ? this.selectedPageIndices() : choices.pages === 'range' ? parseRange(choices.range, this.store.file.pages.length) ?? undefined : undefined;
 		const notice = new Notice('Exporting…', 0);
 		try {
 			const result = await exportBoardPdf(
 				{ app, pdfDocs: this.services.pdfDocs, parent: this.view },
 				this.store.file,
 				this.view.file?.path ?? '',
-				{ quality: choices.quality, dpi: choices.dpi, date: today() },
+				{ ...choices, date: today(), pageIndices },
 				(msg) => notice.setMessage(msg),
 			);
-			const out = await writeBinary(app, choices.path, result.bytes);
+			const written: TFile[] = [];
+			if (choices.format === 'pdf') written.push(await writeBinary(app, `${choices.base}.pdf`, result.bytes));
+			else for (const png of await pdfToPngs(result.bytes, choices.dpi, (msg) => notice.setMessage(msg))) written.push(await writeBinary(app, `${choices.base}${png.suffix}.png`, png.bytes));
 			notice.hide();
-			const kb = Math.round(result.bytes.length / 1024);
-			new Notice(`Exported ${result.pageCount} page(s) to ${out.path} (${kb} KB).`);
+			const what = written.length === 1 ? written[0]!.path : `${written.length} files (${written[0]!.path}, …)`;
+			new Notice(`Exported ${result.pageCount} page(s) to ${what}.`);
 			if (result.problems.length) new Notice(`Export finished with problems:\n• ${result.problems.join('\n• ')}`, 0);
-			if (choices.open) await app.workspace.getLeaf('tab').openFile(out);
+			if (choices.open && written[0]) await app.workspace.getLeaf('tab').openFile(written[0]);
 		} catch (e) {
 			notice.hide();
 			new Notice(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 0);

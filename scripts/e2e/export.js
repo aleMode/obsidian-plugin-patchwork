@@ -6,6 +6,7 @@ const check = (name, ok, detail) => results.push({ name, ok: !!ok, ...(ok ? {} :
 const vault = app.vault;
 const plugin = app.plugins.plugins.patchwork;
 const DIR = '_e2e';
+const EXPORT = { format: 'pdf', pages: 'all', range: '', sheet: 'native', orientation: 'auto', overlap: 0, fitSmallPages: false, tileLabels: false, quality: 'best', dpi: 200, open: false };
 const fs = require('fs');
 const path = require('path');
 const devDir = path.join(vault.adapter.getBasePath(), '..', '.dev');
@@ -47,7 +48,7 @@ try {
 	await sleep(500);
 
 	const t0 = performance.now();
-	await view.surface.runExport({ path: `${DIR}/out.pdf`, quality: 'best', dpi: 200, open: false });
+	await view.surface.runExport({ ...EXPORT, base: `${DIR}/out`, dpi: 200 });
 	const ms = Math.round(performance.now() - t0);
 	const out = vault.getAbstractFileByPath(`${DIR}/out.pdf`);
 	check('export writes the PDF into the vault', !!out, ms);

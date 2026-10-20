@@ -85,6 +85,8 @@ function checkBoard(board: Json, is: Issues) {
 		is.optional(e, 'cropMarks', ep, isBool, 'true/false');
 		is.optional(e, 'dpi', ep, positive, 'a positive number');
 		is.optional(e, 'quality', ep, oneOf('best', 'small'), '"best" or "small"');
+		is.optional(e, 'fitSmallPages', ep, isBool, 'true/false');
+		is.optional(e, 'tileLabels', ep, isBool, 'true/false');
 	}
 }
 

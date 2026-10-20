@@ -5,6 +5,7 @@ const check = (name, ok, detail) => results.push({ name, ok: !!ok, ...(ok ? {} :
 const vault = app.vault;
 const plugin = app.plugins.plugins.patchwork;
 const DIR = '_e2e';
+const EXPORT = { format: 'pdf', pages: 'all', range: '', sheet: 'native', orientation: 'auto', overlap: 0, fitSmallPages: false, tileLabels: false, quality: 'best', dpi: 200, open: false };
 const d = vault.getAbstractFileByPath(DIR);
 if (d) await vault.delete(d, true);
 await vault.createFolder(DIR);
@@ -29,7 +30,7 @@ try {
 	check('footer tokens expanded; page override removes it', furn[1].footer === 'Furniture test — ii of iii' && furn[2].footer === null, furn);
 	check('safe-area guide drawn on screen', view.contentEl.querySelectorAll('.pw-safe-area').length === 3);
 
-	await view.surface.runExport({ path: `${DIR}/out.pdf`, quality: 'best', dpi: 150, open: false });
+	await view.surface.runExport({ ...EXPORT, base: `${DIR}/out`, dpi: 150 });
 	const out = vault.getAbstractFileByPath(`${DIR}/out.pdf`);
 	const doc = await plugin.pdfDocs.acquire(out.path);
 	const texts = [];

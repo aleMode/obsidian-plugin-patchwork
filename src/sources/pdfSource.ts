@@ -22,7 +22,7 @@ export interface PdfDocument {
 	getPage(n: number): Promise<PdfPage>;
 	destroy(): Promise<void>;
 }
-interface PdfJs {
+export interface PdfJs {
 	getDocument(params: object): { promise: Promise<PdfDocument> };
 }
 
@@ -31,7 +31,7 @@ interface PdfJs {
  * bundle, not a plugin API, so they live here only. Standard fonts render without them, but CJK
  * CMaps, JPEG 2000 and ICC profiles need them.
  */
-const PDF_DOC_PARAMS = {
+export const PDF_DOC_PARAMS = {
 	cMapUrl: '/lib/pdfjs/cmaps/',
 	cMapPacked: true,
 	standardFontDataUrl: '/lib/pdfjs/standard_fonts/',

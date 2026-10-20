@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 151 checks across 13 suites, all passing; `npm test`: 150 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 162 checks across 14 suites, all passing; `npm test`: 157 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -13,6 +13,12 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Inspector with nothing selected → **Page numbers**: on/off, start at, format (1/i/a), position (6 options), skip first page. **Header / Footer** with tokens `{page}`, `{pages}`, `{title}`, `{date}`. **Safe area**: a dashed margin guide on every page (never printed).
 - Select a page → **Page furniture**: number Automatic / Custom (e.g. "Cover") / None, header and footer Board default / Custom / None, and a per-page safe area.
 - Export: numbers, headers and footers print exactly as on screen; the PDF viewer's page box shows the same numbers (try roman with a custom "Cover" first page).
+
+### Export dialog: sheets, tiling, ranges, PNG
+- **Patchwork: Export…** now offers: Format (PDF / PNG), Pages (all / selected / range like `1-3, 5`), Sheet size (each page at its own size, A4/A3/A5/Letter/Legal/Tabloid, or custom), Orientation (automatic picks the fewest sheets), Smaller pages (actual size / scale to fit), Tile overlap, Tile labels.
+- Try a big page (e.g. set a page to 1000 × 700 mm in the inspector) and export to A4: it becomes a grid of A4 tiles, all vector (zoom in: text stays sharp), with "A1… C5" labels if enabled. Bookmarks jump to each page's first sheet.
+- PNG: each sheet becomes an image (`name-01.png`, …). Very large sheets at high DPI are split into `-r1c1`, `-r1c2`, … tiles (8192 px cap).
+- Your choices are remembered in the board.
 
 ## New since M0
 
@@ -100,7 +106,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ## Known gaps (not bugs, not built yet)
 
-- Page numbers, headers/footers, tiled export, PNG export are M2.
+- Still to come in M2: auto-arrange pages, `.canvas` export.
 
 ## Fixed tonight (worth a quick re-check)
 - Deleting a board while it has unsaved changes no longer shows Obsidian's scary "Failed to save file … make a backup" notice.

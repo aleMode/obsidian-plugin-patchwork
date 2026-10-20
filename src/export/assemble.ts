@@ -1,8 +1,10 @@
-import { clip, degrees, endPath, PDFDocument, PDFHexString, PDFName, type PDFPage, popGraphicsState, pushGraphicsState, rectangle } from '@cantoo/pdf-lib';
+import { clip, degrees, endPath, grayscale, PDFDocument, PDFHexString, PDFName, type PDFPage, popGraphicsState, pushGraphicsState, rectangle } from '@cantoo/pdf-lib';
 import { drawOrder, vectorTarget } from '../model/exportPlan';
 import { cropToUserBox, drawPlacement, FULL_PAGE } from '../model/pdfGeometry';
 import type { PdfPageLabel } from '../model/numbering';
 import type { Page, PdfModule } from '../model/schema';
+import type { SheetPart } from '../model/sheetPlan';
+import { PT_PER_MM } from '../model/units';
 
 // Stage 2 of export (SPEC 9.1, spike S8): merge the printed batches, draw vector PDF modules clipped
 // to their boxes, and add what Chromium can't (bookmarks, metadata).
@@ -14,6 +16,11 @@ export interface AssembleInput {
 	readSource: (path: string) => Promise<Uint8Array>;
 	title: string;
 	pageLabels?: PdfPageLabel[] | null;
+	/** Output sheets; absent means one sheet per page at its own size. */
+	sheets?: SheetPart[];
+	tileLabels?: boolean;
+	/** The printed number or label of each page, for tile page labels ("iii B2"). */
+	pageNames?: string[];
 }
 
 export interface AssembleResult {
@@ -69,6 +76,33 @@ function addOutline(doc: PDFDocument, entries: { title: string; pageIndex: numbe
 	doc.catalog.set(PDFName.of('Outlines'), root);
 }
 
+/**
+ * Lay the native printed pages out on output sheets (SPEC 9.2): tiles and scaled pages are embedded
+ * as clipped vector copies, so text and vector PDF regions stay sharp.
+ */
+async function buildSheets(native: PDFDocument, plan: SheetPart[], tileLabels: boolean): Promise<PDFDocument> {
+	const doc = await PDFDocument.create();
+	const k = PT_PER_MM;
+	for (const part of plan) {
+		const src = native.getPage(part.page);
+		const H = src.getHeight();
+		const box = { left: part.src.x * k, right: (part.src.x + part.src.w) * k, top: H - part.src.y * k, bottom: H - (part.src.y + part.src.h) * k };
+		const embedded = await doc.embedPage(src, box);
+		const sheet = doc.addPage([part.sheet.w * k, part.sheet.h * k]);
+		const s = part.dest.scale;
+		// Top-left aligned at dest; edge tiles keep blank padding so every sheet is the same size.
+		const top = (part.sheet.h - part.dest.y) * k;
+		sheet.drawPage(embedded, { x: part.dest.x * k, y: top - embedded.height * s, xScale: s, yScale: s });
+		if (tileLabels && part.tile) sheet.drawText(part.tile, { x: 3 * k, y: 3 * k, size: 7, color: grayscale(0.45) });
+	}
+	return doc;
+}
+
+/** One label per output sheet: tiles become "iii B2"; whole pages keep their numbering style. */
+function sheetLabels(plan: SheetPart[], pageLabels: PdfPageLabel[], pageNames: string[]): PdfPageLabel[] {
+	return plan.map((s) => (s.tile ? { prefix: `${pageNames[s.page] ?? s.page + 1} ${s.tile}` } : pageLabels[s.page] ?? { style: 'D', start: s.page + 1 }));
+}
+
 /** /PageLabels so viewers show our page numbers (iii, Cover, …) in their page box. */
 function addPageLabels(doc: PDFDocument, labels: PdfPageLabel[]) {
 	const nums: unknown[] = [];
@@ -109,9 +143,14 @@ export async function assemble(input: AssembleInput): Promise<AssembleResult> {
 		}
 	}
 
-	addOutline(out, input.pages.flatMap((p, i) => (p.name ? [{ title: p.name, pageIndex: i }] : [])));
-	if (input.pageLabels) addPageLabels(out, input.pageLabels);
-	out.setTitle(input.title);
-	out.setCreator('Patchwork for Obsidian');
-	return { bytes: await out.save(), problems };
+	const native = input.sheets?.every((s) => s.dest.scale === 1 && s.dest.x === 0 && s.dest.y === 0 && !s.tile && s.src.x === 0 && s.src.y === 0);
+	const doc = input.sheets && !native ? await buildSheets(out, input.sheets, !!input.tileLabels) : out;
+	// Bookmarks and labels point at each page's first sheet.
+	const firstSheet = new Map<number, number>();
+	(input.sheets ?? input.pages.map((_p, i) => ({ page: i }))).forEach((s, i) => firstSheet.has(s.page) || firstSheet.set(s.page, i));
+	addOutline(doc, input.pages.flatMap((p, i) => (p.name && firstSheet.has(i) ? [{ title: p.name, pageIndex: firstSheet.get(i)! }] : [])));
+	if (input.pageLabels) addPageLabels(doc, doc === out ? input.pageLabels : sheetLabels(input.sheets!, input.pageLabels, input.pageNames ?? []));
+	doc.setTitle(input.title);
+	doc.setCreator('Patchwork for Obsidian');
+	return { bytes: await doc.save(), problems };
 }

@@ -28,7 +28,7 @@ const BOARD: Shape = {
 		numbering: { keys: ['enabled', 'start', 'format', 'position', 'skipFirst'] },
 		defaultSafeArea: INSETS,
 		export: {
-			keys: ['format', 'sheet', 'orientation', 'tileOverlap', 'cropMarks', 'dpi', 'quality'],
+			keys: ['format', 'sheet', 'orientation', 'tileOverlap', 'cropMarks', 'dpi', 'quality', 'fitSmallPages', 'tileLabels'],
 			children: { sheet: { keys: ['w', 'h'] } },
 		},
 	},

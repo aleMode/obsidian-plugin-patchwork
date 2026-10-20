@@ -1,54 +1,153 @@
 import { App, Modal, normalizePath, Notice, Setting, TFile } from 'obsidian';
+import type { DisplayUnit, SheetPreset } from '../model/schema';
+import { parseRange, type SheetSetting, SHEET_SIZES } from '../model/sheetPlan';
+import { formatLength, parseLength } from '../model/units';
 
 export interface ExportChoices {
-	path: string;
+	/** Vault path without extension; ".pdf" or ".png" (plus numbering) is added. */
+	base: string;
+	format: 'pdf' | 'png';
+	pages: 'all' | 'selected' | 'range';
+	range: string;
+	sheet: SheetSetting;
+	orientation: 'auto' | 'portrait' | 'landscape';
+	overlap: number;
+	fitSmallPages: boolean;
+	tileLabels: boolean;
 	quality: 'best' | 'small';
 	dpi: number;
 	open: boolean;
 }
 
-/** Export options for M0: native page size only. Sheets, tiling and ranges come in M2. */
+/** The export dialog (SPEC 9): format, pages, sheet size and tiling, quality. */
 export class ExportModal extends Modal {
-	private choices: ExportChoices;
+	private c: ExportChoices;
 	private warning!: HTMLElement;
 
-	constructor(app: App, initial: ExportChoices, private run: (choices: ExportChoices) => void) {
+	constructor(
+		app: App,
+		initial: ExportChoices,
+		private ctx: { pageCount: number; selectedCount: number; unit: DisplayUnit },
+		private run: (choices: ExportChoices) => void,
+	) {
 		super(app);
-		this.choices = { ...initial };
+		this.c = { ...initial };
 	}
 
 	onOpen() {
-		this.setTitle('Export board to PDF');
-		new Setting(this.contentEl)
+		this.setTitle('Export board');
+		this.render();
+	}
+
+	private render() {
+		const el = this.contentEl;
+		el.empty();
+		const c = this.c;
+		new Setting(el).setName('Format').addDropdown((d) =>
+			d
+				.addOptions({ pdf: 'PDF', png: 'PNG images' })
+				.setValue(c.format)
+				.onChange((v) => {
+					c.format = v as 'pdf' | 'png';
+					this.render();
+				}),
+		);
+		new Setting(el)
 			.setName('File')
-			.setDesc('Vault path of the PDF to write.')
+			.setDesc(c.format === 'pdf' ? 'Vault path; ".pdf" is added.' : 'Vault path; each sheet becomes "name-01.png", … (a single sheet: "name.png").')
 			.addText((t) =>
-				t.setValue(this.choices.path).onChange((v) => {
-					this.choices.path = v;
+				t.setValue(c.base).onChange((v) => {
+					c.base = v;
 					this.updateWarning();
 				}),
 			);
-		this.warning = this.contentEl.createDiv({ cls: 'pw-export-warning' });
+		this.warning = el.createDiv({ cls: 'pw-export-warning' });
 		this.updateWarning();
-		new Setting(this.contentEl)
+
+		const pageOptions: Record<string, string> = { all: `All pages (${this.ctx.pageCount})`, range: 'Page range' };
+		if (this.ctx.selectedCount) pageOptions.selected = `Selected pages (${this.ctx.selectedCount})`;
+		const pages = new Setting(el).setName('Pages').addDropdown((d) =>
+			d
+				.addOptions(pageOptions)
+				.setValue(c.pages in pageOptions ? c.pages : 'all')
+				.onChange((v) => {
+					c.pages = v as ExportChoices['pages'];
+					this.render();
+				}),
+		);
+		if (c.pages === 'range') pages.addText((t) => t.setPlaceholder('1-3, 5').setValue(c.range).onChange((v) => (c.range = v)));
+
+		const sheetValue = typeof c.sheet === 'string' ? c.sheet : 'custom';
+		const sheetOptions: Record<string, string> = { native: 'Each page at its own size' };
+		for (const k of Object.keys(SHEET_SIZES)) sheetOptions[k] = k;
+		sheetOptions.custom = 'Custom size';
+		new Setting(el)
+			.setName('Sheet size')
+			.setDesc('Pages larger than the sheet are split into tiles; smaller ones are centred.')
+			.addDropdown((d) =>
+				d
+					.addOptions(sheetOptions)
+					.setValue(sheetValue)
+					.onChange((v) => {
+						c.sheet = v === 'custom' ? { w: 210, h: 297 } : (v as SheetPreset | 'native');
+						this.render();
+					}),
+			);
+		if (typeof c.sheet === 'object') {
+			const custom = c.sheet;
+			const len = (name: string, key: 'w' | 'h') =>
+				new Setting(el).setName(name).addText((t) =>
+					t.setValue(formatLength(custom[key], this.ctx.unit)).onChange((v) => {
+						const mm = parseLength(v, this.ctx.unit);
+						if (mm !== null && mm > 0) custom[key] = mm;
+					}),
+				);
+			len('Sheet width', 'w');
+			len('Sheet height', 'h');
+		}
+		if (c.sheet !== 'native') {
+			new Setting(el).setName('Orientation').addDropdown((d) =>
+				d
+					.addOptions({ auto: 'Automatic (fewest sheets)', portrait: 'Portrait', landscape: 'Landscape' })
+					.setValue(c.orientation)
+					.onChange((v) => (c.orientation = v as ExportChoices['orientation'])),
+			);
+			new Setting(el).setName('Smaller pages').addDropdown((d) =>
+				d
+					.addOptions({ actual: 'Actual size', fit: 'Scale to fit the sheet' })
+					.setValue(c.fitSmallPages ? 'fit' : 'actual')
+					.onChange((v) => (c.fitSmallPages = v === 'fit')),
+			);
+			new Setting(el)
+				.setName('Tile overlap')
+				.setDesc('Repeated strip between neighbouring tiles, for gluing or aligning.')
+				.addText((t) =>
+					t.setValue(formatLength(c.overlap, this.ctx.unit)).onChange((v) => {
+						const mm = parseLength(v, this.ctx.unit);
+						if (mm !== null && mm >= 0) c.overlap = mm;
+					}),
+				);
+			new Setting(el).setName('Tile labels').setDesc('Print a row and column label in a corner of each tile.').addToggle((t) => t.setValue(c.tileLabels).onChange((v) => (c.tileLabels = v)));
+		}
+		new Setting(el)
 			.setName('Quality')
 			.setDesc('Best quality keeps PDF regions as sharp, selectable vector content (larger files). Smallest file turns them into images.')
 			.addDropdown((d) =>
 				d
 					.addOption('best', 'Best quality')
 					.addOption('small', 'Smallest file')
-					.setValue(this.choices.quality)
-					.onChange((v) => (this.choices.quality = v as 'best' | 'small')),
+					.setValue(c.quality)
+					.onChange((v) => (c.quality = v as 'best' | 'small')),
 			);
-		new Setting(this.contentEl)
+		new Setting(el)
 			.setName('Image resolution')
-			.setDesc('Dots per inch for PDF regions exported as images.')
+			.setDesc(c.format === 'png' ? 'Dots per inch of the PNG images (and of PDF regions exported as images).' : 'Dots per inch for PDF regions exported as images.')
 			.addText((t) => {
 				t.inputEl.type = 'number';
-				t.setValue(String(this.choices.dpi)).onChange((v) => (this.choices.dpi = Number(v)));
+				t.setValue(String(c.dpi)).onChange((v) => (c.dpi = Number(v)));
 			});
-		new Setting(this.contentEl).setName('Open after export').addToggle((t) => t.setValue(this.choices.open).onChange((v) => (this.choices.open = v)));
-		new Setting(this.contentEl).addButton((b) =>
+		new Setting(el).setName('Open after export').addToggle((t) => t.setValue(c.open).onChange((v) => (c.open = v)));
+		new Setting(el).addButton((b) =>
 			b
 				.setButtonText('Export')
 				.setCta()
@@ -56,21 +155,24 @@ export class ExportModal extends Modal {
 		);
 	}
 
+	private target(): string {
+		const base = normalizePath(this.c.base.trim()).replace(/\.(pdf|png)$/i, '');
+		return `${base}.${this.c.format}`;
+	}
+
 	private updateWarning() {
-		const path = this.normalized();
+		const path = this.target();
 		const exists = this.app.vault.getAbstractFileByPath(path) instanceof TFile;
 		this.warning.setText(exists ? `${path} already exists and will be replaced.` : '');
 	}
 
-	private normalized(): string {
-		const p = normalizePath(this.choices.path.trim());
-		return p.toLowerCase().endsWith('.pdf') ? p : `${p}.pdf`;
-	}
-
 	private submit() {
-		if (!(this.choices.dpi >= 36 && this.choices.dpi <= 1200)) return void new Notice('Image resolution must be between 36 and 1200 dots per inch.');
+		const c = this.c;
+		if (!(c.dpi >= 36 && c.dpi <= 1200)) return void new Notice('Image resolution must be between 36 and 1200 dots per inch.');
+		if (c.pages === 'range' && !parseRange(c.range, this.ctx.pageCount)) return void new Notice(`Enter a page range between 1 and ${this.ctx.pageCount}, e.g. "1-3, 5".`);
+		if (typeof c.sheet === 'object' && !(c.overlap < Math.min(c.sheet.w, c.sheet.h))) return void new Notice('Tile overlap must be smaller than the sheet.');
 		this.close();
-		this.run({ ...this.choices, path: this.normalized() });
+		this.run({ ...c, base: this.target().replace(/\.(pdf|png)$/i, '') });
 	}
 
 	onClose() {

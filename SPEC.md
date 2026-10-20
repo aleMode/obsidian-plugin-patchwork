@@ -211,6 +211,8 @@ export interface ExportDefaults {
   cropMarks: boolean;                            // M4
   dpi: number;                                   // raster modules, default 200
   quality: "best" | "small";                     // "small" forces raster PDF modules; default "best"
+  fitSmallPages?: boolean;                       // pages smaller than the sheet: scale to fit (default: actual size)
+  tileLabels?: boolean;                          // print "B3"-style labels on tiles
 }
 ```
 

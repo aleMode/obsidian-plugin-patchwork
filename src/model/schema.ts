@@ -150,5 +150,9 @@ export interface ExportDefaults {
 	cropMarks: boolean;
 	dpi: number;
 	quality: 'best' | 'small';
+	/** Pages smaller than the sheet: scale up to fill it (true) or print at actual size (default). */
+	fitSmallPages?: boolean;
+	/** Print a row/column label ("B3") on each tile. */
+	tileLabels?: boolean;
 	[extra: string]: unknown;
 }
