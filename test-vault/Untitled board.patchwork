@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "unit": "mm",
+  "meta": {
+    "created": "2026-10-19"
+  },
+  "board": {
+    "grid": {
+      "size": 5,
+      "snap": true,
+      "visible": true
+    },
+    "displayUnit": "mm",
+    "order": "reading",
+    "numbering": {
+      "enabled": false,
+      "start": 1,
+      "format": "arabic",
+      "position": "bottom-center",
+      "skipFirst": false
+    },
+    "useAppTheme": false,
+    "export": {
+      "format": "pdf",
+      "sheet": "native",
+      "orientation": "auto",
+      "tileOverlap": 0,
+      "cropMarks": false,
+      "dpi": 200,
+      "quality": "best"
+    }
+  },
+  "pages": [
+    {
+      "id": "5ht6wftv",
+      "name": "Page 1",
+      "x": -70,
+      "y": 0,
+      "w": 210,
+      "h": 297,
+      "modules": [
+        {
+          "id": "q5rybblx",
+          "type": "note",
+          "x": 5,
+          "y": 5,
+          "w": 190,
+          "h": 277,
+          "file": "Spells/Spell index.md",
+          "subpath": "#Spell index"
+        },
+        {
+          "id": "vfi4x2hl",
+          "type": "pdf",
+          "x": 35,
+          "y": 40,
+          "w": 180,
+          "h": 267,
+          "file": "PDFs/Crown of the Fungal Queen 1.03.pdf",
+          "page": 5
+        }
+      ]
+    },
+    {
+      "id": "kdxpf55r",
+      "name": "Page 2",
+      "x": 140,
+      "y": 25,
+      "w": 297,
+      "h": 210,
+      "modules": []
+    }
+  ]
+}
