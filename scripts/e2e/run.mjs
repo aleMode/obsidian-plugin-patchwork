@@ -12,7 +12,7 @@ const suites = readdirSync(dir).filter((f) => f !== 'run.mjs' && /\.(m?js)$/.tes
 
 // Load the latest dev build before testing.
 const cdp = await connect();
-await cdp.evaluate(`await app.plugins.disablePlugin('patchwork'); await app.plugins.enablePlugin('patchwork');`);
+await cdp.evaluate(`await app.plugins.disablePlugin('patchwork'); await app.plugins.enablePluginAndSave('patchwork');`);
 cdp.close();
 
 let failed = 0;
