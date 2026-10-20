@@ -34,7 +34,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 ### Dark PDFs, invert, ink saver
 - Inspector (nothing selected) → **Dark PDFs in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.
 - Select a PDF module → **Invert colours**: for rulebook pages with dark backgrounds. Applies on screen and in exports (such modules export as images).
-- Export dialog → **Ink saver**: PDF regions and images print grayscale and lighter. Notes and text are unchanged.
+- Export dialog → **Ink saver**: PDF regions and images print grayscale and lighter. Notes and text are unchanged. Pages with a dark background stay dark by decision (2026-10-20): use **Invert colours** on those modules.
 
 ### Freeze and stale sources
 - Right-click a note module → **Freeze** (or Inspector → Freeze). A "Frozen YYYY-MM-DD" tag appears. Edit the note: the module keeps the old text and the tag turns orange ("note changed"). **Update snapshot** or **Unfreeze** in the inspector. Exports print the snapshot, never the tag.
