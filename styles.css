@@ -1162,3 +1162,118 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	word-break: break-all;
 	user-select: text;
 }
+
+/* ---------- context bar and properties popover (interface pass) ---------- */
+
+.pw-context-bar {
+	position: absolute;
+	left: var(--pw-cb-x, 0);
+	top: var(--pw-cb-y, 0);
+	z-index: 4;
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding: 3px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	max-width: calc(100% - 16px);
+}
+
+.pw-context-bar.is-hidden,
+.pw-context-bar.pw-offscreen {
+	display: none;
+}
+
+/* Out of the way while an item is dragged; back when it lands. */
+.pw-board.is-dragging ~ .pw-context-bar,
+.pw-board.is-dragging ~ .pw-popover {
+	opacity: 0;
+	pointer-events: none;
+}
+
+.pw-cb-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	height: 26px;
+	padding: 0 var(--size-4-2);
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.pw-cb-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.pw-cb-btn.is-active {
+	background: var(--background-modifier-active-hover);
+	color: var(--interactive-accent);
+}
+
+.pw-cb-caret {
+	font-size: 0.7em;
+	opacity: 0.7;
+}
+
+.pw-cb-label {
+	padding: 0 var(--size-4-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+.pw-cb-name {
+	width: 120px;
+	height: 24px;
+	font-size: var(--font-ui-smaller);
+}
+
+.pw-cb-color {
+	width: 28px;
+	height: 24px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	cursor: pointer;
+}
+
+.pw-popover {
+	position: absolute;
+	left: var(--pw-pop-x, 0);
+	top: var(--pw-pop-y, 0);
+	z-index: 5;
+	width: 320px;
+	max-height: min(60vh, 460px);
+	overflow-y: auto;
+	padding: var(--size-4-2) var(--size-4-3);
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-l);
+}
+
+.pw-popover.is-hidden {
+	display: none;
+}
+
+/* The tab names the group, so the form's own headings are redundant here. */
+.pw-popover-form .setting-item-heading {
+	display: none;
+}
+
+.pw-popover-form .setting-item {
+	padding: var(--size-4-1) 0;
+}
+
+.pw-prop-section.is-hidden {
+	display: none;
+}

@@ -464,3 +464,7 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Toolbar regrouped: Page, Note, PDF, More (text, image, table of contents, trackers), zoom, undo/redo, Settings, Export, View. Labels collapse to icons when the toolbar does not fit.
   - Export is also in the view's menu; the export dialog groups sheet/tiling/booklet/bleed and quality into collapsible sections.
   - Decided, not yet built: inspector becomes an optional dock behind a floating context bar and properties popover; double-click on a note or text module will edit inline (opening the note in a pane moves to a button, the right-click menu and Alt+double-click).
+- **v0.10 · 2026-10-20 (interface pass, step 2)**
+  - A floating **context bar** above the selection holds the few controls used every time (page: name, size, orientation, background, master; note: section, overflow, freeze, open; PDF: crop, page stepper, fit, invert; text, image, tracker, frame, table of contents; several items: align, distribute, lock, delete). The `⋯` button opens a **properties popover** with the rest in tabs: Content, Layout, Style, Advanced for a module; Page, Layout, Numbers for a page.
+  - The sidebar inspector is now an optional dock (View menu) that shows the same forms; it is no longer opened automatically when adding text, a tracker or a table of contents (the popover opens instead).
+  - Double-click on a note still opens it in a pane for now; decision pending implementation: it will edit inline, and open-in-pane stays on the bar's Open button.

@@ -23,7 +23,7 @@ export class TocModuleRenderer implements ModuleRenderer {
 		const root = this.el.createDiv({ cls: 'pw-toc' });
 		if (heading) root.createDiv({ cls: 'pw-toc-heading', text: heading });
 		const entries = this.entries();
-		if (!entries.length) root.createDiv({ cls: 'pw-toc-empty', text: 'Name pages (in the inspector) to list them here.' });
+		if (!entries.length) root.createDiv({ cls: 'pw-toc-empty', text: 'Name your pages (select a page, then type a name on the bar above it) to list them here.' });
 		for (const e of entries) {
 			const row = root.createDiv({ cls: 'pw-toc-row', attr: { 'data-target-page': e.pageId } });
 			row.createSpan({ cls: 'pw-toc-title', text: e.title });

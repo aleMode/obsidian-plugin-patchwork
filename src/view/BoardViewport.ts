@@ -1,4 +1,4 @@
-import { Menu, Notice, setIcon, TFile } from 'obsidian';
+import { type App, Menu, Notice, setIcon, TFile } from 'obsidian';
 import { exportBoardPdf } from '../export/exportPdf';
 import { pdfToPngs } from '../export/exportPng';
 import { parseRange } from '../model/sheetPlan';
@@ -20,6 +20,9 @@ import { gridDrawStep, snapPoint, snapValue } from '../model/snapping';
 import { stepByKey } from '../model/tracker';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
+import { ContextBar } from './ContextBar';
+import { PropertiesPopover } from './PropertiesPopover';
+import type { PropertiesSection } from './PropertiesForm';
 import type { BitmapCache } from '../render/bitmapCache';
 import type { ThumbnailCache } from '../render/thumbnails';
 import { linkpathsFromDrop } from '../sources/dropLinks';
@@ -126,8 +129,12 @@ export class BoardViewport implements BoardSurface {
 	private settledZoom = 0;
 	private zoomTimer: number | null = null;
 	private cleanups: (() => void)[] = [];
+	private contextBar!: ContextBar;
+	private popover!: PropertiesPopover;
+	private host: HTMLElement;
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
+		this.host = container;
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
 		this.labelLayer = this.root.createDiv({ cls: 'pw-page-labels' });
@@ -160,6 +167,9 @@ export class BoardViewport implements BoardSurface {
 			this.minimap.remove();
 		});
 		this.buildToolbar(container);
+		this.contextBar = new ContextBar(this, container, ALIGN_ACTIONS);
+		this.popover = new PropertiesPopover(this, container, view.app);
+		this.cleanups.push(() => this.contextBar.destroy(), () => this.popover.destroy());
 		this.cleanups.push(store.subscribe(() => this.render()));
 		this.bindInput();
 		const dup = view.scope?.register(['Mod'], 'd', () => {
@@ -232,6 +242,8 @@ export class BoardViewport implements BoardSurface {
 		this.renderMinimap();
 		this.updateVisibility();
 		this.modules.sync();
+		this.contextBar.refresh();
+		this.popover.refresh();
 	}
 
 	/** The selection's rect on the board (mm), and whether it can be resized. */
@@ -288,6 +300,59 @@ export class BoardViewport implements BoardSurface {
 
 	get selected(): Selection {
 		return this.selection;
+	}
+
+	get app(): App {
+		return this.view.app;
+	}
+
+	/** Lowest y (in the board's own pixels) that content may use: below the rulers and the floating toolbar. */
+	get topInset(): number {
+		return this.toolbarBottom();
+	}
+
+	focusBoard() {
+		this.root.focus();
+	}
+
+	/** The selection's bounding box in pixels relative to the board host (what the bar and popover position against). */
+	selectionScreenRect(): { x: number; y: number; w: number; h: number } | null {
+		const rects = this.items.flatMap((it) => this.itemRect(it) ?? []);
+		const b = rects.length ? bounds(rects) : null;
+		if (!b) return null;
+		const k = PX_PER_MM * this.camera.zoom;
+		const host = this.host.getBoundingClientRect();
+		const root = this.root.getBoundingClientRect();
+		return { x: this.camera.tx + b.x * k + (root.left - host.left), y: this.camera.ty + b.y * k + (root.top - host.top), w: b.w * k, h: b.h * k };
+	}
+
+	contextBarRect(): { x: number; y: number; w: number; h: number } | null {
+		return this.contextBar.rect;
+	}
+
+	/** The properties popover for the selection (a page or one module), on a tab. */
+	showProperties(tab?: PropertiesSection) {
+		this.popover.show(tab);
+	}
+
+	/** Open the source of a note module in a pane, at its section. */
+	openNote(pageId: string, moduleId: string) {
+		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		if (m?.type !== 'note') return;
+		const note = m as NoteModule;
+		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
+	}
+
+	/** Number of pages of a PDF, or null when it cannot be read. */
+	async pdfPageCount(path: string): Promise<number | null> {
+		try {
+			const doc = await this.services.pdfDocs.acquire(path);
+			const n = doc.numPages;
+			this.services.pdfDocs.release(path);
+			return n;
+		} catch {
+			return null;
+		}
 	}
 
 	get selectedItems(): readonly Item[] {
@@ -431,11 +496,11 @@ export class BoardViewport implements BoardSurface {
 
 	/** A free markdown box (SPEC 5.3 text module), edited in the inspector. */
 	addText() {
-		this.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '**New text**\n\nEdit me in the inspector.' }));
-		this.services.openPanels?.();
+		this.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '**New text**\n\nChange this text with Edit above.' }));
+		this.showProperties('content');
 	}
 
-	/** Interactive tracker (M5): a counter, a row of boxes or a checklist, edited in the inspector. */
+	/** Interactive tracker (M5): a counter, a row of boxes or a checklist, edited in the properties popover. */
 	addTracker(kind: TrackerModule['kind'] = 'counter') {
 		const presets: Record<TrackerModule['kind'], Partial<TrackerModule> & { w: number; h: number }> = {
 			counter: { label: 'Hit points', value: 10, min: 0, w: 50, h: 25 },
@@ -444,7 +509,7 @@ export class BoardViewport implements BoardSurface {
 		};
 		const { w, h, ...rest } = presets[kind];
 		this.placeModule((page, id) => ({ id, type: 'tracker', kind, ...defaultModuleRect(page, { w, h }), ...rest }));
-		this.services.openPanels?.();
+		this.showProperties('content');
 	}
 
 	showTrackerMenu(e?: MouseEvent) {
@@ -459,7 +524,7 @@ export class BoardViewport implements BoardSurface {
 	/** Table of contents (M4): fills the page inside its margins; lists named pages live. */
 	addToc() {
 		this.placeModule((page, id) => ({ id, type: 'toc', ...defaultModuleRect(page, { w: page.w - 40, h: page.h - 40 }), x: 20, y: 20 }));
-		this.services.openPanels?.();
+		this.showProperties('content');
 	}
 
 	pickImage() {
@@ -714,6 +779,8 @@ export class BoardViewport implements BoardSurface {
 		this.renderRulers();
 		this.placeLabels();
 		this.renderMinimap();
+		this.contextBar.reposition();
+		this.popover.reposition();
 		// Switch level of detail right away, so zooming out never mounts content it won't show.
 		this.modules.setDetail(zoom >= DETAIL_ZOOM);
 		this.updateVisibility();
@@ -1285,6 +1352,7 @@ export class BoardViewport implements BoardSurface {
 		this.guideLayer.empty();
 		this.store.endCoalesce();
 		this.root.removeClass('is-dragging');
+		this.contextBar.reposition();
 		if (this.root.hasPointerCapture(e.pointerId)) this.root.releasePointerCapture(e.pointerId);
 	}
 
@@ -1437,7 +1505,8 @@ export class BoardViewport implements BoardSurface {
 		// A frame opens the note its chain starts from.
 		const note = (m?.type === 'frame' ? this.chainHead(m.id) : m) as NoteModule | undefined;
 		if (note?.type !== 'note') return;
-		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
+		const page = this.store.file.pages.find((p) => p.modules.some((x) => x.id === note.id));
+		if (page) this.openNote(page.id, note.id);
 	}
 
 	private chainHead(moduleId: string): AnyModule | undefined {

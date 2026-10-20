@@ -1,6 +1,6 @@
 # Interface reorganisation and inline editing (proposal, 2026-10-20)
 
-Written after the manual test rounds. Nothing here is built except the "quick wins" at the end of section 1. Decisions needed are in section 6.
+Written after the manual test rounds. **Status:** quick wins and step 1 (Patchwork settings dialog, toolbar, export menu, wording) and step 2 (context bar and properties popover) are built; section 4 (inline editing) is not. The decisions in section 6 were taken on 2026-10-20: optional dock, inline editing on double-click, "patchwork" in place of "board", toolbar first.
 
 ## 1. Where everything is today
 
@@ -69,10 +69,12 @@ A compact popover next to the item, never taller than about 8 rows, in four tabs
 
 | Tab | Holds |
 |---|---|
-| Layout | X Y W H on **one row**; lock; to front / back; duplicate; (page: preset, safe area, number / header / footer overrides) |
-| Style | padding; border width + colour + radius; background; opacity; text scale (two columns) |
-| Source | note: file, include heading, line range, scale · PDF: file, rotation, exports mode, source check · image: file |
-| Advanced | label (outline name), CSS class |
+| Content | what the item is: note file, section, include heading, overflow, freeze · PDF file, page, crop, fit, invert · text, image, tracker, table of contents settings (as built) |
+| Layout | X, Y, width, height; lock; to front / back |
+| Style | padding; border; background; opacity; text scale |
+| Advanced | label (outline name), line range and scale (notes), rotation, export mode and source check (PDF), CSS class |
+
+A page gets three tabs: **Page** (name, size preset, orientation, background, master), **Layout** (X, Y, width, height) and **Numbers** (number, header, footer overrides, safe area). As built, the popover opens to the side of the selection when there is room, else below or above it, and never covers the item or the bar.
 
 Worst case today (note, 23 rows) becomes: 5 controls on the bar + 4 tabs of at most 8 rows. No scrolling.
 

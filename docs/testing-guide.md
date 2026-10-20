@@ -7,6 +7,16 @@ What to try by hand, in the order that gives the most signal. Everything here is
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
+## New in the interface pass (latest)
+
+Everything here is also described in `docs/ui-reorganisation.md`.
+
+### Context bar and properties popover
+- Select a page or an item: a small bar floats above it. Page: name, size, orientation, background, master. Note: section ▾, overflow ▾, Freeze, Open. PDF: Crop, page ‹ n ›, fit ▾, invert. Text: Edit. Image: Change, fit ▾. Tracker: kind ▾, Edit, print blank. Linked frame: "Frame 2 of 3", Next frame. Table of contents: Heading. Several items: Align ▾, Distribute ▾, Lock, Delete.
+- The `⋯` button opens the **properties popover** next to the item: tabs *Content / Layout / Style / Advanced* (a page: *Page / Layout / Numbers*). Typing in it edits live; Escape or a click on the board closes it. It should never sit on top of the item you are editing.
+- Check: the bar follows the item while you pan and zoom, hides while you drag, comes back where the item lands, and stays reachable for a page bigger than the screen. Typing Delete or the arrow keys in a popover field must not delete or move the item.
+- Adding text, a tracker or a table of contents opens the popover on it. The sidebar inspector no longer opens by itself: **View → Inspector and outline** if you want the dock.
+
 ## New in M5 (latest, M5 complete)
 
 ### Zoomed-out previews (M3 leftover)
