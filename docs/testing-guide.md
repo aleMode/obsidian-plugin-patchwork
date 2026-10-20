@@ -17,7 +17,7 @@ Plan and decisions: `docs/use-mode-plan.md`. Open `Dashboard/Dashboard.patchwork
 - **Links:** click [[Goblin]] in *Prep*: it opens in a pane to the side. Click Fireball in *Party*: the same side pane switches to it. Ctrl/Cmd-click opens a new tab; Ctrl/Cmd-hover shows the page preview.
 - **Checkboxes:** tick "Prepare the ambush map": open `Dashboard/Session.md`, the line is ticked. Untick it. Tick a task in *Table notes* (a text box): Ctrl+Z unticks it. Tick twice very fast: the second may say the note changed (the module re-renders first); that is the safety check.
 - **Colours:** in Arrange, select a module → the palette button on the context bar: Red … Purple, or "Custom colour…" (Style tab). The cards look right in both themes and in a PDF export (light values).
-- **Plugins:** if you install Dataview, Tasks, Buttons, Meta Bind or use Bases, put their blocks in a note module and try their buttons and checkboxes in Use mode. Tell me what doesn't respond.
+- **Plugins:** Dataview, Tasks, Buttons and Meta Bind are downloaded into the test vault (`.obsidian/plugins`, git-ignored) but not switched on: enable them in Settings → Community plugins, and Bases in Core plugins. Then open `Dashboard/Plugin blocks.patchwork`: tick Dataview's and Tasks' checkboxes (Session.md changes), type in the Tasks filter, press the Buttons and Meta Bind buttons (they toggle the sidebars), flip Meta Bind's "Ready" toggle (frontmatter), click a Bases row (opens to the side).
 - **Fixed:** opening a patchwork sometimes showed it at 2 % zoom (a speck in the corner); it should now always fit.
 
 ## Interface pass

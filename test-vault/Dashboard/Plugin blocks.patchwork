@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "unit": "mm",
+  "meta": {
+    "title": "Plugin blocks"
+  },
+  "board": {
+    "mode": "use"
+  },
+  "pages": [
+    {
+      "id": "plug",
+      "name": "Plugins",
+      "x": 0,
+      "y": 0,
+      "w": 297,
+      "h": 210,
+      "modules": [
+        {
+          "id": "dv",
+          "type": "note",
+          "x": 8,
+          "y": 8,
+          "w": 140,
+          "h": 110,
+          "file": "Dashboard/Plugin blocks.md",
+          "subpath": "#Dataview",
+          "style": {
+            "padding": 3,
+            "tint": "5"
+          }
+        },
+        {
+          "id": "tasks",
+          "type": "note",
+          "x": 154,
+          "y": 8,
+          "w": 135,
+          "h": 60,
+          "file": "Dashboard/Plugin blocks.md",
+          "subpath": "#Tasks",
+          "style": {
+            "padding": 3,
+            "tint": "4"
+          }
+        },
+        {
+          "id": "btn",
+          "type": "note",
+          "x": 154,
+          "y": 74,
+          "w": 65,
+          "h": 44,
+          "file": "Dashboard/Plugin blocks.md",
+          "subpath": "#Buttons",
+          "style": {
+            "padding": 3,
+            "tint": "2"
+          }
+        },
+        {
+          "id": "mb",
+          "type": "note",
+          "x": 224,
+          "y": 74,
+          "w": 65,
+          "h": 44,
+          "file": "Dashboard/Plugin blocks.md",
+          "subpath": "#Meta Bind",
+          "style": {
+            "padding": 3,
+            "tint": "6"
+          }
+        },
+        {
+          "id": "base",
+          "type": "note",
+          "x": 8,
+          "y": 124,
+          "w": 281,
+          "h": 78,
+          "file": "Dashboard/Plugin blocks.md",
+          "subpath": "#Bases",
+          "style": {
+            "padding": 3
+          }
+        }
+      ]
+    }
+  ]
+}

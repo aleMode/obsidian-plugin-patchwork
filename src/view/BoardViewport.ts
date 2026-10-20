@@ -1100,6 +1100,7 @@ export class BoardViewport implements BoardSurface {
 		on('contextmenu', (e) => this.onContextMenu(e));
 		on('dblclick', (e) => this.onDoubleClick(e));
 		// Use mode: links and checkboxes in the content (in Arrange the content doesn't take the pointer).
+		on('click', (e) => this.useMode && this.live.linkClick(e), { capture: true });
 		on('click', (e) => this.useMode && this.live.click(e));
 		on('mouseover', (e) => this.useMode && this.live.hover(e));
 		on('dragover', (e) => this.onDragOver(e));

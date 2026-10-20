@@ -14,6 +14,9 @@ import { findModule, mapModule } from '../store/pageOps';
 /** The id Patchwork registers with Page preview, so Ctrl/Cmd-hovering a link shows the note. */
 export const HOVER_SOURCE = 'patchwork';
 
+/** Internal links: <a> from Obsidian's renderer and Dataview, <span> in Bases tables. */
+const LINK = '.internal-link[data-href], a.internal-link';
+
 /** Checkboxes in here belong to someone else: an embedded note, or a plugin's block (Dataview, Tasks…). */
 const FOREIGN = '.internal-embed, .markdown-embed, [class*="block-language-"]';
 
@@ -32,26 +35,32 @@ export class LiveContent {
 
 	constructor(private d: LiveDeps) {}
 
+	/**
+	 * Before anything else sees the click (capture phase): plugins open their links in the dashboard's
+	 * own pane (Bases does), which would replace the dashboard. All internal links go to the side.
+	 */
+	linkClick(e: MouseEvent) {
+		const link = (e.target as HTMLElement).closest<HTMLElement>(LINK);
+		if (!link) return;
+		e.preventDefault();
+		e.stopPropagation();
+		void this.openLink(link, e);
+	}
+
+	/** After plugins had their turn (bubble phase): checkboxes nobody else handles are written back here. */
 	click(e: MouseEvent) {
-		const t = e.target as HTMLElement;
-		const link = t.closest<HTMLAnchorElement>('a.internal-link');
-		if (link) {
-			e.preventDefault();
-			void this.openLink(link, e);
-			return;
-		}
-		const box = t.closest<HTMLInputElement>('input.task-list-item-checkbox');
+		const box = (e.target as HTMLElement).closest<HTMLInputElement>('input.task-list-item-checkbox');
 		if (box && !box.closest(FOREIGN)) void this.tick(box, e);
 	}
 
 	hover(e: MouseEvent) {
-		const link = (e.target as HTMLElement).closest<HTMLAnchorElement>('a.internal-link');
+		const link = (e.target as HTMLElement).closest<HTMLElement>(LINK);
 		if (!link) return;
 		this.d.app.workspace.trigger('hover-link', { event: e, source: HOVER_SOURCE, hoverParent: this.d.hoverParent, targetEl: link, linktext: linkText(link), sourcePath: this.sourcePath(link) });
 	}
 
 	/** To the side, in the same pane each time; Ctrl/Cmd (and the other modifiers) as anywhere in Obsidian. */
-	private async openLink(link: HTMLAnchorElement, e: MouseEvent) {
+	private async openLink(link: HTMLElement, e: MouseEvent) {
 		const { app } = this.d;
 		const text = linkText(link);
 		const source = this.sourcePath(link);
@@ -130,6 +139,6 @@ function cannotTick(m: AnyModule | undefined, shown: string | undefined, rendere
 	return null;
 }
 
-function linkText(a: HTMLAnchorElement): string {
+function linkText(a: HTMLElement): string {
 	return a.dataset.href ?? a.getAttribute('href') ?? '';
 }

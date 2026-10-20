@@ -32,5 +32,11 @@ Automated: `scripts/e2e/usemode.mjs` (19 checks: switch, remembered mode, no und
 Manual:
 - [ ] Light and dark themes, and a community theme: faint panels and tinted cards readable in each.
 - [ ] Ctrl/Cmd-hover on a link shows the page preview.
-- [ ] Dataview, Tasks, Buttons, Meta Bind, Bases blocks in a note module respond in Use mode (needs the plugins installed).
+- [x] Dataview, Tasks, Buttons, Meta Bind, Bases blocks in a note module respond in Use mode. 2026-10-20, real mouse input over CDP, fixture `Dashboard/Plugin blocks.patchwork` (Dataview 0.5.70, Tasks 8.6.0, Buttons 0.9.13, Meta Bind 1.5.1, Bases core):
+  - Dataview: task checkbox ticks the source note; list links open to the side.
+  - Tasks: query checkbox completes the task (with its ✅ date); the filter field takes typing (Space types, doesn't pan).
+  - Buttons: a command button runs its command.
+  - Meta Bind: the toggle writes its frontmatter field; a command button runs.
+  - Bases: the table renders; its links (spans, with Bases' own handler) now open to the side instead of replacing the dashboard.
+  - With Tasks loaded, Patchwork's own checkbox write-back still changes exactly one character (usemode.mjs 19/19).
 - [ ] A PDF export of a patchwork with tinted modules: light tints, coloured edges.
