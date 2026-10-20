@@ -749,6 +749,8 @@ export class BoardViewport implements BoardSurface {
 			this.fitted = true;
 			this.zoomToFit();
 		}
+		// The ruler canvases are sized in code, not CSS: without a redraw they are stretched (and blur) until the next pan.
+		this.renderRulers();
 		this.updateVisibility();
 	}
 

@@ -60,7 +60,8 @@ export function pageFurniture(file: PatchworkFile, ctx: { title: string; date: s
 	pages.forEach((p, i) => {
 		const formatted = formatNumber(n.start + i, n.format);
 		const pageToken = typeof p.numberLabel === 'string' ? p.numberLabel : formatted;
-		let number: string | null = n.enabled ? pageToken : null;
+		// A page's own custom number is an explicit choice, so it prints even when board numbering is off.
+		let number: string | null = n.enabled || typeof p.numberLabel === 'string' ? pageToken : null;
 		if (p.numberLabel === false || (n.skipFirst && i === 0)) number = null;
 		const tokens = { page: pageToken, pages: pagesToken, title: ctx.title, date: ctx.date };
 		// A page's own header/footer replaces its master's, which replaces the board's; "" means none.

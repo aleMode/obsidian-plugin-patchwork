@@ -103,7 +103,7 @@ PDF module rules:
 
 ### 5.4 Page order and numbering
 - Default order is reading order (rows top to bottom by y-band, then left to right). Manual override via `board.pageOrder` (a list of page IDs, used when `order` is `"manual"`). Pages missing from the list follow in reading order; IDs with no matching page are ignored and removed on save. Auto-arrange can rewrite positions.
-- Board-level numbering: enabled, start offset, format (`arabic`, `roman`, `alpha`), position (6 presets), skip-first-page. Per-page override via `page.numberLabel`: a custom string printed instead of the number, or `false` to hide it. Pages with a custom or hidden number (including the first page under skip-first-page) still count: numbering continues normally on the next page and they are included in `{pages}`.
+- Board-level numbering: enabled, start offset, format (`arabic`, `roman`, `alpha`), position (6 presets), skip-first-page. Per-page override via `page.numberLabel`: a custom string printed instead of the number (also when board numbering is off), or `false` to hide it. Pages with a custom or hidden number (including the first page under skip-first-page) still count: numbering continues normally on the next page and they are included in `{pages}`.
 - Header/footer text per page and board default, with tokens `{page}`, `{pages}`, `{title}`, `{date}`.
 - `{page}` and `{pages}` count **board pages**, not output sheets. A page split into tiles keeps one page number; individual tiles are identified by their row/col label (section 9.2).
 - `{page}` is the page's number (or its custom label); `{pages}` is the **last** page's number, so "page {page} of {pages}" stays right with a start offset. `{title}` is the board's title, else its file name; `{date}` is the export (or viewing) day as YYYY-MM-DD. A page's own `header`/`footer` replaces the board's; an empty string removes it on that page.
@@ -457,3 +457,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - M0 reordered into a vertical slice (note + PDF crop + basic PDF export); grid, rulers, snapping and undo/redo move to M1.
   - `z` is kept as specified.
   - `page.label` renamed to `page.numberLabel` (avoids confusion with `page.name` and `module.label`). Pages with a custom or hidden number still count toward numbering and `{pages}`.
+  - A page's custom number prints even when board numbering is off (an explicit per-page choice wins over the board default, as a page's own header already does). PDF page labels still need numbering on.

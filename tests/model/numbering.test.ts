@@ -53,6 +53,14 @@ describe('pageFurniture', () => {
 		expect(r.get('a')!.pageToken).toBe('1');
 	});
 
+	it('a custom number prints even when board numbering is off; automatic pages stay blank', () => {
+		const f = file();
+		f.board.numbering = { ...f.board.numbering, enabled: false };
+		f.pages[2] = { ...f.pages[2]!, numberLabel: 'Cover' }; // page b
+		const r = pageFurniture(f, ctx);
+		expect(['a', 'b', 'c'].map((id) => r.get(id)!.number)).toEqual([null, 'Cover', null]);
+	});
+
 	it('page header overrides the board header; empty string removes it', () => {
 		const f = file();
 		f.board.header = '{title}';
