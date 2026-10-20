@@ -2,12 +2,12 @@
 
 An Obsidian desktop plugin for composing **boards** of fixed-size pages from live references to notes and PDF regions, and exporting them to PDF or PNG. See [`SPEC.md`](SPEC.md) for scope and design.
 
-Status: pre-alpha. Milestone M0 (foundations and a vertical slice) is done: boards, pages, note / PDF / text / image modules, and PDF export with vector text and vector PDF crops.
+Status: pre-alpha. Milestones M0 and M1 are done: boards and pages with rulers, grid, snapping and smart guides; note / PDF / text / image modules with styles, a crop editor and overflow policies; inspector and outline panels; multi-select with align and distribute; drag files from the explorer; renames follow; and PDF export with vector text and vector PDF crops. See `docs/testing-guide.md`.
 
 ## Using it (M0)
 
 - **Patchwork: New board** (or right-click a folder → *New board*) creates an A4 board and opens it.
-- Toolbar: add a page (presets, portrait or landscape), add a note section or a PDF page, export, zoom, undo/redo.
+- Toolbar: add a page (presets, portrait or landscape), a note section, a PDF region (crop editor), a text box or an image; export; board settings; inspector and outline; zoom; undo/redo. You can also drag notes, PDFs and images from the file explorer onto a page.
 - Drag pages and modules to move them (5 mm grid; hold Alt to place freely). Right-click for orientation, z-order and delete. Delete key removes the selection; Ctrl+Z / Ctrl+Shift+Z undo and redo.
 - Pan with the wheel, by dragging empty space, or holding Space; zoom with Ctrl+wheel or a pinch.
 - **Patchwork: Export…** writes a PDF next to the board. "Best quality" keeps PDF crops as sharp, selectable vector content; "Smallest file" turns them into images.

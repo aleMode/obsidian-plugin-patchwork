@@ -338,6 +338,28 @@ export class BoardViewport implements BoardSurface {
 		).open();
 	}
 
+	/** A free markdown box (SPEC 5.3 text module), edited in the inspector. */
+	addText() {
+		this.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '**New text**\n\nEdit me in the inspector.' }));
+		this.services.openPanels?.();
+	}
+
+	pickImage() {
+		const app = this.view.app;
+		const images = app.vault.getFiles().filter((f) => /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(f.extension));
+		new FilePickerModal(app, images, 'Image to add', (file) => {
+			const img = new Image();
+			const place = (aspect: number) =>
+				this.placeModule((page, id): ImageModule => {
+					const r = defaultModuleRect(page, { w: 80, h: 60 });
+					return { id, type: 'image', ...r, h: Math.max(5, Math.min(r.h * 2, r.w / aspect)), file: file.path };
+				});
+			img.onload = () => place(img.naturalWidth / Math.max(1, img.naturalHeight));
+			img.onerror = () => place(4 / 3);
+			img.src = app.vault.getResourcePath(file);
+		}).open();
+	}
+
 	pickPdf() {
 		const app = this.view.app;
 		const { pdfDocs } = this.services;
@@ -1054,6 +1076,8 @@ export class BoardViewport implements BoardSurface {
 			button('file-plus', 'Add page', (e) => this.showAddPageMenu(e));
 			button('file-text', 'Add note', () => this.pickNote());
 			button('book-open', 'Add PDF', () => this.pickPdf());
+			button('type', 'Add text', () => this.addText());
+			button('image', 'Add image', () => this.pickImage());
 			sep();
 		}
 		button('file-output', 'Export to PDF', () => this.showExport());

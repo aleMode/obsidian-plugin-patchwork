@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.5 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.6 · 2026-10-19 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -388,6 +388,12 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Saves check for external changes and never silently overwrite them.
   - Raster export canvases are capped at 8192 × 8192 px and verified with a pixel probe.
   - Print pipeline (section 9.1) not yet changed: a two-stage Chromium + `pdf-lib` pipeline is under discussion.
+- **v0.6 · 2026-10-20** (M1 complete)
+  - Drag from the file explorer reads the `obsidian://open?…&file=…` URIs Obsidian puts on the drag (no internals).
+  - Shift-drag draws a marquee (also when starting on a page's paper); plain drag on empty board pans. Shift-click toggles; selections never mix pages and modules.
+  - Module styles render via a shared content box (border + padding), so on-screen and vector-exported PDF content match. `fit` overflow shrinks to at most 50 % before clipping.
+  - Rename tracking rewrites closed boards with `vault.process` and open boards through their store (undoable); boards that fail to parse or have a newer format are never touched.
+  - Rendered PDF crops are cached (default 512 MB, setting) and keyed by file mtime; module mounting is spread over frames (8 ms budget).
 - **v0.5 · 2026-10-19** (M0)
   - A first level of detail lands in M0 rather than M3: below 25 % zoom, pages show module outlines instead of content, and PDF canvas resolution follows the zoom (re-rendered when it settles). At most 2 PDF renders run at once. The stress probe required these (`docs/perf.md`).
   - `minAppVersion` is 1.6.6 (`FileManager.trashFile`), see `docs/open-questions.md` Q12.
