@@ -243,7 +243,9 @@ export class ExportModal extends Modal {
 
 /** Write bytes to a vault path, replacing an existing file and creating folders as needed. */
 export async function writeBinary(app: App, path: string, bytes: Uint8Array): Promise<TFile> {
-	const data = bytes.slice().buffer;
+	// A view of a whole buffer hands it over as is; copying a large export would double its memory.
+	const whole = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength && bytes.buffer instanceof ArrayBuffer;
+	const data = whole ? bytes.buffer : bytes.slice().buffer;
 	const existing = app.vault.getAbstractFileByPath(path);
 	if (existing instanceof TFile) {
 		await app.vault.modifyBinary(existing, data);

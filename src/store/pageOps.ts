@@ -4,6 +4,11 @@ import type { AnyModule, Page, PatchworkFile } from '../model/schema';
 // Immutable edits used with BoardStore.update. Each returns the same object when nothing changes,
 // so no-op edits don't create undo steps.
 
+/** The module `moduleId` on page `pageId`, if both exist. */
+export function findModule(file: PatchworkFile, pageId: string | undefined, moduleId: string | undefined): AnyModule | undefined {
+	return file.pages.find((p) => p.id === pageId)?.modules.find((m) => m.id === moduleId);
+}
+
 export function mapPage(file: PatchworkFile, id: string, fn: (p: Page) => Page): PatchworkFile {
 	let changed = false;
 	const pages = file.pages.map((p) => {
@@ -53,7 +58,7 @@ export function moveModule(file: PatchworkFile, pageId: string, moduleId: string
 }
 
 export function removeModule(file: PatchworkFile, pageId: string, moduleId: string): PatchworkFile {
-	const removed = file.pages.find((p) => p.id === pageId)?.modules.find((m) => m.id === moduleId);
+	const removed = findModule(file, pageId, moduleId);
 	const next = mapPage(file, pageId, (p) => {
 		const modules = p.modules.filter((m) => m.id !== moduleId);
 		return modules.length === p.modules.length ? p : { ...p, modules };
@@ -112,7 +117,7 @@ export function defaultModuleRect(page: Page, size?: { w: number; h: number }): 
 /** Move a module to another page, at the given position relative to that page (SPEC 5.2 re-parenting). */
 export function moveModuleToPage(file: PatchworkFile, fromPageId: string, moduleId: string, toPageId: string, x: number, y: number): PatchworkFile {
 	if (fromPageId === toPageId) return moveModule(file, fromPageId, moduleId, x, y);
-	const m = file.pages.find((p) => p.id === fromPageId)?.modules.find((x) => x.id === moduleId);
+	const m = findModule(file, fromPageId, moduleId);
 	if (!m || !file.pages.some((p) => p.id === toPageId)) return file;
 	return addModule(removeModule(file, fromPageId, moduleId), toPageId, { ...m, x, y });
 }

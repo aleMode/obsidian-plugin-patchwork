@@ -1,10 +1,12 @@
 import { Menu, setIcon, TFile } from 'obsidian';
 import { flowChains } from '../model/flow';
-import { PAGE_PRESETS, swapOrientation } from '../model/presets';
+import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
 import type { AnyModule, ImageModule, NoteModule, Page, PdfModule, TrackerModule } from '../model/schema';
-import { mapModule, mapPage } from '../store/pageOps';
-import { withField } from '../ui/formHelpers';
+import { findModule, mapModule, mapPage } from '../store/pageOps';
+import { isImage } from '../sources/fileKinds';
+import { FIT_LABELS, withField, withStyle } from '../ui/formHelpers';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
+import { shieldFromBoard } from './shield';
 import type { AlignMode } from '../model/align';
 import type { BoardViewport } from './BoardViewport';
 
@@ -26,11 +28,7 @@ interface Ctl {
 	custom?: (parent: HTMLElement) => void;
 }
 
-const FITS = [
-	['contain', 'Contain'],
-	['cover', 'Cover (crop to fill)'],
-	['stretch', 'Stretch'],
-] as const;
+const FITS = Object.entries(FIT_LABELS);
 
 const OVERFLOWS = [
 	['clip', 'Clip'],
@@ -61,8 +59,8 @@ export class ContextBar {
 		this.el = host.createDiv({ cls: 'pw-context-bar is-hidden' });
 		this.pill = host.createEl('button', { cls: 'pw-context-pill is-hidden', attr: { 'aria-label': 'Actions for the selection' } });
 		setIcon(this.pill, 'more-horizontal');
-		// The board listens for pointers, wheel and keys on its root: none of that may reach it from here.
-		for (const el of [this.el, this.pill]) for (const type of ['pointerdown', 'dblclick', 'contextmenu', 'wheel', 'keydown', 'keyup']) el.addEventListener(type, (e) => e.stopPropagation());
+		shieldFromBoard(this.el);
+		shieldFromBoard(this.pill);
 		// Hovering (or clicking, or tabbing to) the pill opens the bar.
 		this.pill.addEventListener('pointerenter', () => this.expand());
 		this.pill.addEventListener('click', () => this.expand());
@@ -97,6 +95,7 @@ export class ContextBar {
 		}
 		if (this.expanded || this.pill.hasClass('is-hidden')) return;
 		this.expanded = true;
+		this.build();
 		this.show();
 	}
 
@@ -104,6 +103,7 @@ export class ContextBar {
 		this.collapseTimer = null;
 		if (!this.expanded || this.keepOpen()) return;
 		this.expanded = false;
+		this.build();
 		this.show();
 	}
 
@@ -138,17 +138,33 @@ export class ContextBar {
 	refresh() {
 		// Typing in the name field is a model change too: keep the field (and the caret) as it is.
 		if (this.el.contains(this.el.doc.activeElement) && this.el.doc.activeElement instanceof HTMLInputElement) return this.reposition();
-		const controls = this.controls();
-		this.hasControls = controls.length > 0 && !this.board.boardStore.readOnly;
+		this.hasControls = !this.board.boardStore.readOnly && this.selectionExists();
 		// A different selection starts collapsed again.
 		const key = this.board.selectedItems.map((it) => `${it.pageId}/${it.moduleId ?? ''}`).join('|');
 		if (key !== this.selKey) {
 			this.selKey = key;
 			this.expanded = false;
 		}
-		this.el.empty();
-		if (this.hasControls) for (const c of controls) this.render(c);
+		this.build();
 		this.show();
+	}
+
+	/** Every selection that still exists gets controls (at least "More settings"). */
+	private selectionExists(): boolean {
+		const items = this.board.selectedItems;
+		if (items.length !== 1) return items.length > 1;
+		const it = items[0]!;
+		const file = this.board.boardStore.file;
+		return it.moduleId ? !!findModule(file, it.pageId, it.moduleId) : file.pages.some((p) => p.id === it.pageId);
+	}
+
+	/**
+	 * Controls exist only while the bar is open. Collapsed it is just the pill, and the model changes on
+	 * every frame of a drag: rebuilding hidden buttons then was wasted work and garbage.
+	 */
+	private build() {
+		this.el.empty();
+		if (this.expanded && this.hasControls) for (const c of this.controls()) this.render(c);
 	}
 
 	/** Above the selection, or below it when there is no room; inside the visible board. */
@@ -298,12 +314,8 @@ export class ContextBar {
 		];
 	}
 
-	/** A style key set or removed (an empty style object is dropped). */
 	private setStyle(page: Page, m: AnyModule, key: string, value: unknown) {
-		this.set(page, m, (x) => {
-			const style = withField(x.style ?? {}, key, value);
-			return withField(x, 'style', Object.keys(style).length ? style : undefined);
-		});
+		this.set(page, m, (x) => withStyle(x, key, value));
 	}
 
 	private textBox(page: Page, m: AnyModule): Ctl[] {
@@ -349,7 +361,7 @@ export class ContextBar {
 				text: 'Change',
 				tip: 'Pick another image',
 				onClick: () =>
-					new FilePickerModal(this.board.app, this.board.app.vault.getFiles().filter((f) => /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(f.extension)), 'Pick an image', (f) => this.set(page, m, (x) => ({ ...x, file: f.path }))).open(),
+					new FilePickerModal(this.board.app, this.board.app.vault.getFiles().filter(isImage), 'Pick an image', (f) => this.set(page, m, (x) => ({ ...x, file: f.path }))).open(),
 			},
 			{
 				icon: 'scaling',
@@ -394,7 +406,7 @@ export class ContextBar {
 	private page(page: Page): Ctl[] {
 		const file = this.board.boardStore.file;
 		const landscape = page.w > page.h;
-		const match = PAGE_PRESETS.find((pr) => (landscape ? pr.h === page.w && pr.w === page.h : pr.w === page.w && pr.h === page.h));
+		const match = presetFor(page);
 		const setPage = (fn: (p: Page) => Page) => {
 			this.board.boardStore.update((f) => mapPage(f, page.id, fn));
 			this.board.boardStore.endCoalesce();

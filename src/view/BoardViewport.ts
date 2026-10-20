@@ -15,7 +15,6 @@ import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
 import { masterPreview, pageFurniture } from '../model/numbering';
 import { outputPages, resolvePage } from '../model/masters';
-import { rulerTicks } from '../model/rulers';
 import { gridDrawStep, snapPoint, snapValue } from '../model/snapping';
 import { stepByKey } from '../model/tracker';
 import { PX_PER_MM } from '../model/units';
@@ -31,14 +30,16 @@ import { linkpathsFromDrop } from '../sources/dropLinks';
 import { type PdfDocCache, pdfSourceId } from '../sources/pdfSource';
 import { loadNoteContent } from '../sources/markdownSource';
 import type { BoardStore } from '../store/BoardStore';
-import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, findModule, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { withField } from '../ui/formHelpers';
 import { PatchworkSettingsModal, type SettingsDraft } from '../ui/PatchworkSettingsModal';
 import { NamedPickerModal, TextPromptModal } from '../ui/prompts';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
+import { isImage, isPdf } from '../sources/fileKinds';
 import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
+import { Minimap, Rulers, ThemeColors } from './boardChrome';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
 
@@ -96,8 +97,6 @@ const GUIDE_SNAP_PX = 6;
 const MIN_SIZE_MM = 5;
 // How much of a dropped module must stay on its page so it can still be seen and grabbed.
 const MIN_VISIBLE_MM = 10;
-/** Image files Patchwork can place (what Chromium decodes). */
-const IMAGE_EXT = /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 
 /** Pages within this fraction of a viewport outside the visible area count as visible (pre-mount). */
 const CULL_MARGIN = 0.5;
@@ -114,7 +113,8 @@ export class BoardViewport implements BoardSurface {
 	private layer: HTMLElement;
 	private selectionBox: HTMLElement;
 	private guideLayer: HTMLElement;
-	private rulers: { top: HTMLCanvasElement; left: HTMLCanvasElement };
+	private colors: ThemeColors;
+	private rulers: Rulers;
 	private zoomLabel!: HTMLElement;
 	private toolbar!: HTMLElement;
 	private pages = new Map<string, PageElement>();
@@ -130,9 +130,7 @@ export class BoardViewport implements BoardSurface {
 	 */
 	private labelLayer: HTMLElement;
 	private labels = new Map<string, HTMLElement>();
-	private minimap: HTMLCanvasElement;
-	/** Board area the minimap shows, and its scale, from the last draw (for click-to-pan). */
-	private minimapFrame: { x: number; y: number; k: number } | null = null;
+	private minimap: Minimap;
 	/** Panels (inspector, outline) listen here; the store has its own subscription for content. */
 	private selectionListeners = new Set<(sel: Selection) => void>();
 	private drag: Drag | null = null;
@@ -167,20 +165,10 @@ export class BoardViewport implements BoardSurface {
 			replaceSource: (pageId, moduleId) => this.replaceSource(pageId, moduleId),
 		});
 		this.cleanups.push(() => this.modules.destroy());
-		this.rulers = {
-			top: container.createEl('canvas', { cls: 'pw-ruler pw-ruler-top' }),
-			left: container.createEl('canvas', { cls: 'pw-ruler pw-ruler-left' }),
-		};
-		const corner = container.createDiv({ cls: 'pw-ruler-corner' });
-		this.minimap = container.createEl('canvas', { cls: 'pw-minimap' });
-		this.minimap.toggleClass('is-hidden', !(services.ui?.minimap() ?? true));
-		this.bindMinimap();
-		this.cleanups.push(() => {
-			this.rulers.top.remove();
-			this.rulers.left.remove();
-			corner.remove();
-			this.minimap.remove();
-		});
+		this.colors = new ThemeColors(this.root);
+		this.rulers = new Rulers(container, this.root, this.colors);
+		this.minimap = new Minimap(container, this.root, this.colors, services.ui?.minimap() ?? true, (p) => this.setCamera(cameraCentredOn(p, this.camera.zoom, this.viewportSize())));
+		this.cleanups.push(() => this.rulers.destroy(), () => this.minimap.destroy());
 		this.buildToolbar(container);
 		this.contextBar = new ContextBar(this, container, ALIGN_ACTIONS);
 		this.popover = new PropertiesPopover(this, container, view.app);
@@ -270,11 +258,9 @@ export class BoardViewport implements BoardSurface {
 
 	/** The selection's rect on the board (mm), and whether it can be resized. */
 	private selectedRect(): { rect: Rect; locked: boolean } | null {
-		const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
-		if (!page) return null;
-		if (!this.selection?.moduleId) return { rect: page, locked: false };
-		const m = page.modules.find((x) => x.id === this.selection?.moduleId);
-		return m ? { rect: { x: page.x + m.x, y: page.y + m.y, w: m.w, h: m.h }, locked: !!m.locked } : null;
+		const sel = this.selection;
+		const rect = sel && this.itemRect(sel);
+		return rect ? { rect, locked: !!findModule(this.store.file, sel.pageId, sel.moduleId)?.locked } : null;
 	}
 
 	private renderSelectionBox() {
@@ -376,7 +362,7 @@ export class BoardViewport implements BoardSurface {
 
 	/** Open the source of a note module in a pane, at its section. */
 	openNote(pageId: string, moduleId: string) {
-		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		const m = findModule(this.store.file, pageId, moduleId);
 		if (m?.type !== 'note') return;
 		const note = m as NoteModule;
 		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
@@ -437,7 +423,6 @@ export class BoardViewport implements BoardSurface {
 		for (const l of this.selectionListeners) l(this.selection);
 	}
 
-	/** Centre the camera on the selection, keeping the zoom unless it would not fit. */
 	/** Fit the selection (a page, modules, several pages) in the view; with nothing selected, everything. */
 	zoomToSelection() {
 		const rects = this.items.flatMap((it) => this.itemRect(it) ?? []);
@@ -532,7 +517,7 @@ export class BoardViewport implements BoardSurface {
 
 	/** Point a module at another file, e.g. after its note, PDF or image was deleted (SPEC 5.3). */
 	replaceSource(pageId: string, moduleId: string) {
-		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		const m = findModule(this.store.file, pageId, moduleId);
 		if (!m || this.store.readOnly) return;
 		const app = this.view.app;
 		const set = (patch: (x: AnyModule) => AnyModule) => this.store.update((f) => mapModule(f, pageId, moduleId, patch));
@@ -549,12 +534,10 @@ export class BoardViewport implements BoardSurface {
 				).open(),
 			).open();
 		} else if (m.type === 'image') {
-			const images = app.vault.getFiles().filter((f) => IMAGE_EXT.test(f.extension));
-			new FilePickerModal(app, images, 'Image to show', (file) => set((x) => ({ ...x, file: file.path }))).open();
+			new FilePickerModal(app, app.vault.getFiles().filter(isImage), 'Image to show', (file) => set((x) => ({ ...x, file: file.path }))).open();
 		} else if (m.type === 'pdf') {
-			const pdfs = app.vault.getFiles().filter((f) => f.extension.toLowerCase() === 'pdf');
 			// A different file: page and crop are kept, and the crop editor opens to check them.
-			new FilePickerModal(app, pdfs, 'PDF to show', (file) => {
+			new FilePickerModal(app, app.vault.getFiles().filter(isPdf), 'PDF to show', (file) => {
 				set((x) => {
 					const next = { ...x, file: file.path } as PdfModule;
 					delete next.sourceId;
@@ -588,8 +571,7 @@ export class BoardViewport implements BoardSurface {
 		menu.addItem((i) => i.setTitle('Counter').setIcon('plus-minus').onClick(() => this.addTracker('counter')));
 		menu.addItem((i) => i.setTitle('Boxes').setIcon('square').onClick(() => this.addTracker('boxes')));
 		menu.addItem((i) => i.setTitle('Checklist').setIcon('list-checks').onClick(() => this.addTracker('checklist')));
-		if (e) menu.showAtMouseEvent(e);
-		else menu.showAtPosition({ x: this.root.getBoundingClientRect().left + 80, y: this.root.getBoundingClientRect().top + 80 });
+		this.showMenuAt(menu, e);
 	}
 
 	/** Table of contents (M4): fills the page inside its margins; lists named pages live. */
@@ -600,25 +582,20 @@ export class BoardViewport implements BoardSurface {
 
 	pickImage() {
 		const app = this.view.app;
-		const images = app.vault.getFiles().filter((f) => IMAGE_EXT.test(f.extension));
-		new FilePickerModal(app, images, 'Image to add', (file) => {
-			const img = new Image();
-			const place = (aspect: number) =>
+		new FilePickerModal(app, app.vault.getFiles().filter(isImage), 'Image to add', (file) =>
+			void imageAspect(app, file).then((aspect) =>
 				this.placeModule((page, id): ImageModule => {
 					const r = defaultModuleRect(page, { w: 80, h: 60 });
 					return { id, type: 'image', ...r, h: Math.max(5, Math.min(r.h * 2, r.w / aspect)), file: file.path };
-				});
-			img.onload = () => place(img.naturalWidth / Math.max(1, img.naturalHeight));
-			img.onerror = () => place(4 / 3);
-			img.src = app.vault.getResourcePath(file);
-		}).open();
+				}),
+			),
+		).open();
 	}
 
 	pickPdf() {
 		const app = this.view.app;
 		const { pdfDocs } = this.services;
-		const pdfs = app.vault.getFiles().filter((f) => f.extension.toLowerCase() === 'pdf');
-		new FilePickerModal(app, pdfs, 'PDF to add', (file: TFile) =>
+		new FilePickerModal(app, app.vault.getFiles().filter(isPdf), 'PDF to add', (file: TFile) =>
 			new CropModal(app, pdfDocs, file.path, { page: 1 }, (r) =>
 				this.placeModule((page, id): PdfModule => {
 					const rect = defaultModuleRect(page);
@@ -656,7 +633,7 @@ export class BoardViewport implements BoardSurface {
 		if (this.store.readOnly) return;
 		const file = this.store.file;
 		const info = flowChains(file).get(moduleId);
-		const start = file.pages.find((p) => p.id === pageId)?.modules.find((m) => m.id === moduleId);
+		const start = findModule(file, pageId, moduleId);
 		if (!start || !['note', 'text', 'frame'].includes(start.type)) return;
 		if (info && !info.ok) return void new Notice(info.reason);
 		const last = info?.ok ? info.chain[info.chain.length - 1]! : { pageId, module: start };
@@ -689,7 +666,7 @@ export class BoardViewport implements BoardSurface {
 
 	/** Freeze a note module (M4): store what it shows now, so later edits to the note don't change it. */
 	async freezeNote(pageId: string, moduleId: string) {
-		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		const m = findModule(this.store.file, pageId, moduleId);
 		if (m?.type !== 'note' || this.store.readOnly) return;
 		const content = await loadNoteContent(this.view.app, m as NoteModule);
 		if (!content.ok) return void new Notice(`Can't freeze: ${content.reason}`);
@@ -708,7 +685,7 @@ export class BoardViewport implements BoardSurface {
 
 	/** Record the PDF's current version on a crop, clearing its "PDF changed" warning. */
 	async markPdfChecked(pageId: string, moduleId: string) {
-		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		const m = findModule(this.store.file, pageId, moduleId);
 		if (m?.type !== 'pdf' || this.store.readOnly) return;
 		const { pdfDocs } = this.services;
 		const doc = await pdfDocs.acquire(m.file as string);
@@ -767,12 +744,13 @@ export class BoardViewport implements BoardSurface {
 		this.zoomToFit();
 	}
 
-	/** One-way, lossy export to a .canvas next to the board (SPEC 9.3). */
+	/** The export entries, shared by the toolbar's Export menu and the view's own menu. */
 	addViewMenuItems(menu: Menu) {
 		menu.addItem((i) => i.setTitle('Export as PDF or PNG…').setIcon('file-output').onClick(() => this.showExport()));
 		menu.addItem((i) => i.setTitle('Export to canvas').setIcon('layout-dashboard').onClick(() => void this.exportCanvas()));
 	}
 
+	/** One-way, lossy export to a .canvas next to the board (SPEC 9.3). */
 	async exportCanvas() {
 		const file = this.view.file;
 		if (!file) return;
@@ -813,7 +791,7 @@ export class BoardViewport implements BoardSurface {
 			);
 			const written: TFile[] = [];
 			if (choices.format === 'pdf') written.push(await writeBinary(app, `${choices.base}.pdf`, result.bytes));
-			else for (const png of await pdfToPngs(result.bytes, choices.dpi, (msg) => notice.setMessage(msg))) written.push(await writeBinary(app, `${choices.base}${png.suffix}.png`, png.bytes));
+			else for await (const png of pdfToPngs(result.bytes, choices.dpi, (msg) => notice.setMessage(msg))) written.push(await writeBinary(app, `${choices.base}${png.suffix}.png`, png.bytes));
 			notice.hide();
 			const what = written.length === 1 ? written[0]!.path : `${written.length} files (${written[0]!.path}, …)`;
 			new Notice(`Exported ${result.pageCount} page(s) to ${what}.`);
@@ -928,80 +906,17 @@ export class BoardViewport implements BoardSurface {
 		this.root.style.backgroundPosition = `${this.camera.tx}px ${this.camera.ty}px`;
 	}
 
-	private rulerColors: { bg: string; fg: string; accent: string } | null = null;
-
-	private readRulerColors() {
-		const style = getComputedStyle(this.root);
-		return { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted'), accent: style.getPropertyValue('--interactive-accent') };
-	}
-
 	/** Theme or CSS snippets changed: re-read colours that are cached for per-frame drawing. */
 	themeChanged() {
-		this.rulerColors = null;
+		this.colors.reset();
 		this.renderRulers();
+		this.renderMinimap();
 	}
 
 	/** Rulers in the display unit, measured from the selected page's top-left corner (else the board origin). */
 	private renderRulers() {
 		const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
-		const origin = page ? { x: page.x, y: page.y } : { x: 0, y: 0 };
-		const unit = this.store.file.board.displayUnit;
-		const k = PX_PER_MM * this.camera.zoom;
-		// Rulers redraw on every camera frame: reading styles here would restyle the board each frame
-		// (perf probe: 7 → 33 ms frames), so colours are cached and refreshed with the theme.
-		const colors = (this.rulerColors ??= this.readRulerColors());
-		const draw = (canvas: HTMLCanvasElement, horizontal: boolean) => {
-			const dpr = this.root.win.devicePixelRatio || 1;
-			const thick = 20;
-			// Rulers start `thick` px into the board (past the corner square).
-			const len = (horizontal ? this.root.clientWidth : this.root.clientHeight) - thick;
-			const w = Math.max(1, Math.round((horizontal ? len : thick) * dpr));
-			const h = Math.max(1, Math.round((horizontal ? thick : len) * dpr));
-			// Resizing reallocates the canvas; only do it when the size really changed.
-			if (canvas.width !== w || canvas.height !== h) {
-				canvas.width = w;
-				canvas.height = h;
-			}
-			const c = canvas.getContext('2d');
-			if (!c) return;
-			c.setTransform(dpr, 0, 0, dpr, 0, 0);
-			c.fillStyle = colors.bg;
-			c.fillRect(0, 0, horizontal ? len : thick, horizontal ? thick : len);
-			const t = horizontal ? this.camera.tx : this.camera.ty;
-			const o = horizontal ? origin.x : origin.y;
-			const ticks = rulerTicks((thick - t) / k, (thick + len - t) / k, o, k, unit);
-			const at = (mm: number) => Math.round(mm * k + t - thick) + 0.5;
-			c.strokeStyle = colors.fg;
-			c.fillStyle = colors.fg;
-			c.lineWidth = 1;
-			c.font = '9px var(--font-interface, sans-serif)';
-			const tick = (p: number, size: number) => {
-				if (horizontal) {
-					c.moveTo(p, thick - size);
-					c.lineTo(p, thick);
-				} else {
-					c.moveTo(thick - size, p);
-					c.lineTo(thick, p);
-				}
-			};
-			c.beginPath();
-			for (const mm of ticks.minor) tick(at(mm), 4);
-			for (const { mm } of ticks.major) tick(at(mm), 10);
-			c.stroke();
-			for (const { mm, label } of ticks.major) {
-				const p = at(mm);
-				if (horizontal) c.fillText(label, p + 2, 9);
-				else {
-					c.save();
-					c.translate(9, p + 2);
-					c.rotate(Math.PI / 2);
-					c.fillText(label, 0, 0);
-					c.restore();
-				}
-			}
-		};
-		draw(this.rulers.top, true);
-		draw(this.rulers.left, false);
+		this.rulers.draw(this.camera, page ?? { x: 0, y: 0 }, this.store.file.board.displayUnit);
 	}
 
 	// ---------- saved views (SPEC 4 M3) ----------
@@ -1049,57 +964,13 @@ export class BoardViewport implements BoardSurface {
 	// ---------- minimap (SPEC 5.1, M3) ----------
 
 	toggleMinimap() {
-		const show = this.minimap.hasClass('is-hidden');
-		this.minimap.toggleClass('is-hidden', !show);
-		this.services.ui?.setMinimap(show);
+		this.minimap.shown = !this.minimap.shown;
+		this.services.ui?.setMinimap(this.minimap.shown);
 		this.renderMinimap();
 	}
 
-	/** All pages, scaled to fit, plus the visible area. Cheap enough to redraw every camera frame. */
 	private renderMinimap() {
-		if (this.minimap.hasClass('is-hidden')) return;
-		const pages = this.store.file.pages;
-		const vp = this.viewportSize();
-		const area = visibleRect(this.camera, vp);
-		const all = bounds([...pages, area]);
-		const W = 180, H = 120, pad = 6;
-		const dpr = this.root.win.devicePixelRatio || 1;
-		if (this.minimap.width !== W * dpr) {
-			this.minimap.width = W * dpr;
-			this.minimap.height = H * dpr;
-		}
-		const c = this.minimap.getContext('2d');
-		if (!c || !all) return;
-		c.setTransform(dpr, 0, 0, dpr, 0, 0);
-		const colors = (this.rulerColors ??= this.readRulerColors());
-		c.fillStyle = colors.bg;
-		c.fillRect(0, 0, W, H);
-		const k = Math.min((W - 2 * pad) / all.w, (H - 2 * pad) / all.h);
-		const ox = pad + ((W - 2 * pad) - all.w * k) / 2 - all.x * k;
-		const oy = pad + ((H - 2 * pad) - all.h * k) / 2 - all.y * k;
-		this.minimapFrame = { x: ox, y: oy, k };
-		c.fillStyle = '#ffffff';
-		for (const p of pages) c.fillRect(ox + p.x * k, oy + p.y * k, Math.max(1, p.w * k), Math.max(1, p.h * k));
-		c.strokeStyle = colors.accent;
-		c.lineWidth = 1.5;
-		c.strokeRect(ox + area.x * k, oy + area.y * k, area.w * k, area.h * k);
-	}
-
-	private bindMinimap() {
-		const centreAt = (e: PointerEvent) => {
-			const f = this.minimapFrame;
-			if (!f) return;
-			const r = this.minimap.getBoundingClientRect();
-			const p = { x: (e.clientX - r.left - f.x) / f.k, y: (e.clientY - r.top - f.y) / f.k };
-			this.setCamera(cameraCentredOn(p, this.camera.zoom, this.viewportSize()));
-		};
-		this.minimap.addEventListener('pointerdown', (e) => {
-			this.minimap.setPointerCapture(e.pointerId);
-			centreAt(e);
-		});
-		this.minimap.addEventListener('pointermove', (e) => {
-			if (this.minimap.hasPointerCapture(e.pointerId)) centreAt(e);
-		});
+		this.minimap.draw(this.store.file.pages, this.camera, this.viewportSize());
 	}
 
 	/** Create, update or remove label elements to match the pages. */
@@ -1207,7 +1078,7 @@ export class BoardViewport implements BoardSurface {
 		if (e.button === 0 && !e.shiftKey && !this.spaceHeld && (e.target as HTMLElement).closest('.pw-interactive')) return;
 		const handle = (e.target as HTMLElement).closest<HTMLElement>('.pw-handle')?.dataset.handle as Handle | undefined;
 		// A handle sitting on a tracker control (content that fills the module) must not swallow the click.
-		const control = handle && e.button === 0 && !e.shiftKey ? document.elementsFromPoint(e.clientX, e.clientY).find((el): el is HTMLElement => el.instanceOf(HTMLElement) && el.classList.contains('pw-interactive')) : undefined;
+		const control = handle && e.button === 0 && !e.shiftKey ? this.root.doc.elementsFromPoint(e.clientX, e.clientY).find((el): el is HTMLElement => el.instanceOf(HTMLElement) && el.classList.contains('pw-interactive')) : undefined;
 		if (control) {
 			control.click();
 			return;
@@ -1457,7 +1328,7 @@ export class BoardViewport implements BoardSurface {
 	private stepSelectedTracker(direction: 1 | -1): boolean {
 		const sel = this.selection;
 		if (!sel?.moduleId || this.items.length !== 1 || this.store.readOnly) return false;
-		const m = this.store.file.pages.find((p) => p.id === sel.pageId)?.modules.find((x) => x.id === sel.moduleId);
+		const m = findModule(this.store.file, sel.pageId, sel.moduleId);
 		const next = m?.type === 'tracker' ? stepByKey(m as TrackerModule, direction) : null;
 		if (!next) return false;
 		this.store.update((f) => mapModule(f, sel.pageId, sel.moduleId!, () => next));
@@ -1511,7 +1382,7 @@ export class BoardViewport implements BoardSurface {
 	/** Lock or unlock every selected module (locked if any is unlocked). */
 	toggleLock() {
 		const mods = this.items.filter((it) => it.moduleId);
-		const anyUnlocked = mods.some((it) => !this.store.file.pages.find((p) => p.id === it.pageId)?.modules.find((m) => m.id === it.moduleId)?.locked);
+		const anyUnlocked = mods.some((it) => !findModule(this.store.file, it.pageId, it.moduleId)?.locked);
 		this.store.update((f) => mods.reduce((acc, it) => mapModule(acc, it.pageId, it.moduleId!, (m) => ({ ...m, locked: anyUnlocked ? true : undefined })), f));
 	}
 
@@ -1552,11 +1423,8 @@ export class BoardViewport implements BoardSurface {
 			this.select({ pageId: page.id, moduleId: id });
 		};
 		if (ext === 'md') return add((id): NoteModule => ({ id, type: 'note', ...place(90, 80), file: file.path }));
-		if (/^(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(ext)) {
-			const img = new Image();
-			img.onload = () => add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, (60 * img.naturalHeight) / img.naturalWidth)), file: file.path }));
-			img.onerror = () => add((id): ImageModule => ({ id, type: 'image', ...place(60, 45), file: file.path }));
-			img.src = this.view.app.vault.getResourcePath(file);
+		if (isImage(file)) {
+			void imageAspect(this.view.app, file).then((aspect) => add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, 60 / aspect)), file: file.path })));
 			return;
 		}
 		if (ext === 'pdf') {
@@ -1574,8 +1442,8 @@ export class BoardViewport implements BoardSurface {
 	/** Double-click: a note module opens its source at that section; a PDF module opens the crop editor (SPEC 5.6). */
 	private onDoubleClick(e: MouseEvent) {
 		// The pointer is captured by the board on press, which retargets the click events to the board itself.
-		const hit = this.hit(e, (document.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement);
-		const m = hit?.moduleId ? this.store.file.pages.find((p) => p.id === hit.pageId)?.modules.find((x) => x.id === hit.moduleId) : undefined;
+		const hit = this.hit(e, (this.root.doc.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement);
+		const m = hit?.moduleId ? findModule(this.store.file, hit.pageId, hit.moduleId) : undefined;
 		if (hit?.moduleId && m?.type === 'pdf') return this.editCrop(hit.pageId, hit.moduleId);
 		if (hit?.moduleId && canEditInline(m)) return this.editInline(hit.pageId, hit.moduleId);
 		// A frame opens the note its chain starts from.
@@ -1594,7 +1462,7 @@ export class BoardViewport implements BoardSurface {
 	private editSelection(): boolean {
 		const sel = this.selection;
 		if (!sel?.moduleId || this.items.length !== 1 || this.store.readOnly) return false;
-		const m = this.store.file.pages.find((p) => p.id === sel.pageId)?.modules.find((x) => x.id === sel.moduleId);
+		const m = findModule(this.store.file, sel.pageId, sel.moduleId);
 		if (!canEditInline(m)) return false;
 		this.editInline(sel.pageId, sel.moduleId);
 		return true;
@@ -1628,7 +1496,7 @@ export class BoardViewport implements BoardSurface {
 		const menu = new Menu();
 		const { pageId, moduleId } = hit;
 		if (moduleId) {
-			const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+			const m = findModule(this.store.file, pageId, moduleId);
 			menu.addItem((i) => i.setTitle('Item settings…').setIcon('sliders-horizontal').onClick(() => this.showProperties('content')));
 			menu.addItem((i) => i.setTitle('Size and position…').setIcon('move-diagonal').onClick(() => this.showProperties('layout')));
 			menu.addItem((i) => i.setTitle('Style…').setIcon('paintbrush').onClick(() => this.showProperties('style')));
@@ -1737,6 +1605,7 @@ export class BoardViewport implements BoardSurface {
 		this.fitToolbar();
 	}
 
+	/** At the click, or near the board's corner for menus opened from a command. */
 	private showMenuAt(menu: Menu, e?: MouseEvent) {
 		if (e) {
 			menu.showAtMouseEvent(e);
@@ -1769,7 +1638,7 @@ export class BoardViewport implements BoardSurface {
 		const menu = new Menu();
 		menu.addItem((i) => i.setTitle('Outline and views').setIcon('list-tree').setChecked(this.outlinePanel.isOpen).onClick(() => this.outlinePanel.toggle()));
 		if (this.services.openPanels) menu.addItem((i) => i.setTitle('Inspector and outline in the sidebar').setIcon('panel-right').onClick(() => this.services.openPanels?.()));
-		menu.addItem((i) => i.setTitle('Minimap').setIcon('map').setChecked(!this.minimap.hasClass('is-hidden')).onClick(() => this.toggleMinimap()));
+		menu.addItem((i) => i.setTitle('Minimap').setIcon('map').setChecked(this.minimap.shown).onClick(() => this.toggleMinimap()));
 		this.showMenuAt(menu, e);
 	}
 
@@ -1779,12 +1648,18 @@ export class BoardViewport implements BoardSurface {
 			menu.addItem((i) => i.setTitle(preset.name).onClick(() => this.addPage(preset)));
 			if (preset.w !== preset.h) menu.addItem((i) => i.setTitle(`${preset.name} landscape`).onClick(() => this.addPage(swapOrientation(preset))));
 		}
-		if (e) menu.showAtMouseEvent(e);
-		else {
-			const r = this.root.getBoundingClientRect();
-			menu.showAtPosition({ x: r.left + 40, y: r.top + 40 });
-		}
+		this.showMenuAt(menu, e);
 	}
+}
+
+/** Width ÷ height of an image file; 4:3 when it cannot be decoded. */
+function imageAspect(app: App, file: TFile): Promise<number> {
+	return new Promise((resolve) => {
+		const img = new Image();
+		img.onload = () => resolve(img.naturalWidth / Math.max(1, img.naturalHeight));
+		img.onerror = () => resolve(4 / 3);
+		img.src = app.vault.getResourcePath(file);
+	});
 }
 
 /** Height that gives `rect` the content's aspect ratio at its current width, kept within `maxH`. */

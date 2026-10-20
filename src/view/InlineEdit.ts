@@ -4,7 +4,8 @@ import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import type { ModuleHost } from '../modules/ModuleHost';
 import { type SectionRange, sliceBounds } from '../sources/noteSlice';
 import type { BoardStore } from '../store/BoardStore';
-import { mapModule } from '../store/pageOps';
+import { findModule, mapModule } from '../store/pageOps';
+import { BOARD_EVENTS, shieldFromBoard } from './shield';
 
 export interface InlineEditDeps {
 	app: App;
@@ -28,7 +29,7 @@ export function canEditInline(m: AnyModule | undefined): boolean {
  * file, only the part the module shows. Escape or clicking away finishes.
  */
 export async function editInline(d: InlineEditDeps, pageId: string, moduleId: string): Promise<boolean> {
-	const m = d.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+	const m = findModule(d.store.file, pageId, moduleId);
 	if (!m || d.store.readOnly) return false;
 	if (m.type === 'text') {
 		const save = (value: string) => d.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, markdown: value })));
@@ -150,8 +151,8 @@ function open(d: InlineEditDeps, moduleId: string, initial: string, save: (value
 		d.done();
 	}
 
-	// The board listens for pointers, wheel and keys on its root: typing here must not delete or move anything.
-	for (const type of ['pointerdown', 'click', 'dblclick', 'contextmenu', 'keyup']) ta.addEventListener(type, (e) => e.stopPropagation());
+	// Typing here must not delete or move anything; wheel and keydown are handled below.
+	shieldFromBoard(ta, ['pointerdown', 'click', 'dblclick', 'contextmenu', 'keyup']);
 	ta.addEventListener('wheel', (e) => {
 		if (!e.ctrlKey && !e.metaKey) e.stopPropagation();
 	});
@@ -184,8 +185,7 @@ function open(d: InlineEditDeps, moduleId: string, initial: string, save: (value
  */
 function createFormatBar(d: InlineEditDeps, ta: HTMLTextAreaElement, moduleEl: HTMLElement) {
 	const bar = d.host.createDiv({ cls: 'pw-format-bar' });
-	// The board listens for pointers, wheel and keys: none of that may reach it from here.
-	for (const type of ['pointerdown', 'click', 'dblclick', 'contextmenu', 'wheel', 'keydown', 'keyup']) bar.addEventListener(type, (e) => e.stopPropagation());
+	shieldFromBoard(bar, [...BOARD_EVENTS, 'click']);
 	bar.addEventListener('mousedown', (e) => e.preventDefault());
 
 	/** Apply a replacement as a normal edit, so the text area's undo history keeps working. */

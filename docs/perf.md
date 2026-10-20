@@ -75,3 +75,11 @@ Each chain is measured by rendering its blocks offscreen at every frame's width.
 ## Zoomed-out previews (M3 leftover, 2026-10-20)
 
 Below 25 % zoom, outline boxes show previews kept from earlier renders (≤ 96 px PNG blob URLs, 32 MB budget; images are decoded from their bytes once). A first version used one `<canvas>` per preview: whole-board panning fell to **p50 24 ms (~40 fps)**, since each canvas gets composited. As `<img>`: **p50 16.7 ms, p95 19.6 ms** on the 100-page stress board, same as before previews.
+
+## Memory review (2026-10-20)
+
+- The render cache (512 MB budget) is emptied 60 s after the last patchwork closes; before, a closed board's crops stayed cached until Obsidian quit.
+- PDF export merges each printed batch into the output as it arrives (pdf-lib copies the objects), so batch bytes are not all held until assembly; PNG export yields one image at a time and writes it before drawing the next; `writeBinary` hands over the buffer instead of copying it.
+- Image previews decode at 96 px with `createImageBitmap` resize options, not at full size; the crop editor frees a superseded page canvas at once.
+- The context bar builds its buttons only while open, so drags no longer rebuild hidden controls on every frame.
+- Stress board after the review: pan **p50 16.6 ms, p95 17.8 ms**, no long tasks.

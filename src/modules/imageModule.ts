@@ -32,7 +32,7 @@ export class ImageModuleRenderer implements ModuleRenderer {
 			.then(() => {
 				const thumbs = this.ctx.thumbs;
 				const key = thumbs && ThumbnailCache.key(this.ctx.app, mod);
-				if (key) void thumbs.storeFile(key, this.ctx.app, file);
+				if (key) void thumbs.storeFile(key, this.ctx.app, file, { w: img.naturalWidth, h: img.naturalHeight });
 			})
 			.catch(() => placeholder(this.el, `Could not load image: ${mod.file}`));
 	}

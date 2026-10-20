@@ -283,7 +283,7 @@ Live updates: listen to `vault.on('modify')`, debounce, and re-render only modul
 Targets (verify with the stress board; adjust if unrealistic):
 - Pan/zoom stays smooth (no dropped-frame stutter) on a board with 100 pages and 300 modules.
 - Opening that board paints visible pages in under 1 second; off-screen pages render lazily.
-- Bitmap memory is capped by a setting (default 512 MB) with LRU eviction. No unbounded growth when scrolling around.
+- Bitmap memory is capped by a setting (default 512 MB) with LRU eviction. No unbounded growth when scrolling around. The cache is emptied a minute after the last patchwork closes.
 
 Strategies:
 1. **Pan/zoom with CSS transform** on a single board layer. Never re-layout on pan.
@@ -477,3 +477,6 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Interface choices that must survive a restart (outline panel open and position, minimap) live in the plugin's saved settings (`data.json` in the vault), not in browser storage: storage belongs to the Obsidian profile, so reopening Obsidian another way started with the panel closed.
 - **v0.10 · 2026-10-20 (interface pass, step 4: words)**
   - "Freeze" is "Freeze text (snapshot)" ("Freeze text" on the context bar); "Source check / Start checking" is "Warn if this PDF changes" (Turn on / Mark as checked); "Linked frame" is "Text frame (continues a note)" in the interface. The file format is unchanged (`frozen`, `sourceId`, type `frame`).
+- **v0.10 · 2026-10-20 (memory review)**
+  - Cached PDF renders are freed a minute after the last open patchwork closes (they used to stay, up to the cache budget, until Obsidian quit).
+  - Export holds less at once: each printed batch is merged and dropped as soon as Chromium returns it, PNG files are written one at a time, and the finished bytes are no longer copied on write. Image previews decode straight to preview size.

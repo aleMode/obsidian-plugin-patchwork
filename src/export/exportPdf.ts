@@ -9,7 +9,7 @@ import { outputPages, resolvePage } from '../model/masters';
 import type { PatchworkFile } from '../model/schema';
 import { formatLength } from '../model/units';
 import { type PdfDocCache, readPdfBytes } from '../sources/pdfSource';
-import { assemble, type PageLink } from './assemble';
+import { appendPrinted, assemble, createPrinted, type PageLink } from './assemble';
 import { printPages } from './printHost';
 
 export interface ExportOptions {
@@ -63,7 +63,7 @@ export async function exportBoardPdf(
 	const vector = new Set(pages.flatMap((p) => [...vectorModules(p, opts.quality, !!opts.inkSaver)]));
 	const title = board.meta?.title ?? boardPath.replace(/^.*\//, '').replace(/\.patchwork$/, '');
 	const furniture = pageFurniture(board, { title, date: opts.date });
-	const printed: Uint8Array[] = [];
+	const printed = await createPrinted();
 	const problems: string[] = [];
 	const links: PageLink[] = [];
 	const indexOf = new Map(pages.map((p, i) => [p.id, i]));
@@ -89,7 +89,7 @@ export async function exportBoardPdf(
 			flow,
 			...(font ? { font } : {}),
 		});
-		printed.push(r.bytes);
+		await appendPrinted(printed, r.bytes);
 		problems.push(...r.problems);
 		// Links to pages outside the exported range are dropped; the entry still shows its number.
 		for (const l of r.links) {

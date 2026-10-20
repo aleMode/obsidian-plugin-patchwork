@@ -117,7 +117,11 @@ export class CropModal extends Modal {
 		} finally {
 			p.cleanup();
 		}
-		if (page !== this.page) return;
+		// Superseded by another page, or the editor closed meanwhile: free the pixels now, not at garbage collection.
+		if (page !== this.page || !this.pdfDoc) {
+			canvas.width = canvas.height = 0;
+			return;
+		}
 		if (this.canvas) this.canvas.width = this.canvas.height = 0;
 		this.canvas?.remove();
 		this.canvas = canvas;

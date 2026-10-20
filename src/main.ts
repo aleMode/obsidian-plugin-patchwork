@@ -10,6 +10,7 @@ import { ThumbnailCache } from './render/thumbnails';
 import { DEFAULT_SETTINGS, type PatchworkSettings, PatchworkSettingTab } from './settings';
 import { onVaultRename } from './sources/linkTracker';
 import { PdfDocCache } from './sources/pdfSource';
+import { isPdf } from './sources/fileKinds';
 import { ActiveBoard } from './view/activeBoard';
 import { BoardViewport } from './view/BoardViewport';
 import { InspectorView, VIEW_TYPE_INSPECTOR } from './view/InspectorView';
@@ -17,12 +18,20 @@ import { OutlineView, VIEW_TYPE_OUTLINE } from './view/OutlineView';
 import { refreshPaperScope, removePaperScope } from './view/paperScope';
 import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from './view/PatchworkView';
 
+/**
+ * How long cached PDF renders outlive the last open patchwork. Reopening one soon after reuses them;
+ * otherwise they would hold up to the whole cache budget (512 MB by default) until Obsidian quits.
+ */
+const IDLE_CACHE_MS = 60_000;
+
 export default class PatchworkPlugin extends Plugin {
 	pdfDocs!: PdfDocCache;
 	bitmaps!: BitmapCache;
 	thumbs = new ThumbnailCache();
 	settings: PatchworkSettings = { ...DEFAULT_SETTINGS };
 	activeBoard = new ActiveBoard();
+	private boards = new Set<BoardViewport>();
+	private idleTimer: number | null = null;
 
 	async onload() {
 		this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<PatchworkSettings> | null) };
@@ -43,7 +52,7 @@ export default class PatchworkPlugin extends Plugin {
 			pdfDocs: this.pdfDocs,
 			bitmaps: this.bitmaps,
 			thumbs: this.thumbs,
-			closed: (b: BoardViewport) => this.activeBoard.closed(b),
+			closed: (b: BoardViewport) => this.boardClosed(b),
 			openPanels: () => void this.openPanels(),
 			overflowMarker: { shown: () => this.settings.showOverflowMarker, set: (show: boolean) => void this.setOverflowMarker(show) },
 			ui: {
@@ -58,6 +67,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.registerView(VIEW_TYPE_BOARD, (leaf) =>
 			new PatchworkView(leaf, (el, store, view) => {
 				const board = new BoardViewport(el, store, view, services);
+				this.boards.add(board);
 				// A freshly loaded board is the one the user is looking at.
 				if (this.app.workspace.getActiveViewOfType(PatchworkView) === view || !this.activeBoard.get()) this.activeBoard.set(board);
 				return board;
@@ -130,11 +140,23 @@ export default class PatchworkPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.idleTimer !== null) window.clearTimeout(this.idleTimer);
 		CropModal.closeAll();
 		removePaperScope();
 		this.pdfDocs.destroyAll();
 		this.bitmaps.clear();
 		this.thumbs.clear();
+	}
+
+	private boardClosed(board: BoardViewport) {
+		this.activeBoard.closed(board);
+		this.boards.delete(board);
+		if (this.boards.size > 0) return;
+		if (this.idleTimer !== null) window.clearTimeout(this.idleTimer);
+		this.idleTimer = window.setTimeout(() => {
+			this.idleTimer = null;
+			if (this.boards.size === 0) this.bitmaps.clear();
+		}, IDLE_CACHE_MS);
 	}
 
 	/** Show the inspector and outline in the right sidebar (creating them once). */
@@ -209,7 +231,7 @@ export default class PatchworkPlugin extends Plugin {
 			images: files.filter((f) => /^(png|jpe?g|webp|gif)$/i.test(f.extension)).slice(0, 50).map((f) => f.path),
 			pdfs: [],
 		};
-		for (const f of files.filter((x) => x.extension.toLowerCase() === 'pdf').slice(0, 10)) {
+		for (const f of files.filter(isPdf).slice(0, 10)) {
 			try {
 				const doc = await this.pdfDocs.acquire(f.path);
 				sources.pdfs.push({ path: f.path, pages: doc.numPages });

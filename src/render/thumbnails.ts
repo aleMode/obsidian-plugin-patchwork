@@ -70,16 +70,27 @@ export class ThumbnailCache {
 		}
 	}
 
-	/** Preview of an image file, decoded from its bytes (drawing the shown <img> would taint the canvas). */
-	async storeFile(key: string, app: App, file: TFile) {
-		if (this.entries.has(key) || this.pending.has(key)) return;
+	/**
+	 * Preview of an image file, decoded from its bytes (drawing the shown <img> would taint the canvas).
+	 * `size` is the image's own size: it is decoded straight to preview size, not to a full-size bitmap
+	 * (a 24-megapixel photo would be ~100 MB for a moment).
+	 */
+	async storeFile(key: string, app: App, file: TFile, size: { w: number; h: number }) {
+		if (this.entries.has(key) || this.pending.has(key) || size.w <= 0 || size.h <= 0) return;
+		const k = Math.min(1, THUMB_PX / Math.max(size.w, size.h));
+		this.pending.add(key);
+		let bitmap: ImageBitmap | null = null;
 		try {
-			const bitmap = await createImageBitmap(new Blob([await app.vault.readBinary(file)]));
-			this.store(key, bitmap, bitmap.width, bitmap.height);
-			bitmap.close();
+			const blob = new Blob([await app.vault.readBinary(file)]);
+			bitmap = await createImageBitmap(blob, { resizeWidth: Math.max(1, Math.round(size.w * k)), resizeHeight: Math.max(1, Math.round(size.h * k)), resizeQuality: 'medium' });
 		} catch {
 			// Formats createImageBitmap can't read (e.g. SVG) just have no preview.
+		} finally {
+			this.pending.delete(key);
 		}
+		if (!bitmap) return;
+		this.store(key, bitmap, bitmap.width, bitmap.height);
+		bitmap.close();
 	}
 
 	/** The preview's URL, for an <img>. */

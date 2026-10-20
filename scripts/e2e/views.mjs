@@ -37,7 +37,7 @@ try {
 
 	// Minimap: click on the far page's spot pans the camera there.
 	await inView("if (view.contentEl.querySelector('.pw-minimap').hasClass('is-hidden')) s.toggleMinimap(); s.zoomToFit(); await new Promise((r) => setTimeout(r, 300));");
-	const mm = await inView("const r = view.contentEl.querySelector('.pw-minimap').getBoundingClientRect(); const f = s.minimapFrame; return { x: r.x, y: r.y, fx: f.x, fy: f.y, k: f.k };");
+	const mm = await inView("const r = view.contentEl.querySelector('.pw-minimap').getBoundingClientRect(); const f = s.minimap.frame; return { x: r.x, y: r.y, fx: f.x, fy: f.y, k: f.k };");
 	const target = { x: mm.x + mm.fx + 2105 * mm.k, y: mm.y + mm.fy + 1648 * mm.k };
 	await cdp.mouse('mousePressed', target.x, target.y);
 	await cdp.mouse('mouseReleased', target.x, target.y);

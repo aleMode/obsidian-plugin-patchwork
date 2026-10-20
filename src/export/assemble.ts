@@ -17,8 +17,23 @@ export interface PageLink {
 	target: number;
 }
 
+/**
+ * The printed pages, merged batch by batch as Chromium prints them (`appendPrinted`). Merging at once
+ * lets each batch's bytes go: holding every batch until the end doubled peak memory on large exports.
+ */
+export function createPrinted(): Promise<PDFDocument> {
+	return PDFDocument.create();
+}
+
+/** Add a printed batch's pages. pdf-lib copies their objects (streams included), so `bytes` can be dropped after. */
+export async function appendPrinted(out: PDFDocument, bytes: Uint8Array) {
+	const batch = await PDFDocument.load(bytes);
+	for (const page of await out.copyPages(batch, batch.getPageIndices())) out.addPage(page);
+}
+
 export interface AssembleInput {
-	printed: Uint8Array[];
+	/** Every printed page, in order (see `appendPrinted`); assembly draws onto it. */
+	printed: PDFDocument;
 	pages: readonly Page[];
 	vector: ReadonlySet<string>;
 	readSource: (path: string) => Promise<Uint8Array>;
@@ -197,11 +212,7 @@ function addPageLabels(doc: PDFDocument, labels: PdfPageLabel[]) {
 }
 
 export async function assemble(input: AssembleInput): Promise<AssembleResult> {
-	const out = await PDFDocument.create();
-	for (const bytes of input.printed) {
-		const batch = await PDFDocument.load(bytes);
-		for (const page of await out.copyPages(batch, batch.getPageIndices())) out.addPage(page);
-	}
+	const out = input.printed;
 	const problems: string[] = [];
 	if (out.getPageCount() !== input.pages.length) {
 		problems.push(`Expected ${input.pages.length} printed pages but got ${out.getPageCount()}; the layout may be off.`);

@@ -1,6 +1,7 @@
 import type { App } from 'obsidian';
 import type { BoardViewport } from './BoardViewport';
 import { PropertiesForm, type PropertiesSection } from './PropertiesForm';
+import { shieldFromBoard } from './shield';
 
 const TABS: Record<'module' | 'page', [PropertiesSection, string][]> = {
 	module: [
@@ -34,16 +35,12 @@ export class PropertiesPopover {
 		this.el = host.createDiv({ cls: 'pw-popover is-hidden' });
 		this.tabsEl = this.el.createDiv({ cls: 'pw-tabs' });
 		this.body = this.el.createDiv({ cls: 'pw-popover-body' });
-		// The board listens for pointers, wheel and keys on its root: none of that may reach it from here.
-		for (const type of ['pointerdown', 'dblclick', 'contextmenu', 'wheel', 'keydown', 'keyup']) {
-			this.el.addEventListener(type, (e) => {
-				if (type === 'keydown' && (e as KeyboardEvent).key === 'Escape') {
-					this.hide();
-					this.board.focusBoard();
-				}
-				e.stopPropagation();
-			});
-		}
+		shieldFromBoard(this.el);
+		this.el.addEventListener('keydown', (e) => {
+			if (e.key !== 'Escape') return;
+			this.hide();
+			this.board.focusBoard();
+		});
 	}
 
 	get isOpen(): boolean {

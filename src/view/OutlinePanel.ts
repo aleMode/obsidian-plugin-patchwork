@@ -1,6 +1,7 @@
 import { type App, setIcon } from 'obsidian';
 import type { BoardViewport } from './BoardViewport';
 import { OutlineRenderer } from './OutlineRenderer';
+import { shieldFromBoard } from './shield';
 
 type Pos = { x: number; y: number };
 
@@ -36,8 +37,7 @@ export class OutlinePanel {
 		close.addEventListener('click', () => this.close());
 		this.body = this.el.createDiv({ cls: 'pw-outline-panel-body' });
 		this.outline = new OutlineRenderer(app, this.body, () => this.board);
-		// The board listens for pointers, wheel and keys on its root: none of that may reach it from here.
-		for (const type of ['pointerdown', 'dblclick', 'contextmenu', 'wheel', 'keydown', 'keyup']) this.el.addEventListener(type, (e) => e.stopPropagation());
+		shieldFromBoard(this.el);
 		this.bindDrag(head);
 		head.addEventListener('dblclick', () => {
 			this.pos = null;

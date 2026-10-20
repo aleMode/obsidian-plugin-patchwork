@@ -24,6 +24,11 @@ export function presetById(id: string): PagePreset | undefined {
 	return PAGE_PRESETS.find((p) => p.id === id);
 }
 
+/** The preset a page's size is, in either orientation. */
+export function presetFor(size: { w: number; h: number }): PagePreset | undefined {
+	return PAGE_PRESETS.find((pr) => (pr.w === size.w && pr.h === size.h) || (pr.w === size.h && pr.h === size.w));
+}
+
 export function swapOrientation<T extends { w: number; h: number }>(size: T): T {
 	return { ...size, w: size.h, h: size.w };
 }

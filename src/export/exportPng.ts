@@ -13,11 +13,14 @@ export interface PngFile {
 /**
  * PNG export (SPEC 9.1, Q5): rasterize the final PDF with PDF.js, so PNGs match PDFs exactly.
  * Sheets larger than the tile cap are written as several files (Q11 option a).
+ *
+ * Images are yielded one at a time, so each can be written and dropped before the next is drawn: a
+ * 100-page export at 300 dpi is hundreds of MB of PNGs. PDF.js may take over `pdf`'s buffer (it moves
+ * it to its worker), so the caller must not use `pdf` afterwards.
  */
-export async function pdfToPngs(pdf: Uint8Array, dpi: number, progress: (msg: string) => void): Promise<PngFile[]> {
+export async function* pdfToPngs(pdf: Uint8Array, dpi: number, progress: (msg: string) => void): AsyncGenerator<PngFile> {
 	const lib = (await loadPdfJs()) as PdfJs;
-	const doc = await lib.getDocument({ data: pdf.slice(), ...PDF_DOC_PARAMS }).promise;
-	const out: PngFile[] = [];
+	const doc = await lib.getDocument({ data: pdf, ...PDF_DOC_PARAMS }).promise;
 	const pad = (n: number) => String(n).padStart(String(doc.numPages).length < 2 ? 2 : String(doc.numPages).length, '0');
 	try {
 		for (let i = 1; i <= doc.numPages; i++) {
@@ -41,7 +44,7 @@ export async function pdfToPngs(pdf: Uint8Array, dpi: number, progress: (msg: st
 					canvas.width = canvas.height = 0;
 					if (!blob) throw new Error(`Could not encode image ${i}`);
 					const tile = rows * cols > 1 ? `-r${r + 1}c${c + 1}` : '';
-					out.push({ suffix: doc.numPages > 1 ? `-${pad(i)}${tile}` : tile, bytes: new Uint8Array(await blob.arrayBuffer()) });
+					yield { suffix: doc.numPages > 1 ? `-${pad(i)}${tile}` : tile, bytes: new Uint8Array(await blob.arrayBuffer()) };
 				}
 			}
 			page.cleanup();
@@ -49,5 +52,4 @@ export async function pdfToPngs(pdf: Uint8Array, dpi: number, progress: (msg: st
 	} finally {
 		await doc.destroy();
 	}
-	return out;
 }

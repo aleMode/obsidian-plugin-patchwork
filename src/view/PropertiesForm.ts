@@ -3,7 +3,7 @@ import { pagesUsing } from '../model/masters';
 import { flowChains } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
-import { PAGE_PRESETS, swapOrientation } from '../model/presets';
+import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
 import type { AnyModule, DisplayUnit, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, TextModule, TocModule, TrackerModule } from '../model/schema';
 import { formatLength, formatLengthValue, parseLength } from '../model/units';
 import { MAX_PAGE_SIDE_MM } from '../model/schema';
@@ -11,11 +11,10 @@ import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import { ALIGN_ACTIONS, type BoardViewport } from './BoardViewport';
 import { moduleTitle } from './OutlineRenderer';
-import { insets, PLAIN_NUMBER, uniformInset, withField } from '../ui/formHelpers';
+import { FIT_LABELS, insets, PLAIN_NUMBER, uniformInset, withField, withStyle } from '../ui/formHelpers';
+import { isImage, isPdf } from '../sources/fileKinds';
 
 export type PropertiesSection = 'content' | 'layout' | 'style' | 'furniture' | 'advanced';
-
-const FIT = { contain: 'Contain', cover: 'Cover (crop to fill)', stretch: 'Stretch' };
 
 /** Small form builder on top of Obsidian's Setting, in the board's display unit. */
 class Form {
@@ -86,13 +85,10 @@ class Form {
 }
 
 /**
- * Edits the selection of the active board (SPEC 5.6): the board when nothing is selected, else the
- * page or module. Every field is one coalesced undo step, so typing a number undoes in one go.
- */
-/**
- * Builds the editing forms for the whole patchwork, a page, a module or a group, into any container:
- * the sidebar dock (InspectorView) and the floating properties popover share it. `only` limits a
- * form to one tab's worth of controls.
+ * Builds the editing forms for the whole patchwork, a page, a module or a group (SPEC 5.6) into any
+ * container: the sidebar dock (InspectorView) and the floating properties popover share it. `only`
+ * limits a form to one tab's worth of controls. Every field is one coalesced undo step, so typing a
+ * number undoes in one go.
  */
 export class PropertiesForm {
 	private sections = new Map<PropertiesSection, HTMLElement>();
@@ -135,11 +131,9 @@ export class PropertiesForm {
 		this.makeSections();
 		const file = board.boardStore.file;
 		const form = new Form(() => this.el, file.board.displayUnit, () => board.boardStore.endCoalesce());
-		const readOnly = board.boardStore.readOnly;
-		if (readOnly) this.el.createDiv({ cls: 'pw-panel-empty', text: 'This patchwork is read-only.' });
+		if (board.boardStore.readOnly) return void this.el.createDiv({ cls: 'pw-panel-empty', text: 'This patchwork is read-only.' });
 		const page = file.pages.find((p) => p.id === board.selected?.pageId);
 		const mod = page?.modules.find((m) => m.id === board.selected?.moduleId);
-		if (readOnly) return;
 		if (board.selectedItems.length > 1) this.renderGroup(board);
 		else if (page && mod) this.renderModule(form, board, page, mod);
 		else if (page) this.renderPage(form, board, page);
@@ -208,7 +202,7 @@ export class PropertiesForm {
 		}
 		this.in('content');
 		const landscape = page.w > page.h;
-		const match = PAGE_PRESETS.find((pr) => (landscape ? pr.h === page.w && pr.w === page.h : pr.w === page.w && pr.h === page.h));
+		const match = presetFor(page);
 		const presets: Record<string, string> = { custom: 'Custom' };
 		for (const pr of PAGE_PRESETS) presets[pr.id] = pr.name;
 		form.dropdown('Size preset', presets, match?.id ?? 'custom', (id) => {
@@ -316,8 +310,8 @@ export class PropertiesForm {
 				break;
 			case 'image':
 				form.heading('Image');
-				this.fileRow(m as ImageModule, (f) => /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(f.extension), set);
-				form.dropdown('Fit', FIT, (m as ImageModule).fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
+				this.fileRow(m as ImageModule, isImage, set);
+				form.dropdown('Fit', FIT_LABELS, (m as ImageModule).fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
 				break;
 			case 'frame':
 				this.renderFrame(form, board, page, m);
@@ -414,11 +408,11 @@ export class PropertiesForm {
 
 	private renderPdf(form: Form, board: BoardViewport, page: Page, m: PdfModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
 		form.heading('PDF');
-		this.fileRow(m, (f) => f.extension.toLowerCase() === 'pdf', set);
+		this.fileRow(m, isPdf, set);
 		form.number('Page', m.page, (v) => v !== undefined && Number.isInteger(v) && set('page', (x) => ({ ...x, page: v })), { min: 1 });
 		const crop = m.crop ? m.crop.map((v) => v.toFixed(3)).join(', ') : 'Full page';
 		form.button('Crop', 'Edit crop…', () => board.editCrop(page.id, m.id), crop);
-		form.dropdown('Fit', FIT, m.fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
+		form.dropdown('Fit', FIT_LABELS, m.fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
 		this.in('advanced');
 		form.dropdown('Rotation', { '0': '0°', '90': '90°', '180': '180°', '270': '270°' }, String(m.rotation ?? 0), (v) => set('rotation', (x) => withField(x, 'rotation', v === '0' ? undefined : Number(v))));
 		form.dropdown('In exports', { auto: 'Automatic', vector: 'Vector (sharp)', raster: 'Image (smaller)' }, m.render ?? 'auto', (v) => set('render', (x) => withField(x, 'render', v === 'auto' ? undefined : v)));
@@ -437,11 +431,7 @@ export class PropertiesForm {
 
 	private renderStyle(form: Form, m: AnyModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
 		const s = m.style ?? {};
-		const setStyle = (field: string, key: keyof ModuleStyle & string, value: unknown) =>
-			set(`style.${field}`, (x) => {
-				const style = withField(x.style ?? {}, key, value);
-				return withField(x, 'style', Object.keys(style).length ? style : undefined);
-			});
+		const setStyle = (field: string, key: keyof ModuleStyle & string, value: unknown) => set(`style.${field}`, (x) => withStyle(x, key, value));
 		this.in('style');
 		form.heading('Style');
 		form.length('Padding', s.padding ?? 0, (mm) => setStyle('padding', 'padding', mm > 0 ? mm : undefined), { min: 0 });
