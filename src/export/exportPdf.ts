@@ -2,11 +2,12 @@ import type { App, Component } from 'obsidian';
 import { batches, oversizedPages, vectorModules } from '../model/exportPlan';
 import { pageFurniture, pdfPageLabels } from '../model/numbering';
 import { planSheets, type SheetSetting } from '../model/sheetPlan';
+import { tocEntries } from '../model/toc';
 import { outputPages, resolvePage } from '../model/masters';
 import type { PatchworkFile } from '../model/schema';
 import { formatLength } from '../model/units';
 import { type PdfDocCache, readPdfBytes } from '../sources/pdfSource';
-import { assemble } from './assemble';
+import { assemble, type PageLink } from './assemble';
 import { printPages } from './printHost';
 
 export interface ExportOptions {
@@ -62,6 +63,8 @@ export async function exportBoardPdf(
 	const furniture = pageFurniture(board, { title, date: opts.date });
 	const printed: Uint8Array[] = [];
 	const problems: string[] = [];
+	const links: PageLink[] = [];
+	const indexOf = new Map(pages.map((p, i) => [p.id, i]));
 	const groups = batches(pages, PAGES_PER_BATCH);
 	for (const [i, group] of groups.entries()) {
 		progress(`Rendering pages ${i * PAGES_PER_BATCH + 1}–${i * PAGES_PER_BATCH + group.length} of ${pages.length}…`);
@@ -76,9 +79,15 @@ export async function exportBoardPdf(
 			numberPosition: board.board.numbering.position,
 			inkSaver: !!opts.inkSaver,
 			bleed,
+			tocEntries: (pageId) => tocEntries(board, pageId),
 		});
 		printed.push(r.bytes);
 		problems.push(...r.problems);
+		// Links to pages outside the exported range are dropped; the entry still shows its number.
+		for (const l of r.links) {
+			const target = indexOf.get(l.targetPageId);
+			if (target !== undefined) links.push({ page: i * PAGES_PER_BATCH + l.page, rect: l.rect, target });
+		}
 	}
 
 	progress(vector.size ? `Placing ${vector.size} PDF region(s) as vector…` : 'Assembling…');
@@ -99,6 +108,7 @@ export async function exportBoardPdf(
 			cropMarks: !booklet && !!opts.cropMarks,
 		}),
 		bleed,
+		links,
 		tileLabels: opts.tileLabels,
 		pageNames: pages.map((p) => furniture.get(p.id)?.pageToken ?? ''),
 	});

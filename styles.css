@@ -662,6 +662,41 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	margin-left: var(--size-4-2);
 }
 
+/* ---------- table of contents ---------- */
+
+.pw-toc {
+	padding: 0.5em 0.25em;
+}
+
+.pw-toc-heading {
+	font-size: 1.6em;
+	font-weight: 600;
+	margin-bottom: 0.6em;
+}
+
+.pw-toc-row {
+	display: flex;
+	align-items: baseline;
+	gap: 0.3em;
+	line-height: 1.7;
+}
+
+.pw-toc-leader {
+	flex: 1;
+	border-bottom: 1px dotted currentColor;
+	opacity: 0.5;
+	transform: translateY(-0.25em);
+}
+
+.pw-toc-number {
+	font-variant-numeric: tabular-nums;
+}
+
+.pw-toc-empty {
+	color: var(--text-faint);
+	font-style: italic;
+}
+
 /* ---------- export ---------- */
 
 .pw-print-host {

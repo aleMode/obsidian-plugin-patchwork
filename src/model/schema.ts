@@ -131,7 +131,14 @@ export interface ImageModule extends BaseModule {
 	fit?: Fit;
 }
 
-export type Module = PdfModule | NoteModule | TextModule | ImageModule;
+/** M4: lists the board's named pages with their numbers; entries link to the pages in exports. */
+export interface TocModule extends BaseModule {
+	type: 'toc';
+	/** Heading above the list; absent means "Contents", "" means none. */
+	heading?: string;
+}
+
+export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule;
 
 /**
  * A module whose `type` this version doesn't know (written by a newer plugin, or hand-edited).
@@ -143,7 +150,7 @@ export interface ForeignModule extends BaseModule {
 
 export type AnyModule = Module | ForeignModule;
 
-export const MODULE_TYPES = ['pdf', 'note', 'text', 'image'] as const;
+export const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc'] as const;
 
 export function isKnownModule(m: AnyModule): m is Module {
 	return (MODULE_TYPES as readonly string[]).includes(m.type);

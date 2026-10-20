@@ -171,7 +171,7 @@ export interface Page {
   modules: Module[];                             // draw order = array order unless z set
 }
 
-export type Module = PdfModule | NoteModule | TextModule | ImageModule;
+export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule;
 
 export interface BaseModule {
   id: string; x: number; y: number; w: number; h: number;   // mm, relative to page
@@ -199,6 +199,7 @@ export interface NoteModule extends BaseModule {
 
 export interface TextModule extends BaseModule { type: "text"; markdown: string }
 export interface ImageModule extends BaseModule { type: "image"; file: string; fit?: "contain" | "cover" | "stretch" }
+export interface TocModule extends BaseModule { type: "toc"; heading?: string }   // M4; heading default "Contents", "" = none
 
 export interface ModuleStyle {
   padding?: number; border?: { width: number; color: string; radius?: number };
@@ -414,6 +415,7 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Booklet imposition: pages pad with blanks to a multiple of 4 and are placed two per side of a landscape sheet in saddle-stitch order (native sheet = two pages wide). Pages scale down to fit a half; "scale to fit" also scales them up. No bleed or crop marks in booklets.
   - Bleed is printed by Chromium (each page printed larger, its background and edge-crossing modules extending into it); crop marks, TrimBox and BleedBox are added in the pdf-lib stage. Marks need a 10 mm margin around the bleed: native sheets grow, fixed sheets centre the page. Tiles never get bleed or marks.
   - Master pages are ordinary pages flagged `isMaster` (replacing the planned top-level `masters` list), so they are edited with the normal tools. Pages set `master` to a master's ID and inherit its modules (drawn below their own, not selectable there), header, footer, background and safe area; the page's own values win. Masters are skipped by export, numbering and page ranges, and can't use a master themselves. See `docs/open-questions.md` Q14.
+  - Table of contents is a module (`type: "toc"`), so it can sit on any page with other content. It lists named, exported pages (not masters, not its own page) with their printed numbers, updates live, and its rows become PDF link annotations to the target page's first sheet (mapped through scaling, booklets, bleed and tiles). Links to pages outside an exported range are left out.
   - Fixed: vector PDF regions were missing from any export that re-lays pages onto sheets (tiles, scaled pages); pdf-lib embeds lazily, so the printed pages are flushed first.
 - **v0.6 · 2026-10-20** (M1 complete)
   - Drag from the file explorer reads the `obsidian://open?…&file=…` URIs Obsidian puts on the drag (no internals).

@@ -3,11 +3,19 @@ import { drawOrder, vectorTarget } from '../model/exportPlan';
 import { cropToUserBox, drawPlacement, FULL_PAGE } from '../model/pdfGeometry';
 import type { PdfPageLabel } from '../model/numbering';
 import type { Page, PdfModule } from '../model/schema';
-import type { OutputSheet } from '../model/sheetPlan';
+import { mapToSheets, type OutputSheet } from '../model/sheetPlan';
+import type { Rect } from '../model/geometry';
 import { PT_PER_MM } from '../model/units';
 
 // Stage 2 of export (SPEC 9.1, spike S8): merge the printed batches, draw vector PDF modules clipped
 // to their boxes, and add what Chromium can't (bookmarks, metadata).
+
+/** A clickable area on an exported page (mm, page coordinates) leading to another exported page. */
+export interface PageLink {
+	page: number;
+	rect: Rect;
+	target: number;
+}
 
 export interface AssembleInput {
 	printed: Uint8Array[];
@@ -20,6 +28,7 @@ export interface AssembleInput {
 	sheets?: OutputSheet[];
 	/** Bleed (mm) the printed pages carry around each edge. */
 	bleed?: number;
+	links?: PageLink[];
 	tileLabels?: boolean;
 	/** The printed number or label of each page, for tile page labels ("iii B2"). */
 	pageNames?: string[];
@@ -153,6 +162,27 @@ function isNative(plan: OutputSheet[]): boolean {
 	});
 }
 
+/** Link annotations (table of contents rows) to each target page's first sheet. */
+function addLinks(doc: PDFDocument, plan: OutputSheet[], links: PageLink[], firstSheet: Map<number, number>) {
+	const k = PT_PER_MM;
+	for (const link of links) {
+		const dest = firstSheet.get(link.target);
+		if (dest === undefined) continue;
+		for (const { sheet, rect } of mapToSheets(plan, link.page, link.rect)) {
+			const page = doc.getPage(sheet);
+			const H = page.getHeight();
+			const annot = doc.context.obj({
+				Type: 'Annot',
+				Subtype: 'Link',
+				Rect: [rect.x * k, H - (rect.y + rect.h) * k, (rect.x + rect.w) * k, H - rect.y * k],
+				Border: [0, 0, 0],
+				Dest: [doc.getPage(dest).ref, 'XYZ', null, null, null],
+			} as Parameters<typeof doc.context.obj>[0]);
+			page.node.addAnnot(doc.context.register(annot));
+		}
+	}
+}
+
 /** /PageLabels so viewers show our page numbers (iii, Cover, …) in their page box. */
 function addPageLabels(doc: PDFDocument, labels: PdfPageLabel[]) {
 	const nums: unknown[] = [];
@@ -204,8 +234,9 @@ export async function assemble(input: AssembleInput): Promise<AssembleResult> {
 	const doc = relayout ? await buildSheets(out, relayout, !!input.tileLabels, bleed) : out;
 	// Bookmarks and labels point at each page's first sheet.
 	const firstSheet = new Map<number, number>();
-	const plan = input.sheets ?? input.pages.map((_p, i) => ({ parts: [{ page: i }] }));
+	const plan: OutputSheet[] = input.sheets ?? input.pages.map((p, i) => ({ size: p, parts: [{ page: i, src: { x: 0, y: 0, w: p.w, h: p.h }, dest: { x: 0, y: 0, scale: 1 } }] }));
 	plan.forEach((s, i) => s.parts.forEach((p) => firstSheet.has(p.page) || firstSheet.set(p.page, i)));
+	if (input.links?.length) addLinks(doc, plan, input.links, firstSheet);
 	addOutline(doc, input.pages.flatMap((p, i) => (p.name && firstSheet.has(i) ? [{ title: p.name, pageIndex: firstSheet.get(i)! }] : [])));
 	if (input.pageLabels) addPageLabels(doc, doc === out ? input.pageLabels : sheetLabels(input.sheets!, input.pageLabels, input.pageNames ?? []));
 	doc.setTitle(input.title);

@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 212 checks across 20 suites, all passing; `npm test`: 178 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 220 checks across 21 suites, all passing; `npm test`: 183 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -13,6 +13,11 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Inspector (nothing selected) → **Dark PDFs in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.
 - Select a PDF module → **Invert colours**: for rulebook pages with dark backgrounds. Applies on screen and in exports (such modules export as images).
 - Export dialog → **Ink saver**: PDF regions and images print grayscale and lighter. Notes and text are unchanged.
+
+### Table of contents
+- Command palette → **Patchwork: Add table of contents to page** (on the selected page). It lists every named page with its number, dot leaders in between; unnamed pages, masters and its own page are left out. Rename or reorder pages and it updates.
+- Inspector → Heading: default "Contents", custom, or none.
+- Export and open the PDF: clicking an entry jumps to that page (also on A4 sheets, booklets, with bleed).
 
 ### Master pages
 - Select a page → Inspector → **Master page** on. It gets a dashed outline, its label reads "Master: …", it shows its header/footer templates as typed and "#" for the number, and it disappears from the outline's numbering.

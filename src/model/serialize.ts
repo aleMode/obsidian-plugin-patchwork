@@ -18,6 +18,7 @@ const MODULE_KEYS: Record<string, readonly string[]> = {
 	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow', 'scale'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
+	toc: ['heading'],
 };
 const MODULE_BASE = ['id', 'type', 'x', 'y', 'w', 'h', 'z', 'locked', 'label'];
 

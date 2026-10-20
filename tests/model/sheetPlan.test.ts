@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookletOrder, MARK_MARGIN_MM, parseRange, planSheets } from '../../src/model/sheetPlan';
+import { bookletOrder, mapToSheets, MARK_MARGIN_MM, parseRange, planSheets } from '../../src/model/sheetPlan';
 
 const opts = { sheet: 'A4' as const, orientation: 'auto' as const, overlap: 0, fitSmallPages: false };
 
@@ -95,5 +95,31 @@ describe('parseRange', () => {
 		expect(parseRange('4-2', 5)).toBeNull();
 		expect(parseRange('a', 5)).toBeNull();
 		expect(parseRange('7', 5)).toBeNull();
+	});
+});
+
+describe('mapToSheets', () => {
+	it('native plan: the same rect on the page’s sheet', () => {
+		const plan = planSheets([{ w: 100, h: 100 }, { w: 100, h: 100 }], { ...opts, sheet: 'native' });
+		expect(mapToSheets(plan, 1, { x: 10, y: 20, w: 30, h: 5 })).toEqual([{ sheet: 1, rect: { x: 10, y: 20, w: 30, h: 5 } }]);
+	});
+
+	it('follows scaling, centring and bleed offsets', () => {
+		const [fit] = [planSheets([{ w: 105, h: 148.5 }], { ...opts, fitSmallPages: true })];
+		const [m] = mapToSheets(fit, 0, { x: 0, y: 0, w: 10, h: 10 });
+		expect(m!.rect.w).toBeCloseTo(20);
+		const marked = planSheets([{ w: 100, h: 50 }], { ...opts, sheet: 'native', bleed: 3, cropMarks: true });
+		expect(mapToSheets(marked, 0, { x: 0, y: 0, w: 10, h: 10 })[0]!.rect).toMatchObject({ x: 13, y: 13 });
+	});
+
+	it('split across tiles, clipped to each', () => {
+		const tiles = planSheets([{ w: 400, h: 297 }], opts);
+		const hits = mapToSheets(tiles, 0, { x: 200, y: 10, w: 20, h: 5 });
+		expect(hits.map((h) => [h.sheet, h.rect.x, h.rect.w])).toEqual([[0, 200, 10], [1, 0, 10]]);
+	});
+
+	it('booklet: lands on the right half of its side', () => {
+		const sides = planSheets(Array.from({ length: 4 }, () => ({ w: 148, h: 210 })), { ...opts, layout: 'booklet' });
+		expect(mapToSheets(sides, 0, { x: 0, y: 0, w: 10, h: 10 })).toEqual([{ sheet: 0, rect: { x: 148.75, y: 0, w: 10, h: 10 } }]);
 	});
 });

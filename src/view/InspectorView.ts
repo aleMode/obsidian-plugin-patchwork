@@ -1,7 +1,8 @@
 import { ItemView, setIcon, Setting, TFile, WorkspaceLeaf } from 'obsidian';
 import { pagesUsing } from '../model/masters';
+import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule } from '../model/schema';
+import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule, TocModule } from '../model/schema';
 import { formatLength, parseLength } from '../model/units';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
@@ -356,6 +357,11 @@ export class InspectorView extends ItemView {
 				form.heading('Image');
 				this.fileRow(m as ImageModule, (f) => /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(f.extension), set);
 				form.dropdown('Fit', FIT, (m as ImageModule).fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
+				break;
+			case 'toc':
+				form.heading('Table of contents');
+				this.overrideRow('Heading', (m as TocModule).heading === '' ? 'none' : (m as TocModule).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
+				this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Lists every named page in output order with its number. Entries are links in exported PDFs.' });
 				break;
 		}
 		this.renderStyle(form, m, set);

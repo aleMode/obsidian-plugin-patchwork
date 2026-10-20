@@ -8,6 +8,9 @@ import { ImageModuleRenderer } from '../modules/imageModule';
 import { NoteModuleRenderer, TextModuleRenderer } from '../modules/noteModule';
 import { applyOverflow } from '../modules/overflow';
 import { PdfModuleRenderer } from '../modules/pdfModule';
+import { TocModuleRenderer } from '../modules/tocModule';
+import type { Rect } from '../model/geometry';
+import type { TocEntry } from '../model/toc';
 import { applyModuleStyle } from '../modules/style';
 import { type ModuleContext, type ModuleRenderer, placeholder } from '../modules/types';
 import { printWindowToPdf } from './printAdapter';
@@ -28,11 +31,22 @@ export interface PrintOptions {
 	inkSaver?: boolean;
 	/** Bleed (mm): each sheet is printed this much larger on every side. */
 	bleed?: number;
+	/** Table of contents entries for a page. */
+	tocEntries: (pageId: string) => TocEntry[];
+}
+
+/** A clickable area on a printed page (mm, page coordinates) leading to another page. */
+export interface PrintedLink {
+	/** Index of the page within this batch. */
+	page: number;
+	rect: Rect;
+	targetPageId: string;
 }
 
 export interface PrintResult {
 	bytes: Uint8Array;
 	problems: string[];
+	links: PrintedLink[];
 }
 
 /** Quiet period with no DOM changes before printing; async plugins (Dataview, Mermaid) render late. */
@@ -46,7 +60,7 @@ function pageRules(pages: readonly Page[], bleed: number): string {
 		.join('\n');
 }
 
-function createRenderer(m: AnyModule, body: HTMLElement, ctx: ModuleContext, o: PrintOptions): ModuleRenderer | null {
+function createRenderer(m: AnyModule, body: HTMLElement, ctx: ModuleContext, o: PrintOptions, pageId: string): ModuleRenderer | null {
 	if (!isKnownModule(m)) {
 		placeholder(body, `Unknown module type "${m.type}"`, 'info');
 		return null;
@@ -60,6 +74,8 @@ function createRenderer(m: AnyModule, body: HTMLElement, ctx: ModuleContext, o: 
 			return new ImageModuleRenderer(body, ctx);
 		case 'pdf':
 			return o.vector.has(m.id) ? null : new PdfModuleRenderer(body, ctx, o.dpi / 25.4);
+		case 'toc':
+			return new TocModuleRenderer(body, () => o.tocEntries(pageId));
 	}
 }
 
@@ -77,6 +93,23 @@ async function settle(el: HTMLElement, renderers: ModuleRenderer[]): Promise<boo
 }
 
 const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
+
+const PX_PER_MM_CSS = 96 / 25.4;
+
+/** Table of contents rows, measured on the final layout, so stage 2 can make them links. */
+function findLinks(host: HTMLElement): PrintedLink[] {
+	const links: PrintedLink[] = [];
+	host.querySelectorAll<HTMLElement>('.pw-sheet-page').forEach((pageEl, page) => {
+		const origin = pageEl.getBoundingClientRect();
+		pageEl.querySelectorAll<HTMLElement>('[data-target-page]').forEach((row) => {
+			const r = row.getBoundingClientRect();
+			if (!r.width || !r.height) return;
+			const rect = { x: (r.left - origin.left) / PX_PER_MM_CSS, y: (r.top - origin.top) / PX_PER_MM_CSS, w: r.width / PX_PER_MM_CSS, h: r.height / PX_PER_MM_CSS };
+			links.push({ page, rect, targetPageId: row.dataset.targetPage! });
+		});
+	});
+	return links;
+}
 
 /** Things that would print wrongly, reported to the user instead of silently exported. */
 function findProblems(host: HTMLElement): string[] {
@@ -116,7 +149,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 				mod.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
 				applyModuleStyle(mod, m);
 				const body = mod.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
-				const r = createRenderer(m, body, ctx, o);
+				const r = createRenderer(m, body, ctx, o, page.id);
 				if (!r) return;
 				if (m.type === 'note') notes.push({ el: mod, body, m: m as NoteModule });
 				r.render(m);
@@ -128,7 +161,8 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 		for (const n of notes) applyOverflow(n.el, n.body, n.m.overflow ?? 'clip');
 		const problems = findProblems(host);
 		if (!settled) problems.push('Some content was still changing after 10 s and may be incomplete.');
-		return { bytes: await printWindowToPdf(), problems };
+		const links = findLinks(host);
+		return { bytes: await printWindowToPdf(), problems, links };
 	} finally {
 		renderers.forEach((r) => r.destroy());
 		host.remove();

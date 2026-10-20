@@ -7,6 +7,8 @@ import { NoteModuleRenderer, TextModuleRenderer } from './noteModule';
 import { applyOverflow } from './overflow';
 import { applyModuleStyle } from './style';
 import { PdfModuleRenderer } from './pdfModule';
+import { TocModuleRenderer } from './tocModule';
+import { tocEntries } from '../model/toc';
 import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
 
 /** Fields that change what a module shows. Anything else (position, label, …) is layout only. */
@@ -15,6 +17,7 @@ const CONTENT_KEYS: Record<string, readonly string[]> = {
 	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'invert', 'w', 'h', 'style'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
+	toc: ['heading'],
 };
 
 /**
@@ -136,6 +139,8 @@ export class ModuleHost {
 	private syncPage(page: Page, paper: HTMLElement, live: Set<string>) {
 		// Draw order: by z, then array order (SPEC 6).
 		const order = page.modules.map((m, i) => ({ m, i })).sort((a, b) => (a.m.z ?? 0) - (b.m.z ?? 0) || a.i - b.i);
+		// A table of contents changes with other pages' names and numbers, not just its own fields.
+		const toc = page.modules.some((m) => m.type === 'toc') ? JSON.stringify(tocEntries(this.o.store.file, page.id)) : '';
 		order.forEach(({ m }, rank) => {
 			live.add(m.id);
 			let mounted = this.mounted.get(m.id);
@@ -146,7 +151,7 @@ export class ModuleHost {
 			const isNew = !mounted;
 			if (!mounted) mounted = this.mount(m, page.id, paper);
 			this.layout(mounted, m, rank);
-			const key = contentKey(m);
+			const key = m.type === 'toc' ? contentKey(m) + toc : contentKey(m);
 			mounted.module = m;
 			if (key === mounted.key) return;
 			mounted.key = key;
@@ -179,12 +184,12 @@ export class ModuleHost {
 		// Inherited (master) modules get no IDs, so clicks fall through to the page.
 		const el = isInheritedId(m.id) ? paper.createDiv({ cls: 'pw-module is-inherited' }) : paper.createDiv({ cls: 'pw-module', attr: { 'data-module-id': m.id, 'data-page-id': pageId } });
 		const body = el.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
-		const mounted: Mounted = { pageId, el, body, renderer: this.createRenderer(m, body), key: '', module: m };
+		const mounted: Mounted = { pageId, el, body, renderer: this.createRenderer(m, body, pageId), key: '', module: m };
 		this.mounted.set(m.id, mounted);
 		return mounted;
 	}
 
-	private createRenderer(m: AnyModule, body: HTMLElement): ModuleRenderer | null {
+	private createRenderer(m: AnyModule, body: HTMLElement, pageId: string): ModuleRenderer | null {
 		if (!isKnownModule(m)) {
 			placeholder(body, `Unknown module type "${m.type}" (kept as is)`, 'info');
 			return null;
@@ -198,6 +203,8 @@ export class ModuleHost {
 				return new PdfModuleRenderer(body, this.ctx);
 			case 'image':
 				return new ImageModuleRenderer(body, this.ctx);
+			case 'toc':
+				return new TocModuleRenderer(body, () => tocEntries(this.o.store.file, pageId));
 		}
 	}
 
@@ -244,7 +251,7 @@ export class ModuleHost {
 			const deps = m.renderer?.dependencies();
 			if (!deps || !paths.some((p) => deps.has(p))) continue;
 			m.renderer?.destroy();
-			m.renderer = this.createRenderer(m.module, m.body);
+			m.renderer = this.createRenderer(m.module, m.body, m.pageId);
 			this.renderContent(m);
 		}
 	}

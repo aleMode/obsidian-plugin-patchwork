@@ -137,6 +137,9 @@ function checkModule(m: Json, path: string, is: Issues) {
 			is.required(m, 'file', path, isStr, 'a vault path');
 			is.optional(m, 'fit', path, isFit, '"contain", "cover" or "stretch"');
 			break;
+		case 'toc':
+			is.optional(m, 'heading', path, isStr, 'text');
+			break;
 		default:
 			if (isStr(m.type)) is.warnings.push(`${path}: unknown module type "${m.type}" kept as is`);
 	}

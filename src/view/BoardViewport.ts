@@ -377,6 +377,12 @@ export class BoardViewport implements BoardSurface {
 		this.services.openPanels?.();
 	}
 
+	/** Table of contents (M4): fills the page inside its margins; lists named pages live. */
+	addToc() {
+		this.placeModule((page, id) => ({ id, type: 'toc', ...defaultModuleRect(page, { w: page.w - 40, h: page.h - 40 }), x: 20, y: 20 }));
+		this.services.openPanels?.();
+	}
+
 	pickImage() {
 		const app = this.view.app;
 		const images = app.vault.getFiles().filter((f) => /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(f.extension));

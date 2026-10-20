@@ -133,6 +133,27 @@ function planBooklet(pages: readonly Size[], opts: PlanOptions): OutputSheet[] {
 }
 
 /**
+ * Where a region of a page (mm, page coordinates) ends up on the output sheets: one entry per sheet
+ * showing part of it, clipped to what that sheet shows. Used to place link annotations.
+ */
+export function mapToSheets(plan: readonly OutputSheet[], page: number, r: Rect): { sheet: number; rect: Rect }[] {
+	const out: { sheet: number; rect: Rect }[] = [];
+	plan.forEach((s, sheet) => {
+		for (const part of s.parts) {
+			if (part.page !== page) continue;
+			const x0 = Math.max(r.x, part.src.x);
+			const y0 = Math.max(r.y, part.src.y);
+			const x1 = Math.min(r.x + r.w, part.src.x + part.src.w);
+			const y1 = Math.min(r.y + r.h, part.src.y + part.src.h);
+			if (x1 <= x0 || y1 <= y0) continue;
+			const k = part.dest.scale;
+			out.push({ sheet, rect: { x: part.dest.x + (x0 - part.src.x) * k, y: part.dest.y + (y0 - part.src.y) * k, w: (x1 - x0) * k, h: (y1 - y0) * k } });
+		}
+	});
+	return out;
+}
+
+/**
  * Parse a page range like "1-3, 5, 8-" (1-based, in output order) into sorted 0-based indices.
  * Returns null when the text is invalid or selects nothing.
  */
