@@ -31,15 +31,21 @@ const CACHE_SIZE = 32;
 export class FlowLayout {
 	private cache = new Map<string, Promise<FlowOutcome>>();
 
-	constructor(private app: App, private boardPath: () => string) {}
+	constructor(
+		private app: App,
+		private boardPath: () => string,
+		/** Board font, which changes how much text fits. */
+		private font: () => string | undefined = () => undefined,
+	) {}
 
 	async layout(chain: readonly FlowMember[]): Promise<FlowOutcome> {
 		const content = await this.content(chain[0]!);
 		if ('error' in content) return content;
-		const key = chainSignature(chain) + '\n' + content.markdown;
+		const font = this.font();
+		const key = chainSignature(chain) + '\n' + (font ?? '') + '\n' + content.markdown;
 		let result = this.cache.get(key);
 		if (!result) {
-			result = this.measure(splitBlocks(content.markdown), chain, content.sourcePath);
+			result = this.measure(splitBlocks(content.markdown), chain, content.sourcePath, font);
 			this.cache.set(key, result);
 			if (this.cache.size > CACHE_SIZE) this.cache.delete(this.cache.keys().next().value!);
 		}
@@ -55,8 +61,12 @@ export class FlowLayout {
 		return c.ok ? { markdown: c.markdown, sourcePath: c.file.path } : { error: c.reason };
 	}
 
-	private async measure(blocks: Block[], chain: readonly FlowMember[], sourcePath: string): Promise<FlowResult> {
+	private async measure(blocks: Block[], chain: readonly FlowMember[], sourcePath: string, font: string | undefined): Promise<FlowResult> {
 		const root = activeDocument.body.createDiv({ cls: 'pw-flow-measure pw-paper theme-light' });
+		if (font) {
+			root.addClass('has-board-font');
+			root.setCssProps({ '--pw-font': font });
+		}
 		const component = new Component();
 		component.load();
 		const ranges: [number, number][] = [];

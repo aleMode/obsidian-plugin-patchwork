@@ -1,6 +1,6 @@
 import { TFile } from 'obsidian';
 import type { AnyModule, ImageModule } from '../model/schema';
-import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
+import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder } from './types';
 
 export class ImageModuleRenderer implements ModuleRenderer {
 	private deps = new Set<string>();
@@ -20,7 +20,7 @@ export class ImageModuleRenderer implements ModuleRenderer {
 		const mod = m as ImageModule;
 		this.deps = new Set([mod.file]);
 		const file = this.ctx.app.vault.getAbstractFileByPath(mod.file);
-		if (!(file instanceof TFile)) return placeholder(this.el, `Image not found: ${mod.file}`, 'missing');
+		if (!(file instanceof TFile)) return placeholder(this.el, `Image not found: ${mod.file}`, 'missing', pickAnother(this.ctx, mod.id));
 		this.el.empty();
 		const img = this.el.createEl('img', {
 			cls: `pw-image pw-fit-${mod.fit ?? 'contain'}`,

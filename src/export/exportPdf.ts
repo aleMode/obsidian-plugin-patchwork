@@ -69,7 +69,8 @@ export async function exportBoardPdf(
 	const indexOf = new Map(pages.map((p, i) => [p.id, i]));
 	// Chains span the whole board, also pages outside the exported range.
 	const chains = flowChains(board);
-	const flow = { info: (id: string) => chains.get(id), layout: new FlowLayout(env.app, () => boardPath) };
+	const font = board.board.fontFamily;
+	const flow = { info: (id: string) => chains.get(id), layout: new FlowLayout(env.app, () => boardPath, () => font) };
 	const groups = batches(pages, PAGES_PER_BATCH);
 	for (const [i, group] of groups.entries()) {
 		progress(`Rendering pages ${i * PAGES_PER_BATCH + 1}–${i * PAGES_PER_BATCH + group.length} of ${pages.length}…`);
@@ -86,6 +87,7 @@ export async function exportBoardPdf(
 			bleed,
 			tocEntries: (pageId) => tocEntries(board, pageId),
 			flow,
+			...(font ? { font } : {}),
 		});
 		printed.push(r.bytes);
 		problems.push(...r.problems);

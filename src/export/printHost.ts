@@ -37,6 +37,8 @@ export interface PrintOptions {
 	tocEntries: (pageId: string) => TocEntry[];
 	/** Linked text frames; shared by all batches so each chain is measured once. */
 	flow: FlowContext;
+	/** Board font for notes and text (CSS font-family), if set. */
+	font?: string;
 }
 
 /** A clickable area on a printed page (mm, page coordinates) leading to another page. */
@@ -143,6 +145,10 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
 	// Obsidian's print CSS hides `body > :not(.print)`; its own PDF export uses the same class.
 	const host = doc.body.createDiv({ cls: o.inkSaver ? 'pw-print-host print pw-ink-saver' : 'pw-print-host print' });
+	if (o.font) {
+		host.addClass('has-board-font');
+		host.setCssProps({ '--pw-font': o.font });
+	}
 	doc.body.addClass('pw-printing');
 	const renderers: ModuleRenderer[] = [];
 	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule }[] = [];

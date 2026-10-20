@@ -16,6 +16,8 @@ export interface ModuleContext {
 	resolution?: () => number;
 	/** Linked text frames (M5). */
 	flow?: FlowContext;
+	/** Offer to pick another file for a module whose source is missing (board only, not export). */
+	replaceSource?: (moduleId: string) => void;
 }
 
 /** Draws one module's content into its element. Created when the page becomes visible. */
@@ -29,10 +31,23 @@ export interface ModuleRenderer {
 	destroy(): void;
 }
 
-export function placeholder(el: HTMLElement, message: string, kind: 'missing' | 'error' | 'info' = 'error') {
+export function placeholder(el: HTMLElement, message: string, kind: 'missing' | 'error' | 'info' = 'error', action?: { label: string; run: () => void }) {
 	el.empty();
 	const box = el.createDiv({ cls: `pw-module-placeholder is-${kind}` });
 	box.createDiv({ text: message });
+	if (!action) return;
+	// Module content ignores the pointer on the board; `pw-interactive` lets this one button through.
+	const button = box.createEl('button', { cls: 'pw-interactive pw-placeholder-action', text: action.label });
+	button.addEventListener('click', (e) => {
+		e.stopPropagation();
+		action.run();
+	});
+}
+
+/** "Pick another…" for a missing source, when the context offers it (SPEC 5.3). */
+export function pickAnother(ctx: ModuleContext, moduleId: string): { label: string; run: () => void } | undefined {
+	const replace = ctx.replaceSource;
+	return replace ? { label: 'Pick another…', run: () => replace(moduleId) } : undefined;
 }
 
 /**

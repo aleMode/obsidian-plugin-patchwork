@@ -7,7 +7,7 @@ import { PX_PER_MM } from '../model/units';
 import { BitmapCache, bucketResolution } from '../render/bitmapCache';
 import { pdfChanged } from '../model/freshness';
 import { type PdfDocument, type PdfPage, pdfSourceId } from '../sources/pdfSource';
-import { type ModuleContext, type ModuleRenderer, placeholder, setBadge } from './types';
+import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setBadge } from './types';
 
 /** Never allocate a canvas side beyond this, whatever the module size (memory, spike S4). */
 const MAX_CANVAS_SIDE = 4096;
@@ -58,6 +58,10 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		const gen = ++this.generation;
 		this.deps = new Set([mod.file]);
 		this.stale = false;
+		if (!(this.ctx.app.vault.getAbstractFileByPath(mod.file) instanceof TFile)) {
+			this.clearShown();
+			return placeholder(this.el, `PDF not found: ${mod.file}`, 'missing', pickAnother(this.ctx, mod.id));
+		}
 		this.done = this.load(mod, gen)
 			.then(() => {
 				if (gen === this.generation) setBadge(this.el, this.stale ? 'PDF changed: check this crop' : null, 'warning');

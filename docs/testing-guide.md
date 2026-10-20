@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 247 checks across 24 suites, all passing; `npm test`: 202 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 252 checks across 25 suites, all passing; `npm test`: 202 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -8,6 +8,12 @@ What to try by hand, in the order that gives the most signal. Everything here is
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
 ## New in M5 (latest, M5 complete)
+
+### Small spec items filled in
+- Inspector (nothing selected) → **Font**, e.g. `Georgia, serif`: notes, text and headers on the pages use it, on screen, in exports, and when linked frames measure their text.
+- A module whose note, PDF or image was deleted shows **Pick another…** right on the board. For a PDF, the crop editor opens after picking, to check the crop.
+- Right-click a page → **Zoom to page**; command *Zoom to selection* fits whatever is selected.
+- A page wider or taller than 5080 mm gets a warning in the inspector: export it on a sheet size (tiles).
 
 ### Trackers
 - Toolbar → **Add tracker** (checklist icon) → Counter, Boxes or Checklist. Click − / + on a counter, click boxes (clicking the last filled one empties it), tick checklist items. Every click is one undo step and is saved.

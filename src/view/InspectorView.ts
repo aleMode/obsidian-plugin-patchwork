@@ -6,6 +6,7 @@ import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule, TocModule, TrackerModule } from '../model/schema';
 import { formatLength, parseLength } from '../model/units';
+import { MAX_PAGE_SIDE_MM } from '../model/schema';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import type { ActiveBoard } from './activeBoard';
@@ -210,6 +211,8 @@ export class InspectorView extends ItemView {
 		form.toggle('Snap to grid', file.board.grid.snap, (v) => setBoard('snap', { grid: { ...board.boardStore.file.board.grid, snap: v } }));
 		form.toggle('Show grid', file.board.grid.visible, (v) => setBoard('visible', { grid: { ...board.boardStore.file.board.grid, visible: v } }));
 		form.toggle('Use app theme for pages', file.board.useAppTheme, (v) => setBoard('theme', { useAppTheme: v }), 'Off: pages look like white paper, also in dark mode and in exports.');
+		form.text('Font', file.board.fontFamily, (v) => setBoard('font', withField(file.board, 'fontFamily', v)), 'Theme font');
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'For notes and text on the pages, e.g. "Georgia, serif". Empty: the theme’s font.' });
 		form.toggle('Dark PDFs in dark mode', !!file.board.pdfDarkMode, (v) => setBoard('pdfDark', withField(file.board, 'pdfDarkMode', v ? true : undefined)), 'Viewing only: PDF regions are shown colour-inverted while Obsidian uses a dark theme. Exports are unchanged.');
 		const n = file.board.numbering;
 		const setNum = (field: string, patch: Partial<BoardSettings['numbering']>) => setBoard(`num.${field}`, { numbering: { ...board.boardStore.file.board.numbering, ...patch } });
@@ -252,6 +255,9 @@ export class InspectorView extends ItemView {
 		form.length('Y', page.y, (mm) => setPage('y', (p) => ({ ...p, y: mm })));
 		form.length('Width', page.w, (mm) => setPage('w', (p) => ({ ...p, w: mm })), { min: 5 });
 		form.length('Height', page.h, (mm) => setPage('h', (p) => ({ ...p, h: mm })), { min: 5 });
+		if (Math.max(page.w, page.h) > MAX_PAGE_SIDE_MM) {
+			this.contentEl.createDiv({ cls: 'pw-panel-hint mod-warning', text: `Larger than a PDF page can be (${formatLength(MAX_PAGE_SIDE_MM, board.boardStore.file.board.displayUnit)} per side): export it on a sheet size, which splits it into tiles.` });
+		}
 		const landscape = page.w > page.h;
 		const match = PAGE_PRESETS.find((pr) => (landscape ? pr.h === page.w && pr.w === page.h : pr.w === page.w && pr.h === page.h));
 		const presets: Record<string, string> = { custom: 'Custom' };

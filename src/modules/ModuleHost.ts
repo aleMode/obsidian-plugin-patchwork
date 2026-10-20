@@ -55,6 +55,8 @@ export interface ModuleHostOptions {
 	paperOf: (pageId: string) => HTMLElement | undefined;
 	boardPath: () => string;
 	parent: Component;
+	/** Pick another source file for a module (missing-file placeholders). */
+	replaceSource?: (pageId: string, moduleId: string) => void;
 }
 
 /**
@@ -78,8 +80,14 @@ export class ModuleHost {
 	selectedModules: ReadonlySet<string> = new Set();
 
 	constructor(private o: ModuleHostOptions) {
-		const layout = new FlowLayout(o.ctx.app, o.boardPath);
-		this.ctx = { ...o.ctx, component: this.component, flow: { info: (id) => this.flowInfo().get(id), layout } };
+		const layout = new FlowLayout(o.ctx.app, o.boardPath, () => o.store.file.board.fontFamily);
+		const replace = o.replaceSource;
+		this.ctx = {
+			...o.ctx,
+			component: this.component,
+			flow: { info: (id) => this.flowInfo().get(id), layout },
+			...(replace ? { replaceSource: (id: string) => this.mounted.has(id) && replace(this.mounted.get(id)!.pageId, id) } : {}),
+		};
 		o.parent.addChild(this.component);
 		const { app } = o.ctx;
 		this.component.registerEvent(app.metadataCache.on('changed', (file) => this.sourceChanged(file.path)));

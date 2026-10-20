@@ -71,6 +71,8 @@ const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const GUIDE_SNAP_PX = 6;
 /** Smallest page or module a resize can produce, in mm. */
 const MIN_SIZE_MM = 5;
+/** Image files Patchwork can place (what Chromium decodes). */
+const IMAGE_EXT = /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 
 /** Pages within this fraction of a viewport outside the visible area count as visible (pre-mount). */
 const CULL_MARGIN = 0.5;
@@ -132,6 +134,7 @@ export class BoardViewport implements BoardSurface {
 			paperOf: (id) => this.pages.get(id)?.paper,
 			boardPath: () => view.file?.path ?? '',
 			parent: view,
+			replaceSource: (pageId, moduleId) => this.replaceSource(pageId, moduleId),
 		});
 		this.cleanups.push(() => this.modules.destroy());
 		this.rulers = {
@@ -213,6 +216,8 @@ export class BoardViewport implements BoardSurface {
 		this.syncLabels();
 		this.modules.selectedModules = new Set(this.items.flatMap((it) => (it.moduleId ? [it.moduleId] : [])));
 		this.root.toggleClass('pw-pdf-dark', !!file.board.pdfDarkMode);
+		this.root.toggleClass('has-board-font', !!file.board.fontFamily);
+		this.root.setCssProps({ '--pw-font': file.board.fontFamily ?? '' });
 		this.renderSelectionBox();
 		this.renderGrid();
 		this.renderRulers();
@@ -321,6 +326,12 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** Centre the camera on the selection, keeping the zoom unless it would not fit. */
+	/** Fit the selection (a page, modules, several pages) in the view; with nothing selected, everything. */
+	zoomToSelection() {
+		const rects = this.items.flatMap((it) => this.itemRect(it) ?? []);
+		this.zoomToFit(rects.length ? bounds(rects) ?? undefined : undefined);
+	}
+
 	revealSelection() {
 		const sel = this.selectedRect();
 		const vp = this.viewportSize();
@@ -373,6 +384,41 @@ export class BoardViewport implements BoardSurface {
 		).open();
 	}
 
+	/** Point a module at another file, e.g. after its note, PDF or image was deleted (SPEC 5.3). */
+	replaceSource(pageId: string, moduleId: string) {
+		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		if (!m || this.store.readOnly) return;
+		const app = this.view.app;
+		const set = (patch: (x: AnyModule) => AnyModule) => this.store.update((f) => mapModule(f, pageId, moduleId, patch));
+		if (m.type === 'note') {
+			new FilePickerModal(app, app.vault.getMarkdownFiles(), 'Note to show', (file) =>
+				new SectionPickerModal(app, sectionsOf(app, file), (choice) =>
+					set((x) => {
+						const next = { ...x, file: file.path } as NoteModule;
+						if (choice.subpath) next.subpath = choice.subpath;
+						else delete next.subpath;
+						delete next.lines;
+						return next;
+					}),
+				).open(),
+			).open();
+		} else if (m.type === 'image') {
+			const images = app.vault.getFiles().filter((f) => IMAGE_EXT.test(f.extension));
+			new FilePickerModal(app, images, 'Image to show', (file) => set((x) => ({ ...x, file: file.path }))).open();
+		} else if (m.type === 'pdf') {
+			const pdfs = app.vault.getFiles().filter((f) => f.extension.toLowerCase() === 'pdf');
+			// A different file: page and crop are kept, and the crop editor opens to check them.
+			new FilePickerModal(app, pdfs, 'PDF to show', (file) => {
+				set((x) => {
+					const next = { ...x, file: file.path } as PdfModule;
+					delete next.sourceId;
+					return next;
+				});
+				this.editCrop(pageId, moduleId);
+			}).open();
+		}
+	}
+
 	/** A free markdown box (SPEC 5.3 text module), edited in the inspector. */
 	addText() {
 		this.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '**New text**\n\nEdit me in the inspector.' }));
@@ -408,7 +454,7 @@ export class BoardViewport implements BoardSurface {
 
 	pickImage() {
 		const app = this.view.app;
-		const images = app.vault.getFiles().filter((f) => /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(f.extension));
+		const images = app.vault.getFiles().filter((f) => IMAGE_EXT.test(f.extension));
 		new FilePickerModal(app, images, 'Image to add', (file) => {
 			const img = new Image();
 			const place = (aspect: number) =>
@@ -669,8 +715,8 @@ export class BoardViewport implements BoardSurface {
 		return Math.min(PX_PER_MM * 8, Math.max(PX_PER_MM * 0.25, PX_PER_MM * this.camera.zoom * dpr));
 	}
 
-	zoomToFit() {
-		const b = bounds(this.store.file.pages);
+	zoomToFit(rect?: Rect) {
+		const b = rect ?? bounds(this.store.file.pages);
 		const vp = this.viewportSize();
 		if (!b || vp.w === 0) return;
 		// Keep content clear of the rulers and the floating toolbar along the top.
@@ -1404,6 +1450,7 @@ export class BoardViewport implements BoardSurface {
 			menu.addItem((i) => i.setTitle('Send to back').setIcon('send-to-back').onClick(() => this.store.update((f) => restack(f, pageId, moduleId, 'back'))));
 			menu.addItem((i) => i.setTitle('Delete module').setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
 		} else {
+			menu.addItem((i) => i.setTitle('Zoom to page').setIcon('scan').onClick(() => this.zoomToSelection()));
 			menu.addItem((i) => i.setTitle('Duplicate page').setIcon('copy').onClick(() => this.duplicateSelection()));
 			menu.addItem((i) => i.setTitle('Swap orientation').setIcon('rotate-cw').onClick(() => this.store.update((f) => mapPage(f, pageId, (p) => swapOrientation(p)))));
 			menu.addItem((i) => i.setTitle('Delete page').setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));

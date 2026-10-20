@@ -2,7 +2,7 @@ import { Component, MarkdownRenderer } from 'obsidian';
 import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import { loadNoteContent, noteDependencies } from '../sources/markdownSource';
 import { snapshotChanged } from '../model/freshness';
-import { type ModuleContext, type ModuleRenderer, placeholder, setBadge } from './types';
+import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setBadge } from './types';
 
 /** Renders markdown with Obsidian's renderer; each render gets its own child component for cleanup. */
 abstract class MarkdownModule implements ModuleRenderer {
@@ -75,7 +75,7 @@ export class NoteModuleRenderer extends MarkdownModule {
 		this.done = loadNoteContent(this.ctx.app, note)
 			.then((content) => {
 				if (!this.isCurrent(gen)) return;
-				if (!content.ok) return placeholder(this.el, content.reason, content.missingFile ? 'missing' : 'error');
+				if (!content.ok) return placeholder(this.el, content.reason, content.missingFile ? 'missing' : 'error', pickAnother(this.ctx, note.id));
 				return this.show(content.markdown, content.file.path, gen);
 			})
 			.catch((e: unknown) => {

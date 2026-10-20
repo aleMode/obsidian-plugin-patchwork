@@ -80,6 +80,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('add-tracker', 'Add tracker to page', (v) => v.showTrackerMenu(), true);
 		this.addBoardCommand('continue-frame', 'Continue selected text in a new frame', (v) => v.continueSelectionInFrame(), true);
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
+		this.addBoardCommand('zoom-to-selection', 'Zoom to selection', (v) => v.zoomToSelection());
 		this.addBoardCommand('export', 'Export…', (v) => v.showExport());
 		this.addBoardCommand('board-settings', 'Board settings…', (v) => v.showBoardSettings(), true);
 		this.addBoardCommand('arrange-row', 'Arrange pages in a row', (v) => v.autoArrange('row'), true);

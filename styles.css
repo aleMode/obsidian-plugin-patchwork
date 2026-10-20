@@ -362,6 +362,11 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	padding-left: calc(var(--pw-indent, 0) * 1.2em);
 }
 
+.pw-placeholder-action {
+	margin-top: 2mm;
+	font-size: 8pt;
+}
+
 .pw-module-badge {
 	position: absolute;
 	top: 1mm;
@@ -698,6 +703,15 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 .pw-suggest-detail {
 	color: var(--text-faint);
 	margin-left: var(--size-4-2);
+}
+
+/* Board font (SPEC 5.5): notes, text and furniture on the paper, on screen and in print. Markdown
+   reads --font-text, so that is overridden too. */
+.pw-board.has-board-font .pw-page-paper,
+.pw-print-host.has-board-font .pw-sheet,
+.pw-flow-measure.has-board-font {
+	--font-text: var(--pw-font);
+	font-family: var(--pw-font);
 }
 
 /* ---------- trackers ---------- */
