@@ -149,7 +149,13 @@ export interface TocModule extends BaseModule {
 	heading?: string;
 }
 
-export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule;
+/** M5: a linked text frame; shows what doesn't fit in the module `from` (a note, text or frame). */
+export interface FrameModule extends BaseModule {
+	type: 'frame';
+	from: string;
+}
+
+export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule;
 
 /**
  * A module whose `type` this version doesn't know (written by a newer plugin, or hand-edited).
@@ -161,7 +167,7 @@ export interface ForeignModule extends BaseModule {
 
 export type AnyModule = Module | ForeignModule;
 
-export const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc'] as const;
+export const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame'] as const;
 
 export function isKnownModule(m: AnyModule): m is Module {
 	return (MODULE_TYPES as readonly string[]).includes(m.type);

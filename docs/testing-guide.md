@@ -1,13 +1,21 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 223 checks across 22 suites, all passing; `npm test`: 185 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 235 checks across 23 suites, all passing; `npm test`: 198 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
-## New in M4 (latest, M4 complete)
+## New in M5 (latest)
+
+### Linked text frames
+- Right-click a note or text module → **Continue in a new frame** (or command *Continue selected text in a new frame*). A frame of the same size appears at the same spot on the next page (a new page if needed). Text that doesn't fit the first box continues there, a paragraph/list/table at a time; the last frame gets the red overflow marker if text is still left.
+- Resize either box, edit the text or the note: the split updates. A heading is never stranded at the bottom of a frame.
+- Add more frames from a frame's right-click menu or the inspector (*Add another frame*). Delete a middle frame: the chain closes up. Export: each page prints its share.
+- Worth checking with your real notes: callouts, tables, embeds and images, and how the split looks.
+
+## New in M4 (M4 complete)
 
 ### Dark PDFs, invert, ink saver
 - Inspector (nothing selected) → **Dark PDFs in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.

@@ -2,6 +2,7 @@ import type { App, Component } from 'obsidian';
 import type { AnyModule } from '../model/schema';
 import type { BitmapCache } from '../render/bitmapCache';
 import type { PdfDocCache } from '../sources/pdfSource';
+import type { FlowContext } from './flowLayout';
 
 /** What module renderers need from the plugin. */
 export interface ModuleContext {
@@ -13,6 +14,8 @@ export interface ModuleContext {
 	component: Component;
 	/** Canvas pixels per mm the current zoom needs on screen. Absent when rendering for export. */
 	resolution?: () => number;
+	/** Linked text frames (M5). */
+	flow?: FlowContext;
 }
 
 /** Draws one module's content into its element. Created when the page becomes visible. */

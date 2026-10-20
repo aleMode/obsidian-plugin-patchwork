@@ -51,10 +51,17 @@ export function moveModule(file: PatchworkFile, pageId: string, moduleId: string
 }
 
 export function removeModule(file: PatchworkFile, pageId: string, moduleId: string): PatchworkFile {
-	return mapPage(file, pageId, (p) => {
+	const removed = file.pages.find((p) => p.id === pageId)?.modules.find((m) => m.id === moduleId);
+	const next = mapPage(file, pageId, (p) => {
 		const modules = p.modules.filter((m) => m.id !== moduleId);
 		return modules.length === p.modules.length ? p : { ...p, modules };
 	});
+	// Deleting a linked frame joins its neighbours, so the text keeps flowing (M5).
+	if (removed?.type !== 'frame' || next === file) return next;
+	return {
+		...next,
+		pages: next.pages.map((p) => (p.modules.some((m) => m.from === moduleId) ? { ...p, modules: p.modules.map((m) => (m.from === moduleId ? { ...m, from: removed.from } : m)) } : p)),
+	};
 }
 
 /**

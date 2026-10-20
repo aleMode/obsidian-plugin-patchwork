@@ -25,14 +25,25 @@ abstract class MarkdownModule implements ModuleRenderer {
 
 	/** Render markdown unless a newer render started meanwhile (renders are async). */
 	protected async show(markdown: string, sourcePath: string, generation: number) {
-		if (generation !== this.generation) return;
+		const target = this.begin(generation);
+		if (target) await MarkdownRenderer.render(this.ctx.app, markdown, target, sourcePath, this.child!);
+	}
+
+	/** Render blocks one wrapper each, the same structure FlowLayout measured. */
+	protected async showBlocks(blocks: readonly string[], sourcePath: string, generation: number) {
+		const target = this.begin(generation);
+		if (!target) return;
+		for (const b of blocks) await MarkdownRenderer.render(this.ctx.app, b, target.createDiv({ cls: 'pw-flow-block' }), sourcePath, this.child!);
+	}
+
+	private begin(generation: number): HTMLElement | null {
+		if (generation !== this.generation) return null;
 		this.clearChild();
 		const child = new Component();
 		this.ctx.component.addChild(child);
 		this.child = child;
 		this.el.empty();
-		const target = this.el.createDiv({ cls: 'markdown-rendered pw-markdown' });
-		await MarkdownRenderer.render(this.ctx.app, markdown, target, sourcePath, child);
+		return this.el.createDiv({ cls: 'markdown-rendered pw-markdown' });
 	}
 
 	protected nextGeneration() {
@@ -90,5 +101,34 @@ export class TextModuleRenderer extends MarkdownModule {
 
 	render(m: AnyModule) {
 		this.done = this.show((m as TextModule).markdown, this.boardPath(), this.nextGeneration());
+	}
+}
+
+/**
+ * A member of a linked-frame chain (M5): the head note or text, or a frame continuing it. Shows its
+ * share of the chain's blocks; the last frame is marked when text is left over.
+ */
+export class FlowRenderer extends MarkdownModule {
+	render(m: AnyModule) {
+		const gen = this.nextGeneration();
+		const flow = this.ctx.flow;
+		const info = flow?.info(m.id);
+		if (!flow || !info) return placeholder(this.el, 'This frame isn’t linked to any text.', 'info');
+		if (!info.ok) return placeholder(this.el, info.reason, 'info');
+		const head = info.chain[0]!.module;
+		this.deps = head.type === 'note' ? noteDependencies(this.ctx.app, head.file as string) : new Set();
+		const last = info.index === info.chain.length - 1;
+		this.done = flow.layout
+			.layout(info.chain)
+			.then(async (r) => {
+				if (!this.isCurrent(gen)) return;
+				if ('error' in r) return placeholder(this.el, r.error, 'missing');
+				const [start, end] = r.ranges[info.index]!;
+				await this.showBlocks(r.blocks.slice(start, end).map((b) => b.text), r.sourcePath, gen);
+				if (this.isCurrent(gen)) this.el.parentElement?.toggleClass('is-overflowing', last && r.leftover);
+			})
+			.catch((e: unknown) => {
+				if (this.isCurrent(gen)) placeholder(this.el, `Could not lay out linked text: ${e instanceof Error ? e.message : String(e)}`);
+			});
 	}
 }

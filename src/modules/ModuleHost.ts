@@ -3,7 +3,9 @@ import { isInheritedId, resolvePage } from '../model/masters';
 import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
 import type { BoardStore } from '../store/BoardStore';
 import { ImageModuleRenderer } from './imageModule';
-import { NoteModuleRenderer, TextModuleRenderer } from './noteModule';
+import { FlowRenderer, NoteModuleRenderer, TextModuleRenderer } from './noteModule';
+import { FlowLayout } from './flowLayout';
+import { chainSignature, type FlowInfo, flowChains } from '../model/flow';
 import { applyOverflow } from './overflow';
 import { applyModuleStyle } from './style';
 import { PdfModuleRenderer } from './pdfModule';
@@ -32,6 +34,8 @@ function contentKey(m: AnyModule): string {
 
 interface Mounted {
 	pageId: string;
+	/** Which renderer it has: the module type, or 'flow' for members of a linked-frame chain. */
+	kind: string;
 	el: HTMLElement;
 	body: HTMLElement;
 	/** Watches note content size, so overflow is re-applied when async content (embeds, Dataview) lands. */
@@ -66,10 +70,13 @@ export class ModuleHost {
 	private frame = 0;
 	private component = new Component();
 	private ctx: ModuleContext;
+	/** Linked-frame chains of the current file, recomputed when the file changes. */
+	private chains: { file: unknown; map: Map<string, FlowInfo> } = { file: null, map: new Map() };
 	selectedModules: ReadonlySet<string> = new Set();
 
 	constructor(private o: ModuleHostOptions) {
-		this.ctx = { ...o.ctx, component: this.component };
+		const layout = new FlowLayout(o.ctx.app, o.boardPath);
+		this.ctx = { ...o.ctx, component: this.component, flow: { info: (id) => this.flowInfo().get(id), layout } };
 		o.parent.addChild(this.component);
 		const { app } = o.ctx;
 		this.component.registerEvent(app.metadataCache.on('changed', (file) => this.sourceChanged(file.path)));
@@ -77,6 +84,22 @@ export class ModuleHost {
 		this.component.registerEvent(app.vault.on('rename', (file: TAbstractFile, old: string) => this.sourceChanged(old, file.path)));
 		this.component.registerEvent(app.vault.on('modify', (file) => o.ctx.pdfDocs.invalidate(file.path)));
 		this.component.register(o.ctx.pdfDocs.onInvalidate((path) => this.sourceChanged(path)));
+	}
+
+	private flowInfo(): Map<string, FlowInfo> {
+		const file = this.o.store.file;
+		if (this.chains.file !== file) this.chains = { file, map: flowChains(file) };
+		return this.chains.map;
+	}
+
+	/** Renderer kind and content key; chain members re-render when anything in their chain changes. */
+	private identity(m: AnyModule, toc: string): { kind: string; key: string } {
+		const info = this.flowInfo().get(m.id);
+		if (m.type === 'frame' || info) {
+			const chain = info?.ok ? chainSignature(info.chain) + info.index : JSON.stringify(info ?? null);
+			return { kind: 'flow', key: contentKey(m) + chain };
+		}
+		return { kind: m.type, key: m.type === 'toc' ? contentKey(m) + toc : contentKey(m) };
 	}
 
 	setVisible(visible: readonly string[]) {
@@ -148,10 +171,15 @@ export class ModuleHost {
 				this.unmount(m.id, mounted);
 				mounted = undefined;
 			}
+			const { kind, key } = this.identity(m, toc);
+			if (mounted && mounted.kind !== kind) {
+				// Joined or left a chain: a different renderer draws it now.
+				this.unmount(m.id, mounted);
+				mounted = undefined;
+			}
 			const isNew = !mounted;
-			if (!mounted) mounted = this.mount(m, page.id, paper);
+			if (!mounted) mounted = this.mount(m, page.id, paper, kind);
 			this.layout(mounted, m, rank);
-			const key = m.type === 'toc' ? contentKey(m) + toc : contentKey(m);
 			mounted.module = m;
 			if (key === mounted.key) return;
 			mounted.key = key;
@@ -180,16 +208,17 @@ export class ModuleHost {
 		if (this.queue.length) this.frame = window.requestAnimationFrame(() => this.drain());
 	}
 
-	private mount(m: AnyModule, pageId: string, paper: HTMLElement): Mounted {
+	private mount(m: AnyModule, pageId: string, paper: HTMLElement, kind: string): Mounted {
 		// Inherited (master) modules get no IDs, so clicks fall through to the page.
 		const el = isInheritedId(m.id) ? paper.createDiv({ cls: 'pw-module is-inherited' }) : paper.createDiv({ cls: 'pw-module', attr: { 'data-module-id': m.id, 'data-page-id': pageId } });
 		const body = el.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
-		const mounted: Mounted = { pageId, el, body, renderer: this.createRenderer(m, body, pageId), key: '', module: m };
+		const mounted: Mounted = { pageId, kind, el, body, renderer: this.createRenderer(m, body, pageId, kind), key: '', module: m };
 		this.mounted.set(m.id, mounted);
 		return mounted;
 	}
 
-	private createRenderer(m: AnyModule, body: HTMLElement, pageId: string): ModuleRenderer | null {
+	private createRenderer(m: AnyModule, body: HTMLElement, pageId: string, kind: string): ModuleRenderer | null {
+		if (kind === 'flow') return new FlowRenderer(body, this.ctx);
 		if (!isKnownModule(m)) {
 			placeholder(body, `Unknown module type "${m.type}" (kept as is)`, 'info');
 			return null;
@@ -205,6 +234,8 @@ export class ModuleHost {
 				return new ImageModuleRenderer(body, this.ctx);
 			case 'toc':
 				return new TocModuleRenderer(body, () => tocEntries(this.o.store.file, pageId));
+			case 'frame':
+				return new FlowRenderer(body, this.ctx);
 		}
 	}
 
@@ -214,7 +245,7 @@ export class ModuleHost {
 		mounted.el.toggleClass('is-selected', this.selectedModules.has(m.id));
 		mounted.el.toggleClass('is-locked', !!m.locked);
 		applyModuleStyle(mounted.el, m);
-		if (resized && m.type === 'note') this.updateOverflow({ ...mounted, module: m });
+		if (resized && m.type === 'note' && mounted.kind === 'note') this.updateOverflow({ ...mounted, module: m });
 	}
 
 	private renderContent(mounted: Mounted) {
@@ -223,7 +254,7 @@ export class ModuleHost {
 		} catch (e) {
 			placeholder(mounted.body, `Could not render module: ${e instanceof Error ? e.message : String(e)}`);
 		}
-		if (mounted.module.type === 'note') void mounted.renderer?.rendered().then(() => this.watchOverflow(mounted));
+		if (mounted.kind === 'note') void mounted.renderer?.rendered().then(() => this.watchOverflow(mounted));
 	}
 
 	private watchOverflow(m: Mounted) {
@@ -251,7 +282,7 @@ export class ModuleHost {
 			const deps = m.renderer?.dependencies();
 			if (!deps || !paths.some((p) => deps.has(p))) continue;
 			m.renderer?.destroy();
-			m.renderer = this.createRenderer(m.module, m.body, m.pageId);
+			m.renderer = this.createRenderer(m.module, m.body, m.pageId, m.kind);
 			this.renderContent(m);
 		}
 	}

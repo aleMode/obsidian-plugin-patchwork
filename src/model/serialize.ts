@@ -20,6 +20,7 @@ const MODULE_KEYS: Record<string, readonly string[]> = {
 	text: ['markdown'],
 	image: ['file', 'fit'],
 	toc: ['heading'],
+	frame: ['from'],
 };
 const MODULE_BASE = ['id', 'type', 'x', 'y', 'w', 'h', 'z', 'locked', 'label'];
 

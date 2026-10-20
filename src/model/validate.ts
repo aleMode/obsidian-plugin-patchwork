@@ -142,6 +142,9 @@ function checkModule(m: Json, path: string, is: Issues) {
 		case 'toc':
 			is.optional(m, 'heading', path, isStr, 'text');
 			break;
+		case 'frame':
+			is.required(m, 'from', path, isStr, 'a module ID');
+			break;
 		default:
 			if (isStr(m.type)) is.warnings.push(`${path}: unknown module type "${m.type}" kept as is`);
 	}

@@ -1,5 +1,6 @@
 import { ItemView, setIcon, Setting, TFile, WorkspaceLeaf } from 'obsidian';
 import { pagesUsing } from '../model/masters';
+import { flowChains } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule, TocModule } from '../model/schema';
@@ -358,6 +359,9 @@ export class InspectorView extends ItemView {
 				this.fileRow(m as ImageModule, (f) => /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i.test(f.extension), set);
 				form.dropdown('Fit', FIT, (m as ImageModule).fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
 				break;
+			case 'frame':
+				this.renderFrame(form, board, page, m);
+				break;
 			case 'toc':
 				form.heading('Table of contents');
 				this.overrideRow('Heading', (m as TocModule).heading === '' ? 'none' : (m as TocModule).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
@@ -365,6 +369,15 @@ export class InspectorView extends ItemView {
 				break;
 		}
 		this.renderStyle(form, m, set);
+	}
+
+	/** Linked frame (M5): where it sits in its chain. */
+	private renderFrame(form: Form, board: BoardViewport, page: Page, m: AnyModule) {
+		form.heading('Linked frame');
+		const info = flowChains(board.boardStore.file).get(m.id);
+		const text = !info ? 'Not linked.' : !info.ok ? info.reason : `Frame ${info.index + 1} of ${info.chain.length}, continuing “${moduleTitle(info.chain[0]!.module)}”. Text that doesn't fit in one frame flows into the next, a block at a time.`;
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text });
+		form.button('Continue', 'Add another frame', () => board.continueInFrame(page.id, m.id), 'Placed on the next page, at the same spot.');
 	}
 
 	private fileRow(m: { file: string }, accept: (f: TFile) => boolean, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {

@@ -3,6 +3,8 @@ import { batches, oversizedPages, vectorModules } from '../model/exportPlan';
 import { pageFurniture, pdfPageLabels } from '../model/numbering';
 import { planSheets, type SheetSetting } from '../model/sheetPlan';
 import { tocEntries } from '../model/toc';
+import { flowChains } from '../model/flow';
+import { FlowLayout } from '../modules/flowLayout';
 import { outputPages, resolvePage } from '../model/masters';
 import type { PatchworkFile } from '../model/schema';
 import { formatLength } from '../model/units';
@@ -65,6 +67,9 @@ export async function exportBoardPdf(
 	const problems: string[] = [];
 	const links: PageLink[] = [];
 	const indexOf = new Map(pages.map((p, i) => [p.id, i]));
+	// Chains span the whole board, also pages outside the exported range.
+	const chains = flowChains(board);
+	const flow = { info: (id: string) => chains.get(id), layout: new FlowLayout(env.app, () => boardPath) };
 	const groups = batches(pages, PAGES_PER_BATCH);
 	for (const [i, group] of groups.entries()) {
 		progress(`Rendering pages ${i * PAGES_PER_BATCH + 1}–${i * PAGES_PER_BATCH + group.length} of ${pages.length}…`);
@@ -80,6 +85,7 @@ export async function exportBoardPdf(
 			inkSaver: !!opts.inkSaver,
 			bleed,
 			tocEntries: (pageId) => tocEntries(board, pageId),
+			flow,
 		});
 		printed.push(r.bytes);
 		problems.push(...r.problems);

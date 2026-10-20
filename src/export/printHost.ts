@@ -5,7 +5,8 @@ import type { NumberPosition } from '../model/schema';
 import { renderFurniture } from '../view/furniture';
 import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
 import { ImageModuleRenderer } from '../modules/imageModule';
-import { NoteModuleRenderer, TextModuleRenderer } from '../modules/noteModule';
+import { FlowRenderer, NoteModuleRenderer, TextModuleRenderer } from '../modules/noteModule';
+import type { FlowContext } from '../modules/flowLayout';
 import { applyOverflow } from '../modules/overflow';
 import { PdfModuleRenderer } from '../modules/pdfModule';
 import { TocModuleRenderer } from '../modules/tocModule';
@@ -33,6 +34,8 @@ export interface PrintOptions {
 	bleed?: number;
 	/** Table of contents entries for a page. */
 	tocEntries: (pageId: string) => TocEntry[];
+	/** Linked text frames; shared by all batches so each chain is measured once. */
+	flow: FlowContext;
 }
 
 /** A clickable area on a printed page (mm, page coordinates) leading to another page. */
@@ -61,6 +64,7 @@ function pageRules(pages: readonly Page[], bleed: number): string {
 }
 
 function createRenderer(m: AnyModule, body: HTMLElement, ctx: ModuleContext, o: PrintOptions, pageId: string): ModuleRenderer | null {
+	if (isFlow(m, o)) return new FlowRenderer(body, ctx);
 	if (!isKnownModule(m)) {
 		placeholder(body, `Unknown module type "${m.type}"`, 'info');
 		return null;
@@ -76,8 +80,12 @@ function createRenderer(m: AnyModule, body: HTMLElement, ctx: ModuleContext, o: 
 			return o.vector.has(m.id) ? null : new PdfModuleRenderer(body, ctx, o.dpi / 25.4);
 		case 'toc':
 			return new TocModuleRenderer(body, () => o.tocEntries(pageId));
+		case 'frame':
+			return new FlowRenderer(body, ctx);
 	}
 }
+
+const isFlow = (m: AnyModule, o: PrintOptions) => m.type === 'frame' || !!o.flow.info(m.id);
 
 async function settle(el: HTMLElement, renderers: ModuleRenderer[]): Promise<boolean> {
 	const deadline = Date.now() + SETTLE_TIMEOUT_MS;
@@ -125,7 +133,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	const doc = activeDocument;
 	const component = new Component();
 	o.parent.addChild(component);
-	const ctx: ModuleContext = { ...o.ctx, component };
+	const ctx: ModuleContext = { ...o.ctx, component, flow: o.flow };
 	const sheet = new (doc.defaultView ?? window).CSSStyleSheet();
 	const bleed = o.bleed ?? 0;
 	sheet.replaceSync(pageRules(pages, bleed));
@@ -151,7 +159,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 				const body = mod.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
 				const r = createRenderer(m, body, ctx, o, page.id);
 				if (!r) return;
-				if (m.type === 'note') notes.push({ el: mod, body, m: m as NoteModule });
+				if (m.type === 'note' && !isFlow(m, o)) notes.push({ el: mod, body, m: m as NoteModule });
 				r.render(m);
 				renderers.push(r);
 			});

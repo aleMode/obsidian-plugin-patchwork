@@ -9,7 +9,8 @@ import { bounds, containsPoint, type Handle, inset, intersects, type Point, type
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
+import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
+import { flowChains } from '../model/flow';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
 import { masterPreview, pageFurniture } from '../model/numbering';
@@ -432,6 +433,45 @@ export class BoardViewport implements BoardSurface {
 				}),
 			),
 		).open();
+	}
+
+	/**
+	 * Linked frames (M5): continue the chain this module is in with a new frame of the same size, at
+	 * the same spot on the next page (a new page if this is the last one). One undo step.
+	 */
+	continueInFrame(pageId: string, moduleId: string) {
+		if (this.store.readOnly) return;
+		const file = this.store.file;
+		const info = flowChains(file).get(moduleId);
+		const start = file.pages.find((p) => p.id === pageId)?.modules.find((m) => m.id === moduleId);
+		if (!start || !['note', 'text', 'frame'].includes(start.type)) return;
+		if (info && !info.ok) return void new Notice(info.reason);
+		const last = info?.ok ? info.chain[info.chain.length - 1]! : { pageId, module: start };
+		const pages = outputPages(file);
+		const at = pages.findIndex((p) => p.id === last.pageId);
+		const id = newId(allIds(file));
+		let target = pages[at + 1];
+		this.store.update((f) => {
+			let next = f;
+			if (!target) {
+				const lastPage = f.pages.find((p) => p.id === last.pageId)!;
+				const r = addPage(f, { w: lastPage.w, h: lastPage.h }, `Page ${f.pages.length + 1}`);
+				next = r.file;
+				target = r.page;
+			}
+			const m = last.module;
+			const w = Math.min(m.w, target.w);
+			const h = Math.min(m.h, target.h);
+			const frame: FrameModule = { id, type: 'frame', from: m.id, x: Math.min(m.x, target.w - w), y: Math.min(m.y, target.h - h), w, h, ...(m.style ? { style: m.style } : {}) };
+			return addModule(next, target.id, frame);
+		});
+		if (target) this.select({ pageId: target.id, moduleId: id });
+	}
+
+	continueSelectionInFrame() {
+		const sel = this.selection;
+		if (sel?.moduleId) this.continueInFrame(sel.pageId, sel.moduleId);
+		else new Notice('Select a note, text or frame module first.');
 	}
 
 	/** Freeze a note module (M4): store what it shows now, so later edits to the note don't change it. */
@@ -1296,6 +1336,10 @@ export class BoardViewport implements BoardSurface {
 		if (moduleId) {
 			const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
 			if (m?.type === 'pdf') menu.addItem((i) => i.setTitle('Edit crop…').setIcon('crop').onClick(() => this.editCrop(pageId, moduleId)));
+			if (m?.type === 'text' || m?.type === 'frame') {
+				menu.addItem((i) => i.setTitle('Continue in a new frame').setIcon('link').onClick(() => this.continueInFrame(pageId, moduleId)));
+				menu.addSeparator();
+			}
 			if (m?.type === 'note') {
 				const current = (m as NoteModule).overflow ?? 'clip';
 				const policies = [['clip', 'Overflow: clip'], ['fit', 'Overflow: shrink to fit'], ['grow', 'Overflow: grow']] as const;
@@ -1317,6 +1361,7 @@ export class BoardViewport implements BoardSurface {
 					);
 				}
 				const frozen = !!(m as NoteModule).frozen;
+				menu.addItem((i) => i.setTitle('Continue in a new frame').setIcon('link').onClick(() => this.continueInFrame(pageId, moduleId)));
 				menu.addItem((i) =>
 					i
 						.setTitle(frozen ? 'Unfreeze' : 'Freeze')
