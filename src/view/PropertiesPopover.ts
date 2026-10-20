@@ -69,9 +69,23 @@ export class PropertiesPopover {
 			if (this.el.contains(t) || el?.closest('.pw-context-bar, .menu, .modal-container, .suggestion-container')) return;
 			this.hide();
 		};
+		// Escape closes it too. A key press goes to whatever has the focus (usually the board or a bar button,
+		// not the popover), so listen on the window; an open menu or dialog gets the key first.
+		const win = doc.win;
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key !== 'Escape' || doc.querySelector('.menu, .modal-container')) return;
+			e.preventDefault();
+			e.stopPropagation();
+			this.hide();
+			this.board.focusBoard();
+		};
 		this.offDoc?.();
 		doc.addEventListener('pointerdown', onDown, true);
-		this.offDoc = () => doc.removeEventListener('pointerdown', onDown, true);
+		win.addEventListener('keydown', onKey, true);
+		this.offDoc = () => {
+			doc.removeEventListener('pointerdown', onDown, true);
+			win.removeEventListener('keydown', onKey, true);
+		};
 	}
 
 	hide() {

@@ -65,6 +65,25 @@ try {
 	await ev(`v.store.undo();`);
 	check('the edit is one undo step', await until(async () => (await ev(`return mod('t').markdown`)) === 'hello'));
 
+	// ---- real clicks: inside places the caret, outside ends the edit
+	await ev(`s.editInline('a', 't');`);
+	await until(editing, 15000);
+	await type('first line\nsecond line\nthird line');
+	const box = JSON.parse(await ev(`const ta = document.querySelector('.pw-inline-editor'); const r = ta.getBoundingClientRect(); ta.setSelectionRange(ta.value.length, ta.value.length); return JSON.stringify({ x: r.x, y: r.y, w: r.width, h: r.height, caret: getComputedStyle(ta).caretColor, color: getComputedStyle(ta).color, pe: getComputedStyle(ta).pointerEvents })`));
+	check('the text area takes the pointer and its caret follows the text colour', box.pe === 'auto' && box.caret === box.color, box);
+	await cdp.mouse('mouseMoved', box.x + 6, box.y + 6, { button: 'none' });
+	await cdp.mouse('mousePressed', box.x + 6, box.y + 6);
+	await cdp.mouse('mouseReleased', box.x + 6, box.y + 6);
+	await ev(`${wait(400)}`);
+	check('clicking inside keeps editing and moves the caret', (await editing()) && (await ev(`const ta = document.querySelector('.pw-inline-editor'); return ta.selectionStart < ta.value.length && document.activeElement === ta`)));
+	await cdp.mouse('mouseMoved', box.x + box.w + 70, box.y + box.h + 70, { button: 'none' });
+	await cdp.mouse('mousePressed', box.x + box.w + 70, box.y + box.h + 70);
+	await cdp.mouse('mouseReleased', box.x + box.w + 70, box.y + box.h + 70);
+	check('clicking outside ends editing', await editorGone());
+	await until(async () => (await ev(`return mod('t').markdown`)) === 'first line\nsecond line\nthird line');
+	await ev(`v.store.undo();`);
+	await until(async () => (await ev(`return mod('t').markdown`)) === 'hello');
+
 	// ---- note slice
 	check('note section: a text area opens', await open('n'));
 	check('it holds exactly the shown part', (await ev(`return document.querySelector('.pw-inline-editor').value`)) === 'beta line\ngamma line');

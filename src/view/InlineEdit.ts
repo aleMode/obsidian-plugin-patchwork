@@ -115,9 +115,20 @@ function open(d: InlineEditDeps, moduleId: string, initial: string, save: (value
 	const ta = host.body.createEl('textarea', { cls: 'pw-inline-editor', attr: { spellcheck: 'true', 'aria-label': 'Edit the text' } });
 	ta.value = initial;
 
+	// Obsidian's own hotkey handling sees keys first; Escape is taken at the window so it always ends the edit.
+	const win = ta.win;
+	const onWindowKey = (e: KeyboardEvent) => {
+		if (e.key !== 'Escape' || !ta.isConnected || ta.doc.querySelector('.menu, .modal-container')) return;
+		e.preventDefault();
+		e.stopPropagation();
+		void finish();
+	};
+	win.addEventListener('keydown', onWindowKey, true);
+
 	async function finish() {
 		if (finished) return;
 		finished = true;
+		win.removeEventListener('keydown', onWindowKey, true);
 		const value = ta.value;
 		// Stays visible (read-only) while a note is being saved, so there is no flash of the old text.
 		ta.readOnly = true;

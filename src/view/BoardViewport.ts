@@ -1557,6 +1557,10 @@ export class BoardViewport implements BoardSurface {
 		const { pageId, moduleId } = hit;
 		if (moduleId) {
 			const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+			menu.addItem((i) => i.setTitle('Item settings…').setIcon('sliders-horizontal').onClick(() => this.showProperties('content')));
+			menu.addItem((i) => i.setTitle('Size and position…').setIcon('move-diagonal').onClick(() => this.showProperties('layout')));
+			menu.addItem((i) => i.setTitle('Style…').setIcon('paintbrush').onClick(() => this.showProperties('style')));
+			menu.addSeparator();
 			if (m?.type === 'pdf') menu.addItem((i) => i.setTitle('Edit crop…').setIcon('crop').onClick(() => this.editCrop(pageId, moduleId)));
 			if (m?.type === 'text' || m?.type === 'frame') {
 				menu.addItem((i) => i.setTitle('Continue in a new frame').setIcon('link').onClick(() => this.continueInFrame(pageId, moduleId)));
@@ -1608,6 +1612,10 @@ export class BoardViewport implements BoardSurface {
 			menu.addItem((i) => i.setTitle('Send to back').setIcon('send-to-back').onClick(() => this.store.update((f) => restack(f, pageId, moduleId, 'back'))));
 			menu.addItem((i) => i.setTitle('Delete module').setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
 		} else {
+			menu.addItem((i) => i.setTitle('Page settings…').setIcon('sliders-horizontal').onClick(() => this.showProperties('content')));
+			menu.addItem((i) => i.setTitle('Size and position…').setIcon('move-diagonal').onClick(() => this.showProperties('layout')));
+			menu.addItem((i) => i.setTitle('Page numbers, header and footer…').setIcon('hash').onClick(() => this.showProperties('furniture')));
+			menu.addSeparator();
 			menu.addItem((i) => i.setTitle('Zoom to page').setIcon('scan').onClick(() => this.zoomToSelection()));
 			menu.addItem((i) => i.setTitle('Duplicate page').setIcon('copy').onClick(() => this.duplicateSelection()));
 			menu.addItem((i) => i.setTitle('Swap orientation').setIcon('rotate-cw').onClick(() => this.store.update((f) => mapPage(f, pageId, (p) => swapOrientation(p)))));
@@ -1650,7 +1658,7 @@ export class BoardViewport implements BoardSurface {
 			button('redo-2', 'Redo', () => this.store.redo());
 		}
 		sep();
-		if (!this.store.readOnly) labelled('settings-2', 'Settings', 'Patchwork settings: units, grid, page numbers, appearance', () => this.showSettings());
+		if (!this.store.readOnly) labelled('settings-2', 'Settings', 'Settings for the whole patchwork: units, grid, numbering, appearance. Right-click a page or an item for its own settings.', () => this.showSettings());
 		labelled('file-output', 'Export', 'Export as PDF or PNG, or to a canvas', (e) => this.showExportMenu(e));
 		labelled('layout-panel-left', 'View', 'Outline, inspector and minimap', (e) => this.showViewMenu(e));
 		this.cleanups.push(() => bar.remove());

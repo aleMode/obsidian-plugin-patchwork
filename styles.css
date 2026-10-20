@@ -1285,6 +1285,12 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 }
 
 .pw-module .pw-inline-editor {
+	/* The module body ignores the pointer and the selection (clicks select and drag the module); the editor must not. */
+	pointer-events: auto;
+	user-select: text;
+	cursor: text;
+	/* Obsidian's own caret colour is pale on the white paper. */
+	caret-color: currentColor;
 	position: absolute;
 	inset: 0;
 	width: 100%;
