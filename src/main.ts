@@ -55,7 +55,15 @@ export default class PatchworkPlugin extends Plugin {
 		this.registerExtensions([BOARD_EXTENSION], VIEW_TYPE_BOARD);
 
 		refreshPaperScope();
-		this.registerEvent(this.app.workspace.on('css-change', () => refreshPaperScope()));
+		this.registerEvent(
+			this.app.workspace.on('css-change', () => {
+				refreshPaperScope();
+				for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_BOARD)) {
+					const surface = leaf.view instanceof PatchworkView ? leaf.view.surface : null;
+					if (surface instanceof BoardViewport) surface.themeChanged();
+				}
+			}),
+		);
 
 		this.addCommand({
 			id: 'new-board',

@@ -9,12 +9,12 @@ export class PageElement {
 	readonly el: HTMLElement;
 	/** Paper area modules mount into. Light-scoped unless the board uses the app theme. */
 	readonly paper: HTMLElement;
-	private label: HTMLElement;
+	/** Name and size, shown by the board's label overlay (kept out of the zoomed layer; see BoardViewport). */
+	labelText = '';
 	private page: Page | null = null;
 
 	constructor(parent: HTMLElement) {
 		this.el = parent.createDiv({ cls: 'pw-page' });
-		this.label = this.el.createDiv({ cls: 'pw-page-label' });
 		this.paper = this.el.createDiv({ cls: 'pw-page-paper' });
 	}
 
@@ -32,7 +32,7 @@ export class PageElement {
 		this.paper.toggleClass('has-background', !!page.background);
 		this.paper.setCssProps({ '--pw-page-bg': page.background ?? '' });
 		this.el.toggleClass('is-selected', opts.selected);
-		this.label.setText(`${page.name ?? 'Untitled page'} · ${formatLength(page.w, opts.unit)} × ${formatLength(page.h, opts.unit)}`);
+		this.labelText = `${page.name ?? 'Untitled page'} · ${formatLength(page.w, opts.unit)} × ${formatLength(page.h, opts.unit)}`;
 	}
 
 	/** Dashed margin guide (SPEC 5.2): on the board only, never printed, never constraining modules. */

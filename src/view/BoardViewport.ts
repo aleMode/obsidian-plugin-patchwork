@@ -26,7 +26,7 @@ import { BoardSettingsModal } from '../ui/BoardSettingsModal';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
-import { type Camera, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
+import { boardToScreen, type Camera, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
 
@@ -92,6 +92,13 @@ export class BoardViewport implements BoardSurface {
 	/** Selected items; the last one is the primary (inspector, resize handles, ruler origin). */
 	private items: Item[] = [];
 	private marqueeEl: HTMLElement;
+	/**
+	 * Page labels live in screen space, above the zoomed layer: inside it they needed a huge font
+	 * (to look constant-size when scaled down) that Chromium re-rasterized on every pan frame,
+	 * halving the frame rate on a 100-page board.
+	 */
+	private labelLayer: HTMLElement;
+	private labels = new Map<string, HTMLElement>();
 	/** Panels (inspector, outline) listen here; the store has its own subscription for content. */
 	private selectionListeners = new Set<(sel: Selection) => void>();
 	private drag: Drag | null = null;
@@ -106,6 +113,7 @@ export class BoardViewport implements BoardSurface {
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
+		this.labelLayer = this.root.createDiv({ cls: 'pw-page-labels' });
 		// Above the pages so handles are never clipped by a page edge.
 		this.selectionBox = this.layer.createDiv({ cls: 'pw-selection' });
 		this.guideLayer = this.layer.createDiv({ cls: 'pw-guides' });
@@ -189,6 +197,7 @@ export class BoardViewport implements BoardSurface {
 				this.pages.delete(id);
 			}
 		}
+		this.syncLabels();
 		this.modules.selectedModules = new Set(this.items.flatMap((it) => (it.moduleId ? [it.moduleId] : [])));
 		this.renderSelectionBox();
 		this.renderGrid();
@@ -516,6 +525,7 @@ export class BoardViewport implements BoardSurface {
 		this.zoomLabel.setText(`${Math.round(zoom * 100)}%`);
 		this.renderGrid();
 		this.renderRulers();
+		this.placeLabels();
 		// Switch level of detail right away, so zooming out never mounts content it won't show.
 		this.modules.setDetail(zoom >= DETAIL_ZOOM);
 		this.updateVisibility();
@@ -581,24 +591,43 @@ export class BoardViewport implements BoardSurface {
 		this.root.style.backgroundPosition = `${this.camera.tx}px ${this.camera.ty}px`;
 	}
 
+	private rulerColors: { bg: string; fg: string } | null = null;
+
+	private readRulerColors() {
+		const style = getComputedStyle(this.root);
+		return { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted') };
+	}
+
+	/** Theme or CSS snippets changed: re-read colours that are cached for per-frame drawing. */
+	themeChanged() {
+		this.rulerColors = null;
+		this.renderRulers();
+	}
+
 	/** Rulers in the display unit, measured from the selected page's top-left corner (else the board origin). */
 	private renderRulers() {
 		const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
 		const origin = page ? { x: page.x, y: page.y } : { x: 0, y: 0 };
 		const unit = this.store.file.board.displayUnit;
 		const k = PX_PER_MM * this.camera.zoom;
-		const style = getComputedStyle(this.root);
-		const colors = { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted') };
+		// Rulers redraw on every camera frame: reading styles here would restyle the board each frame
+		// (perf probe: 7 → 33 ms frames), so colours are cached and refreshed with the theme.
+		const colors = (this.rulerColors ??= this.readRulerColors());
 		const draw = (canvas: HTMLCanvasElement, horizontal: boolean) => {
 			const dpr = this.root.win.devicePixelRatio || 1;
 			const thick = 20;
 			// Rulers start `thick` px into the board (past the corner square).
 			const len = (horizontal ? this.root.clientWidth : this.root.clientHeight) - thick;
-			canvas.width = Math.max(1, Math.round((horizontal ? len : thick) * dpr));
-			canvas.height = Math.max(1, Math.round((horizontal ? thick : len) * dpr));
+			const w = Math.max(1, Math.round((horizontal ? len : thick) * dpr));
+			const h = Math.max(1, Math.round((horizontal ? thick : len) * dpr));
+			// Resizing reallocates the canvas; only do it when the size really changed.
+			if (canvas.width !== w || canvas.height !== h) {
+				canvas.width = w;
+				canvas.height = h;
+			}
 			const c = canvas.getContext('2d');
 			if (!c) return;
-			c.scale(dpr, dpr);
+			c.setTransform(dpr, 0, 0, dpr, 0, 0);
 			c.fillStyle = colors.bg;
 			c.fillRect(0, 0, horizontal ? len : thick, horizontal ? thick : len);
 			const t = horizontal ? this.camera.tx : this.camera.ty;
@@ -638,6 +667,38 @@ export class BoardViewport implements BoardSurface {
 		draw(this.rulers.left, false);
 	}
 
+	/** Create, update or remove label elements to match the pages. */
+	private syncLabels() {
+		for (const [id, page] of this.pages) {
+			let label = this.labels.get(id);
+			if (!label) {
+				label = this.labelLayer.createDiv({ cls: 'pw-page-label' });
+				this.labels.set(id, label);
+			}
+			if (label.textContent !== page.labelText) label.setText(page.labelText);
+			label.toggleClass('is-selected', this.items.some((it) => it.pageId === id && !it.moduleId));
+		}
+		for (const [id, label] of this.labels) {
+			if (this.pages.has(id)) continue;
+			label.remove();
+			this.labels.delete(id);
+		}
+		this.placeLabels();
+	}
+
+	/** Position labels just above their pages, in screen pixels; off-screen pages hide theirs. */
+	private placeLabels() {
+		for (const page of this.store.file.pages) {
+			const label = this.labels.get(page.id);
+			if (!label) continue;
+			const show = this.visible.has(page.id);
+			label.toggleClass('is-hidden', !show);
+			if (!show) continue;
+			const p = boardToScreen(this.camera, page);
+			label.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`;
+		}
+	}
+
 	/** Virtualization (hard rule 9): only pages near the viewport get their modules mounted. */
 	private updateVisibility() {
 		const vp = this.viewportSize();
@@ -651,7 +712,10 @@ export class BoardViewport implements BoardSurface {
 		const changed = next.size !== this.visible.size || ordered.some((id) => !this.visible.has(id));
 		this.visible = next;
 		for (const [id, el] of this.pages) el.el.toggleClass('is-culled', !next.has(id));
-		if (changed) this.modules.setVisible(ordered);
+		if (changed) {
+			this.modules.setVisible(ordered);
+			this.placeLabels();
+		}
 	}
 
 	get visiblePages(): ReadonlySet<string> {

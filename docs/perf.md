@@ -52,3 +52,18 @@ The cold-page miss is decode-bound: the two crops come from full-page illustrati
 | Best quality (PDF regions as vector) | 11.7 s | 100 | 84 MB | 411 MB | 1.58 GB |
 
 No crash (M2 acceptance). Vector export is faster (no rasterizing) but larger: each crop carries its source page's full-resolution art (spike S8). RSS includes Chromium's print buffers and drops back over time.
+
+## Re-measured after M2 (2026-10-20)
+
+The dev window now runs at **60 Hz** (16.7 ms frames; the M0 numbers were at 144 Hz), so "smooth" means p50 ≈ 16.7 ms.
+
+| Measurement | Result | SPEC 8 target |
+|---|---|---|
+| Open zoomed to fit: 100 pages painted | ~380 ms | < 1 s ✅ |
+| One page at working zoom, cold (two rulebook crops) | 0.55–0.68 s | < 1 s ✅ (Q13 no longer misses on this board) |
+| Same page revisited after panning away | **~42 ms** (bitmap cache) | ✅ |
+| Pan, whole board visible | p50 16.6 ms, p95 18 ms | smooth ✅ |
+| Pan along a row at working zoom | p50 16.6 ms, p95 24 ms, 3 frames > 50 ms per 240 | smooth ⚠️ small hitches on mount |
+| Renderer memory start / end / after close | ~640 / 650 / 650 MB | bounded ✅ |
+
+**Regression found and fixed:** whole-board panning had dropped to ~30 fps since M1. Cause: page labels lived inside the zoomed layer with a counter-scaled font (≈170 px glyphs at 7 % zoom), which Chromium re-rasterized every frame. Labels now sit in a screen-space overlay without `will-change` (giving each of 100 labels its own compositor layer also cost ~8 ms per frame). Ruler colours are cached instead of read with `getComputedStyle` every frame.

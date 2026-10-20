@@ -103,16 +103,31 @@
 	outline: calc(2px / var(--pw-zoom)) solid var(--interactive-accent);
 }
 
-/* Labels keep a constant on-screen size whatever the zoom. */
+/* Page labels: a screen-space overlay above the board layer (constant size, cheap to move). */
+.pw-page-labels {
+	position: absolute;
+	left: 0;
+	top: 0;
+	pointer-events: none;
+	z-index: 1;
+}
+
 .pw-page-label {
 	position: absolute;
 	left: 0;
-	bottom: 100%;
-	margin-bottom: calc(4px / var(--pw-zoom));
-	font-size: calc(var(--font-ui-smaller) / var(--pw-zoom));
+	top: 0;
+	margin-top: -1.6em;
+	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 	white-space: nowrap;
-	pointer-events: none;
+}
+
+.pw-page-label.is-hidden {
+	display: none;
+}
+
+.pw-page-label.is-selected {
+	color: var(--text-accent);
 }
 
 .pw-page.is-culled .pw-page-paper {

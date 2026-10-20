@@ -85,6 +85,16 @@ out.firstPageAtWorkingZoom = { visiblePage: await untilReady(view, first.id) };
 out.firstPageAtWorkingZoom.withPreMountedNeighbours = await untilReady(view);
 out.firstPageAtWorkingZoom.longTasks = takeLongTasks();
 
+// 2b. Revisit: pan far away (modules unmount) and back. With the bitmap cache, PDF crops reappear
+//     without re-decoding.
+s.setCamera({ zoom, tx: -1e6, ty: -1e6 });
+await sleep(400);
+const t2 = performance.now();
+s.setCamera({ zoom, tx: 20, ty: 20 });
+out.revisitFirstPage = await untilReady(view, first.id);
+out.revisitFirstPage.cache = plugin.bitmaps.stats();
+void t2;
+
 // 3. Pan across the first row at that zoom (new pages mount as they come into view).
 await sleep(500);
 out.panRowWorkingZoom = await panFrames(view, 240, (c) => ({ tx: c.tx - 15 }));
