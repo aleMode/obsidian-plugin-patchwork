@@ -106,6 +106,8 @@ export interface PdfModule extends BaseModule {
 	fit?: Fit;
 	rotation?: 0 | 90 | 180 | 270;
 	invert?: boolean;
+	/** M4: fingerprint of the PDF when the crop was made, to warn when the file is replaced. */
+	sourceId?: string;
 	renderDpi?: number;
 	render?: 'auto' | 'vector' | 'raster';
 }
@@ -118,6 +120,15 @@ export interface NoteModule extends BaseModule {
 	includeHeading?: boolean;
 	overflow?: 'clip' | 'fit' | 'grow';
 	scale?: number;
+	/** M4: shows this snapshot instead of the live note. */
+	frozen?: FrozenNote;
+}
+
+export interface FrozenNote {
+	/** When the snapshot was taken (YYYY-MM-DD). */
+	at: string;
+	markdown: string;
+	[extra: string]: unknown;
 }
 
 export interface TextModule extends BaseModule {

@@ -34,11 +34,18 @@ export interface PdfPage {
 }
 export interface PdfDocument {
 	numPages: number;
+	/** PDF file identifiers; the first changes when the file is replaced by a different document. */
+	fingerprints?: (string | null)[];
 	getPage(n: number): Promise<PdfPage>;
 	getOutline(): Promise<PdfOutlineItem[] | null>;
 	getDestination(name: string): Promise<unknown[] | null>;
 	getPageIndex(ref: unknown): Promise<number>;
 	destroy(): Promise<void>;
+}
+
+/** What identifies this version of a PDF (PDF.js fingerprint), for stale-crop warnings. */
+export function pdfSourceId(doc: PdfDocument): string | undefined {
+	return doc.fingerprints?.[0] ?? undefined;
 }
 
 /** The PDF's bookmarks, flattened with depth and resolved to 1-based page numbers (spike S3). */

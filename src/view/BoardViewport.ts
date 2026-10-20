@@ -20,7 +20,8 @@ import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import type { BitmapCache } from '../render/bitmapCache';
 import { linkpathsFromDrop } from '../sources/dropLinks';
-import type { PdfDocCache } from '../sources/pdfSource';
+import { type PdfDocCache, pdfSourceId } from '../sources/pdfSource';
+import { loadNoteContent } from '../sources/markdownSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
@@ -407,7 +408,7 @@ export class BoardViewport implements BoardSurface {
 			new CropModal(app, pdfDocs, file.path, { page: 1 }, (r) =>
 				this.placeModule((page, id): PdfModule => {
 					const rect = defaultModuleRect(page);
-					return { id, type: 'pdf', ...rect, ...(r.resizeModule ? fitHeight(rect, r.aspect, page.h) : {}), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}) };
+					return { id, type: 'pdf', ...rect, ...(r.resizeModule ? fitHeight(rect, r.aspect, page.h) : {}), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}), ...(r.sourceId ? { sourceId: r.sourceId } : {}) };
 				}),
 			).open(),
 		).open();
@@ -425,10 +426,45 @@ export class BoardViewport implements BoardSurface {
 					const next: PdfModule = { ...(x as PdfModule), page: r.page, ...(r.resizeModule ? fitHeight(x, r.aspect, page.h - x.y) : {}) };
 					if (r.crop) next.crop = r.crop;
 					else delete next.crop;
+					// Re-editing the crop counts as checking it against the current file.
+					if (r.sourceId) next.sourceId = r.sourceId;
 					return next;
 				}),
 			),
 		).open();
+	}
+
+	/** Freeze a note module (M4): store what it shows now, so later edits to the note don't change it. */
+	async freezeNote(pageId: string, moduleId: string) {
+		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		if (m?.type !== 'note' || this.store.readOnly) return;
+		const content = await loadNoteContent(this.view.app, m as NoteModule);
+		if (!content.ok) return void new Notice(`Can't freeze: ${content.reason}`);
+		this.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, frozen: { at: today(), markdown: content.markdown } })));
+	}
+
+	unfreezeNote(pageId: string, moduleId: string) {
+		this.store.update((f) =>
+			mapModule(f, pageId, moduleId, (x) => {
+				const next = { ...x };
+				delete next.frozen;
+				return next;
+			}),
+		);
+	}
+
+	/** Record the PDF's current version on a crop, clearing its "PDF changed" warning. */
+	async markPdfChecked(pageId: string, moduleId: string) {
+		const m = this.store.file.pages.find((p) => p.id === pageId)?.modules.find((x) => x.id === moduleId);
+		if (m?.type !== 'pdf' || this.store.readOnly) return;
+		const { pdfDocs } = this.services;
+		const doc = await pdfDocs.acquire(m.file as string);
+		try {
+			const id = pdfSourceId(doc);
+			if (id) this.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, sourceId: id })));
+		} finally {
+			pdfDocs.release(m.file as string);
+		}
 	}
 
 	showBoardSettings() {
@@ -1218,7 +1254,7 @@ export class BoardViewport implements BoardSurface {
 				add((id): PdfModule => {
 					const w = 90;
 					const h = r.resizeModule ? fitHeight({ w }, r.aspect, page.h).h : 120;
-					return { id, type: 'pdf', ...place(w, h), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}) };
+					return { id, type: 'pdf', ...place(w, h), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}), ...(r.sourceId ? { sourceId: r.sourceId } : {}) };
 				}),
 			).open();
 		}
@@ -1280,6 +1316,13 @@ export class BoardViewport implements BoardSurface {
 							),
 					);
 				}
+				const frozen = !!(m as NoteModule).frozen;
+				menu.addItem((i) =>
+					i
+						.setTitle(frozen ? 'Unfreeze' : 'Freeze')
+						.setIcon(frozen ? 'flame' : 'snowflake')
+						.onClick(() => (frozen ? this.unfreezeNote(pageId, moduleId) : void this.freezeNote(pageId, moduleId))),
+				);
 				menu.addSeparator();
 			}
 			menu.addItem((i) => i.setTitle('Duplicate').setIcon('copy').onClick(() => this.duplicateSelection()));

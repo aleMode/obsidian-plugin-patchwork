@@ -120,6 +120,7 @@ function checkModule(m: Json, path: string, is: Issues) {
 			is.optional(m, 'renderDpi', path, positive, 'a positive number');
 			is.optional(m, 'render', path, oneOf('auto', 'vector', 'raster'), '"auto", "vector" or "raster"');
 			is.optional(m, 'invert', path, isBool, 'true/false');
+			is.optional(m, 'sourceId', path, isStr, 'text');
 			break;
 		case 'note':
 			is.required(m, 'file', path, isStr, 'a vault path');
@@ -128,6 +129,7 @@ function checkModule(m: Json, path: string, is: Issues) {
 			is.optional(m, 'includeHeading', path, isBool, 'true/false');
 			is.optional(m, 'overflow', path, oneOf('clip', 'fit', 'grow'), '"clip", "fit" or "grow"');
 			is.optional(m, 'scale', path, positive, 'a positive number');
+			is.optional(m, 'frozen', path, (v) => isObj(v) && isStr(v.markdown) && isStr(v.at), '{at, markdown}');
 			break;
 		case 'text':
 			if (m.markdown === undefined) m.markdown = '';

@@ -347,6 +347,29 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	padding-left: calc(var(--pw-indent, 0) * 1.2em);
 }
 
+.pw-module-badge {
+	position: absolute;
+	top: 1mm;
+	right: 1mm;
+	z-index: 1;
+	padding: 0 1.5mm;
+	border-radius: 1mm;
+	background: rgba(60, 60, 60, 0.75);
+	color: #fff;
+	font-size: 7pt;
+	line-height: 1.6;
+	white-space: nowrap;
+}
+
+.pw-module-badge.is-warning {
+	background: rgba(200, 110, 0, 0.9);
+}
+
+/* Status tags are for the board only. */
+.pw-print-host .pw-module-badge {
+	display: none;
+}
+
 .pw-module-placeholder {
 	position: absolute;
 	inset: 0;

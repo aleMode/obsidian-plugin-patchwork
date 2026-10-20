@@ -184,6 +184,7 @@ export interface PdfModule extends BaseModule {
   fit?: "contain" | "cover" | "stretch";
   rotation?: 0 | 90 | 180 | 270;
   invert?: boolean;                              // M4: invert colours on screen and in exports (forces raster)
+  sourceId?: string;                             // M4: PDF fingerprint when the crop was made; warns if the file is replaced
   renderDpi?: number;
   render?: "auto" | "vector" | "raster";        // export rendering, default "auto" (section 9.1)
 }
@@ -195,6 +196,7 @@ export interface NoteModule extends BaseModule {
   includeHeading?: boolean;
   overflow?: "clip" | "fit" | "grow";
   scale?: number;
+  frozen?: { at: string; markdown: string };     // M4: snapshot shown instead of the live note
 }
 
 export interface TextModule extends BaseModule { type: "text"; markdown: string }
@@ -410,12 +412,13 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - PNG export rasterizes the final PDF; sheets above 8192 px per side become several files (`-r1c1`, …), resolving Q11 with option (a).
   - Export dialog adds page selection (all / selected / range) and remembers its choices in `board.export` (new optional `fitSmallPages`, `tileLabels`).
   - Auto-arrange keeps the first page in place and lays pages out in output order (row, or a grid of ⌈√n⌉ columns).
-- **v0.8 · 2026-10-20** (M3 complete, M4 in progress)
+- **v0.8 · 2026-10-20** (M3 and M4 complete)
   - Saved views live in the board file (`views`). Dark-mode PDF viewing (`board.pdfDarkMode`) is viewing only; per-module `invert` and the `inkSaver` export option force raster for the affected modules.
   - Booklet imposition: pages pad with blanks to a multiple of 4 and are placed two per side of a landscape sheet in saddle-stitch order (native sheet = two pages wide). Pages scale down to fit a half; "scale to fit" also scales them up. No bleed or crop marks in booklets.
   - Bleed is printed by Chromium (each page printed larger, its background and edge-crossing modules extending into it); crop marks, TrimBox and BleedBox are added in the pdf-lib stage. Marks need a 10 mm margin around the bleed: native sheets grow, fixed sheets centre the page. Tiles never get bleed or marks.
   - Master pages are ordinary pages flagged `isMaster` (replacing the planned top-level `masters` list), so they are edited with the normal tools. Pages set `master` to a master's ID and inherit its modules (drawn below their own, not selectable there), header, footer, background and safe area; the page's own values win. Masters are skipped by export, numbering and page ranges, and can't use a master themselves. See `docs/open-questions.md` Q14.
   - Table of contents is a module (`type: "toc"`), so it can sit on any page with other content. It lists named, exported pages (not masters, not its own page) with their printed numbers, updates live, and its rows become PDF link annotations to the target page's first sheet (mapped through scaling, booklets, bleed and tiles). Links to pages outside an exported range are left out.
+  - Stale sources and freeze: note modules can be frozen to a markdown snapshot stored in the board (rendered against the note's path, so links and embeds still resolve; embeds stay live). A badge shows the snapshot date and flags when the live note differs. PDF crops record the PDF.js fingerprint of the file they were made on (`sourceId`); a replaced file shows "PDF changed: check this crop" until the crop is re-edited or marked as checked. Badges never print. See Q15.
   - Fixed: vector PDF regions were missing from any export that re-lays pages onto sheets (tiles, scaled pages); pdf-lib embeds lazily, so the printed pages are flushed first.
 - **v0.6 · 2026-10-20** (M1 complete)
   - Drag from the file explorer reads the `obsidian://open?…&file=…` URIs Obsidian puts on the drag (no internals).

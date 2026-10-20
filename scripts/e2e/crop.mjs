@@ -29,6 +29,7 @@ try {
 	const near = (a, b) => Math.abs(a - b) < 0.01;
 	check('crop applied from the drawn rectangle', m.crop && near(m.crop[0], 20 / 210) && near(m.crop[1], 150 / 297) && near(m.crop[2], 110 / 210) && near(m.crop[3], 230 / 297), m.crop);
 	check('module resized to the crop shape', Math.abs(m.h - 100 * (80 / 90)) < 1.5, m.h);
+	check('crop records the PDF version it was made on', typeof m.sourceId === 'string' && m.sourceId.length > 8, m.sourceId);
 	check('crop is one undo step', (await inView('view.store.undo(); return view.store.file.pages[0].modules[0].crop === undefined;')));
 } catch (e) {
 	check('no exception', false, String(e.stack ?? e));

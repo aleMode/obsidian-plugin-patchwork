@@ -31,3 +31,15 @@ export function placeholder(el: HTMLElement, message: string, kind: 'missing' | 
 	const box = el.createDiv({ cls: `pw-module-placeholder is-${kind}` });
 	box.createDiv({ text: message });
 }
+
+/**
+ * A small status tag in the module's corner (frozen, source changed). Screen only: the print host
+ * hides it. `null` removes it.
+ */
+export function setBadge(el: HTMLElement, text: string | null, kind: 'info' | 'warning' = 'info') {
+	let badge = el.querySelector<HTMLElement>(':scope > .pw-module-badge');
+	if (!text) return void badge?.remove();
+	if (!badge) badge = el.createDiv({ cls: 'pw-module-badge' });
+	badge.setText(text);
+	badge.toggleClass('is-warning', kind === 'warning');
+}

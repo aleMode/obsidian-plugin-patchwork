@@ -67,3 +67,7 @@ Questions raised while building, each with the recommended answer we are proceed
 - SPEC 6 planned a top-level `masters?: Master[]` with no shape defined. A separate list needs its own editing surface (every page tool would have to learn a second kind of page).
 - **Chosen (M4, SPEC v0.8):** a master is an ordinary page with `isMaster: true`; pages use it with `master: "<page id>"`. Masters sit on the board like other pages, are edited with the same tools, and are left out of export, numbering, page ranges and the outline's numbers. Inherited modules are drawn below the page's own and can't be selected there. One level only (a master can't use a master).
 - Easy to change while there are no users: a migration could move flagged pages into a `masters` list later. **Recommendation:** keep it unless you'd rather masters live off the board.
+
+### Q15. What "stale-source warnings and freeze" mean
+- SPEC 4 names the feature only. **Chosen (M4):** notes can be *frozen* (markdown snapshot stored in the board, badge flags later changes to the note). PDF crops remember which version of the PDF they were made on and warn when the file is replaced, since a new rulebook version can shift pages and crops.
+- Not built: freezing PDF crops or images (would need stored image snapshots, e.g. PNGs next to the board), and stale warnings for live (unfrozen) notes, which change on purpose. **Recommendation:** wait for a real need; the stored-PNG route is straightforward if it comes up.

@@ -1,18 +1,22 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 220 checks across 21 suites, all passing; `npm test`: 183 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 223 checks across 22 suites, all passing; `npm test`: 185 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
-## New in M4 (latest)
+## New in M4 (latest, M4 complete)
 
 ### Dark PDFs, invert, ink saver
 - Inspector (nothing selected) → **Dark PDFs in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.
 - Select a PDF module → **Invert colours**: for rulebook pages with dark backgrounds. Applies on screen and in exports (such modules export as images).
 - Export dialog → **Ink saver**: PDF regions and images print grayscale and lighter. Notes and text are unchanged.
+
+### Freeze and stale sources
+- Right-click a note module → **Freeze** (or Inspector → Freeze). A "Frozen YYYY-MM-DD" tag appears. Edit the note: the module keeps the old text and the tag turns orange ("note changed"). **Update snapshot** or **Unfreeze** in the inspector. Exports print the snapshot, never the tag.
+- PDF crops now remember which version of the file they were made on. Replace a PDF with a different file under the same name (e.g. a new rulebook version): its crops get an orange "PDF changed: check this crop" tag until you re-edit the crop or press Inspector → Source check → **Mark as checked**. Crops made before today have no record; **Start checking** adds one.
 
 ### Table of contents
 - Command palette → **Patchwork: Add table of contents to page** (on the selected page). It lists every named page with its number, dot leaders in between; unnamed pages, masters and its own page are left out. Rename or reorder pages and it updates.

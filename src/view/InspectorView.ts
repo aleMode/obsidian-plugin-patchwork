@@ -344,7 +344,7 @@ export class InspectorView extends ItemView {
 
 		switch (m.type) {
 			case 'note':
-				this.renderNote(form, m as NoteModule, set);
+				this.renderNote(form, board, page, m as NoteModule, set);
 				break;
 			case 'pdf':
 				this.renderPdf(form, board, page, m as PdfModule, set);
@@ -381,7 +381,7 @@ export class InspectorView extends ItemView {
 			);
 	}
 
-	private renderNote(form: Form, m: NoteModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
+	private renderNote(form: Form, board: BoardViewport, page: Page, m: NoteModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
 		form.heading('Note');
 		this.fileRow(m, (f) => f.extension === 'md', set);
 		const file = this.app.vault.getAbstractFileByPath(m.file);
@@ -396,6 +396,15 @@ export class InspectorView extends ItemView {
 		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Lines count from the start of the section (or of the note), 1-based.' });
 		form.dropdown('Overflow', { clip: 'Clip', fit: 'Shrink to fit', grow: 'Grow' }, m.overflow ?? 'clip', (v) => set('overflow', (x) => withField(x, 'overflow', v === 'clip' ? undefined : v)));
 		form.number('Scale', m.scale, (v) => set('scale', (x) => withField(x, 'scale', v === 1 ? undefined : v)), { min: 0.1, max: 5, placeholder: '1' });
+		const freeze = new Setting(this.contentEl).setName('Freeze');
+		if (m.frozen) {
+			freeze.setDesc(`Showing a snapshot from ${m.frozen.at}; changes to the note don't appear here.`);
+			freeze.addButton((b) => b.setButtonText('Update snapshot').onClick(() => void board.freezeNote(page.id, m.id)));
+			freeze.addButton((b) => b.setButtonText('Unfreeze').onClick(() => board.unfreezeNote(page.id, m.id)));
+		} else {
+			freeze.setDesc('Keep showing the note as it is now, even if it changes later (the snapshot is stored in the board).');
+			freeze.addButton((b) => b.setButtonText('Freeze').onClick(() => void board.freezeNote(page.id, m.id)));
+		}
 	}
 
 	private renderPdf(form: Form, board: BoardViewport, page: Page, m: PdfModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
@@ -408,6 +417,14 @@ export class InspectorView extends ItemView {
 		form.dropdown('Rotation', { '0': '0°', '90': '90°', '180': '180°', '270': '270°' }, String(m.rotation ?? 0), (v) => set('rotation', (x) => withField(x, 'rotation', v === '0' ? undefined : Number(v))));
 		form.dropdown('In exports', { auto: 'Automatic', vector: 'Vector (sharp)', raster: 'Image (smaller)' }, m.render ?? 'auto', (v) => set('render', (x) => withField(x, 'render', v === 'auto' ? undefined : v)));
 		form.toggle('Invert colours', !!m.invert, (v) => set('invert', (x) => withField(x, 'invert', v ? true : undefined)), 'For dark-background pages: light on screen and in print (exported as an image).');
+		form.button(
+			'Source check',
+			m.sourceId ? 'Mark as checked' : 'Start checking',
+			() => void board.markPdfChecked(page.id, m.id),
+			m.sourceId
+				? 'Warns on the module when the PDF file is replaced (e.g. a new rulebook version). After checking the crop, mark it as checked.'
+				: 'Remember this version of the PDF and warn if the file is replaced. Crops made or edited in the crop editor do this automatically.',
+		);
 	}
 
 	private renderStyle(form: Form, m: AnyModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {

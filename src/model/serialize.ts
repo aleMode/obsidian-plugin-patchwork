@@ -8,14 +8,15 @@ type Json = Record<string, unknown>;
 type Shape = { keys: readonly string[]; children?: Record<string, Shape> };
 
 const INSETS: Shape = { keys: ['top', 'right', 'bottom', 'left'] };
+const FROZEN: Shape = { keys: ['at', 'markdown'] };
 const STYLE: Shape = {
 	keys: ['padding', 'border', 'background', 'opacity', 'fontScale', 'cssClass'],
 	children: { border: { keys: ['width', 'color', 'radius'] } },
 };
 
 const MODULE_KEYS: Record<string, readonly string[]> = {
-	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'invert', 'renderDpi', 'render'],
-	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow', 'scale'],
+	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'invert', 'sourceId', 'renderDpi', 'render'],
+	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow', 'scale', 'frozen'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
 	toc: ['heading'],
@@ -67,7 +68,7 @@ function moduleOut(m: Json): Json {
 	const typeKeys = MODULE_KEYS[m.type as string];
 	// Modules of unknown type are written verbatim (key order included).
 	if (!typeKeys) return m;
-	return ordered(m, [...MODULE_BASE, ...typeKeys, 'style'], (k, v) => (k === 'style' ? shaped(v, STYLE) : tidy(v)));
+	return ordered(m, [...MODULE_BASE, ...typeKeys, 'style'], (k, v) => (k === 'style' ? shaped(v, STYLE) : k === 'frozen' ? shaped(v, FROZEN) : tidy(v)));
 }
 
 function pageOut(p: Json): Json {

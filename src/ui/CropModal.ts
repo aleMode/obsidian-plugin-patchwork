@@ -2,7 +2,7 @@ import { App, Modal, Setting } from 'obsidian';
 import { type Handle, resizeRect } from '../model/geometry';
 import { cropAroundHit, cropFromPoints, FULL_PAGE, moveCrop, tidyCrop } from '../model/pdfGeometry';
 import type { Crop } from '../model/schema';
-import { type PdfDocCache, type PdfDocument, pdfOutline, searchPdf } from '../sources/pdfSource';
+import { type PdfDocCache, type PdfDocument, pdfOutline, pdfSourceId, searchPdf } from '../sources/pdfSource';
 
 export interface CropResult {
 	page: number;
@@ -11,6 +11,8 @@ export interface CropResult {
 	/** Width / height of the result as displayed, for sizing the module to match. */
 	aspect: number;
 	resizeModule: boolean;
+	/** Identifies the PDF version the crop was made on (stale-crop warnings). */
+	sourceId?: string;
 }
 
 type Gesture =
@@ -227,8 +229,10 @@ export class CropModal extends Modal {
 		const crop = full ? undefined : tidyCrop(this.crop);
 		const [x0, y0, x1, y1] = this.crop;
 		const aspect = ((x1 - x0) * this.pageAspect) / (y1 - y0);
+		// Before close(): closing releases the document.
+		const sourceId = this.pdfDoc ? pdfSourceId(this.pdfDoc) : undefined;
 		this.close();
-		this.onApply({ page: this.page, crop, aspect, resizeModule: this.resizeModule });
+		this.onApply({ page: this.page, crop, aspect, resizeModule: this.resizeModule, ...(sourceId ? { sourceId } : {}) });
 	}
 
 	onClose() {

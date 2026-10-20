@@ -5,8 +5,9 @@ import type { AnyModule, Crop, PdfModule } from '../model/schema';
 import { contentBox } from '../model/style';
 import { PX_PER_MM } from '../model/units';
 import { BitmapCache, bucketResolution } from '../render/bitmapCache';
-import type { PdfDocument, PdfPage } from '../sources/pdfSource';
-import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
+import { pdfChanged } from '../model/freshness';
+import { type PdfDocument, type PdfPage, pdfSourceId } from '../sources/pdfSource';
+import { type ModuleContext, type ModuleRenderer, placeholder, setBadge } from './types';
 
 /** Never allocate a canvas side beyond this, whatever the module size (memory, spike S4). */
 const MAX_CANVAS_SIDE = 4096;
@@ -31,6 +32,8 @@ export class PdfModuleRenderer implements ModuleRenderer {
 	private renderedPxPerMm = 0;
 	/** What is on screen: a canvas, and its cache key if the cache owns it. */
 	private shown: { canvas: HTMLCanvasElement; key: string | null } | null = null;
+	/** The file was replaced since the crop was made (see `PdfModule.sourceId`). */
+	private stale = false;
 
 	/** `pxPerMm`: fixed canvas resolution (export passes its DPI). Otherwise follows the zoom. */
 	constructor(private el: HTMLElement, private ctx: ModuleContext, private pxPerMm?: number) {}
@@ -54,17 +57,23 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		this.cancel();
 		const gen = ++this.generation;
 		this.deps = new Set([mod.file]);
-		this.done = this.load(mod, gen).catch((e: unknown) => {
-			if (gen !== this.generation) return;
-			if ((e as Error)?.name === 'RenderingCancelledException') return;
-			this.clearShown();
-			placeholder(this.el, `Could not render ${mod.file} p. ${mod.page}: ${(e as Error)?.message ?? String(e)}`);
-		});
+		this.stale = false;
+		this.done = this.load(mod, gen)
+			.then(() => {
+				if (gen === this.generation) setBadge(this.el, this.stale ? 'PDF changed: check this crop' : null, 'warning');
+			})
+			.catch((e: unknown) => {
+				if (gen !== this.generation) return;
+				if ((e as Error)?.name === 'RenderingCancelledException') return;
+				this.clearShown();
+				placeholder(this.el, `Could not render ${mod.file} p. ${mod.page}: ${(e as Error)?.message ?? String(e)}`);
+			});
 	}
 
 	private async load(m: PdfModule, gen: number) {
 		const doc = await this.document(m.file);
 		if (gen !== this.generation) return;
+		this.stale = pdfChanged(m, pdfSourceId(doc));
 		if (m.page > doc.numPages) {
 			this.clearShown();
 			return placeholder(this.el, `${m.file} has only ${doc.numPages} pages (module wants page ${m.page})`);
