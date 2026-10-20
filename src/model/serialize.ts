@@ -34,7 +34,7 @@ const BOARD: Shape = {
 	},
 };
 
-const PAGE_KEYS = ['id', 'name', 'x', 'y', 'w', 'h', 'safeArea', 'background', 'numberLabel', 'header', 'footer', 'modules'];
+const PAGE_KEYS = ['id', 'name', 'x', 'y', 'w', 'h', 'safeArea', 'background', 'numberLabel', 'header', 'footer', 'isMaster', 'master', 'modules'];
 const FILE_KEYS = ['version', 'unit', 'meta', 'board', 'pages', 'views'];
 const VIEW: Shape = { keys: ['id', 'name', 'x', 'y', 'zoom'] };
 

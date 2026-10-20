@@ -1,4 +1,5 @@
 import { ItemView, setIcon, Setting, TFile, WorkspaceLeaf } from 'obsidian';
+import { pagesUsing } from '../model/masters';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule } from '../model/schema';
 import { formatLength, parseLength } from '../model/units';
@@ -176,6 +177,11 @@ export class InspectorView extends ItemView {
 			.setDesc(items.length < 3 ? 'Needs three or more.' : 'Equal gaps, keeping the outermost in place.')
 			.addButton((b) => b.setButtonText('Horizontally').setDisabled(items.length < 3).onClick(() => board.distribute('h')))
 			.addButton((b) => b.setButtonText('Vertically').setDisabled(items.length < 3).onClick(() => board.distribute('v')));
+		if (kind === 'pages') {
+			const pages = board.boardStore.file.pages.filter((p) => items.some((it) => it.pageId === p.id));
+			const first = pages[0]?.master;
+			this.masterDropdown(new Form(this.contentEl, board.boardStore.file.board.displayUnit), board, pages.map((p) => p.id), pages.every((p) => p.master === first) ? first : undefined);
+		}
 		const actions = new Setting(this.contentEl).setName('Selection');
 		if (kind === 'modules') actions.addButton((b) => b.setButtonText('Lock or unlock').onClick(() => board.toggleLock()));
 		actions.addButton((b) => {
@@ -259,11 +265,46 @@ export class InspectorView extends ItemView {
 			this.render();
 		});
 		form.color('Background', page.background, (v) => setPage('background', (p) => withField(p, 'background', v)));
+		this.renderMaster(form, board, page);
 		form.heading('Page furniture');
 		this.overrideRow('Number', page.numberLabel === false ? 'none' : page.numberLabel, (v) => setPage('numberLabel', (p) => withField(p, 'numberLabel', v === 'none' ? false : v)), 'Automatic');
-		this.overrideRow('Header', page.header === '' ? 'none' : page.header, (v) => setPage('header', (p) => withField(p, 'header', v === 'none' ? '' : v)), 'Board default');
-		this.overrideRow('Footer', page.footer === '' ? 'none' : page.footer, (v) => setPage('footer', (p) => withField(p, 'footer', v === 'none' ? '' : v)), 'Board default');
+		const inherit = page.master ? 'From master' : 'Board default';
+		this.overrideRow('Header', page.header === '' ? 'none' : page.header, (v) => setPage('header', (p) => withField(p, 'header', v === 'none' ? '' : v)), inherit);
+		this.overrideRow('Footer', page.footer === '' ? 'none' : page.footer, (v) => setPage('footer', (p) => withField(p, 'footer', v === 'none' ? '' : v)), inherit);
 		form.length('Safe area', uniformInset(page.safeArea), (mm) => setPage('safe', (p) => withField(p, 'safeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
+	}
+
+	/** Master pages (M4): flag this page as one, or pick the master it uses. */
+	private renderMaster(form: Form, board: BoardViewport, page: Page) {
+		const file = board.boardStore.file;
+		form.toggle(
+			'Master page',
+			!!page.isMaster,
+			(v) => {
+				// A master can't use another master; its own `master` is dropped when it becomes one.
+				this.update(board, 'isMaster', (f) => mapPage(f, page.id, (p) => withField(withField(p, 'isMaster', v ? true : undefined), 'master', v ? undefined : p.master)));
+				this.render();
+			},
+			'Not exported or numbered. Its modules, header, footer, background and safe area show on pages that use it.',
+		);
+		if (page.isMaster) {
+			const n = pagesUsing(file, page.id).length;
+			this.contentEl.createDiv({ cls: 'pw-panel-hint', text: n ? `Used by ${n} page(s).` : 'No pages use this master yet; pick it in a page’s Master setting.' });
+			return;
+		}
+		this.masterDropdown(form, board, [page.id], page.master);
+	}
+
+	/** Pick the master for one or more pages. */
+	private masterDropdown(form: Form, board: BoardViewport, pageIds: string[], current: string | undefined) {
+		const masters = board.boardStore.file.pages.filter((p) => p.isMaster);
+		if (!masters.length) return;
+		const options: Record<string, string> = { '': 'None' };
+		for (const m of masters) options[m.id] = m.name ?? 'Untitled master';
+		const ids = new Set(pageIds);
+		form.dropdown('Master', options, current && current in options ? current : '', (v) =>
+			this.update(board, 'master', (f) => ({ ...f, pages: f.pages.map((p) => (ids.has(p.id) && !p.isMaster ? withField(p, 'master', v || undefined) : p)) })),
+		);
 	}
 
 	/**

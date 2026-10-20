@@ -62,3 +62,8 @@ Questions raised while building, each with the recommended answer we are proceed
 ### Q13. "Visible pages paint in under 1 s" with heavy PDF art
 - Measured in M0 (`docs/perf.md`): a page with two crops of full-page rulebook illustrations takes 1.2–1.5 s the first time, bound by PDF.js decoding (one page at a time per document). Everything else meets the target.
 - **Recommendation:** keep the target for warm content and for opening a board; for cold PDF pages, aim for "first crop within ~0.6 s, page complete within ~1.5 s" and make revisits instant with the M1 bitmap cache. Revisit after M1.
+
+### Q14. Master pages: separate list or flagged pages?
+- SPEC 6 planned a top-level `masters?: Master[]` with no shape defined. A separate list needs its own editing surface (every page tool would have to learn a second kind of page).
+- **Chosen (M4, SPEC v0.8):** a master is an ordinary page with `isMaster: true`; pages use it with `master: "<page id>"`. Masters sit on the board like other pages, are edited with the same tools, and are left out of export, numbering, page ranges and the outline's numbers. Inherited modules are drawn below the page's own and can't be selected there. One level only (a master can't use a master).
+- Easy to change while there are no users: a migration could move flagged pages into a `masters` list later. **Recommendation:** keep it unless you'd rather masters live off the board.

@@ -32,7 +32,9 @@ export class PageElement {
 		this.paper.toggleClass('has-background', !!page.background);
 		this.paper.setCssProps({ '--pw-page-bg': page.background ?? '' });
 		this.el.toggleClass('is-selected', opts.selected);
-		this.labelText = `${page.name ?? 'Untitled page'} · ${formatLength(page.w, opts.unit)} × ${formatLength(page.h, opts.unit)}`;
+		this.el.toggleClass('is-master', !!page.isMaster);
+		const name = page.isMaster ? `Master: ${page.name ?? 'untitled'}` : page.name ?? 'Untitled page';
+		this.labelText = `${name} · ${formatLength(page.w, opts.unit)} × ${formatLength(page.h, opts.unit)}`;
 	}
 
 	/** Dashed margin guide (SPEC 5.2): on the board only, never printed, never constraining modules. */

@@ -165,6 +165,8 @@ function checkPages(pages: unknown[], is: Issues) {
 		for (const k of ['name', 'background', 'header', 'footer']) is.optional(page, k, pp, isStr, 'text');
 		is.optional(page, 'numberLabel', pp, (v) => isStr(v) || v === false, 'text or false');
 		is.optional(page, 'safeArea', pp, isInsets, 'insets {top,right,bottom,left} ≥ 0');
+		is.optional(page, 'isMaster', pp, isBool, 'true/false');
+		is.optional(page, 'master', pp, isStr, 'a page ID');
 		if (page.modules === undefined) page.modules = [];
 		if (!Array.isArray(page.modules)) {
 			is.errors.push(`${pp}.modules: expected a list`);

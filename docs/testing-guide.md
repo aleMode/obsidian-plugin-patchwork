@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 201 checks across 19 suites, all passing; `npm test`: 171 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 212 checks across 20 suites, all passing; `npm test`: 178 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -13,6 +13,11 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Inspector (nothing selected) → **Dark PDFs in dark mode**: with Obsidian in a dark theme, PDF regions on the board are shown colour-inverted (hues kept). Viewing only; exports unchanged.
 - Select a PDF module → **Invert colours**: for rulebook pages with dark backgrounds. Applies on screen and in exports (such modules export as images).
 - Export dialog → **Ink saver**: PDF regions and images print grayscale and lighter. Notes and text are unchanged.
+
+### Master pages
+- Select a page → Inspector → **Master page** on. It gets a dashed outline, its label reads "Master: …", it shows its header/footer templates as typed and "#" for the number, and it disappears from the outline's numbering.
+- Put a logo or frame on it, set its header and background. Then select other pages (one, or several with Shift-click) → **Master** dropdown → pick it. The master's modules appear under each page's own (clicking them selects the page), with the header and background, unless the page sets its own.
+- Edit the master: every page using it updates. Export: the master page is not in the PDF, numbers skip it, its content prints on the pages using it.
 
 ### Booklets, bleed, crop marks
 - Export dialog → **Layout: Booklet (fold in half)** with sheet size A4 on a board of A5 pages: each side of a landscape A4 sheet carries two pages in folding order (8|1, 2|7, …; blanks pad to a multiple of 4). Print double-sided, flip on the short edge, fold: the pages should read in order. Worth one real print if you can.

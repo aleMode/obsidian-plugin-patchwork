@@ -2,7 +2,7 @@ import type { App, Component } from 'obsidian';
 import { batches, oversizedPages, vectorModules } from '../model/exportPlan';
 import { pageFurniture, pdfPageLabels } from '../model/numbering';
 import { planSheets, type SheetSetting } from '../model/sheetPlan';
-import { orderedPages } from '../model/ordering';
+import { outputPages, resolvePage } from '../model/masters';
 import type { PatchworkFile } from '../model/schema';
 import { formatLength } from '../model/units';
 import { type PdfDocCache, readPdfBytes } from '../sources/pdfSource';
@@ -44,8 +44,9 @@ export async function exportBoardPdf(
 	opts: ExportOptions,
 	progress: (message: string) => void,
 ): Promise<ExportResult> {
-	const all = orderedPages(board);
-	const pages = opts.pageIndices ? opts.pageIndices.flatMap((i) => (all[i] ? [all[i]] : [])) : all;
+	const all = outputPages(board);
+	// Master modules and furniture are baked into each page (resolved) before printing.
+	const pages = (opts.pageIndices ? opts.pageIndices.flatMap((i) => (all[i] ? [all[i]] : [])) : all).map((p) => resolvePage(board, p));
 	if (pages.length === 0) throw new Error('No pages to export.');
 	// Only a native-size export has to fit a single PDF page; tiling splits big pages (SPEC 9.2).
 	const tooBig = opts.sheet === 'native' ? oversizedPages(pages) : [];

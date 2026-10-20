@@ -1,4 +1,4 @@
-import { orderedPages } from './ordering';
+import { masterOf, outputPages } from './masters';
 import type { NumberFormat, PatchworkFile } from './schema';
 
 // Page numbers, headers and footers (SPEC 5.4). Pure.
@@ -53,7 +53,7 @@ export interface PageFurniture {
  * {pages} is the last page's number, so "page {page} of {pages}" stays right with a start offset.
  */
 export function pageFurniture(file: PatchworkFile, ctx: { title: string; date: string }): Map<string, PageFurniture> {
-	const pages = orderedPages(file);
+	const pages = outputPages(file);
 	const n = file.board.numbering;
 	const pagesToken = formatNumber(n.start + pages.length - 1, n.format);
 	const out = new Map<string, PageFurniture>();
@@ -63,9 +63,10 @@ export function pageFurniture(file: PatchworkFile, ctx: { title: string; date: s
 		let number: string | null = n.enabled ? pageToken : null;
 		if (p.numberLabel === false || (n.skipFirst && i === 0)) number = null;
 		const tokens = { page: pageToken, pages: pagesToken, title: ctx.title, date: ctx.date };
-		// A page's own header/footer replaces the board's; an empty string means "none on this page".
-		const header = p.header ?? file.board.header;
-		const footer = p.footer ?? file.board.footer;
+		// A page's own header/footer replaces its master's, which replaces the board's; "" means none.
+		const master = masterOf(file, p);
+		const header = p.header ?? master?.header ?? file.board.header;
+		const footer = p.footer ?? master?.footer ?? file.board.footer;
 		out.set(p.id, {
 			number,
 			pageToken,
@@ -92,7 +93,17 @@ const PDF_STYLE: Record<NumberFormat, 'D' | 'r' | 'a'> = { arabic: 'D', roman: '
 export function pdfPageLabels(file: PatchworkFile): PdfPageLabel[] | null {
 	const n = file.board.numbering;
 	if (!n.enabled) return null;
-	return orderedPages(file).map((p, i) =>
+	return outputPages(file).map((p, i) =>
 		typeof p.numberLabel === 'string' ? { prefix: p.numberLabel } : { style: PDF_STYLE[n.format], start: Math.max(1, n.start + i) },
 	);
+}
+
+/**
+ * What a master page shows on the board: its header and footer as typed (tokens unexpanded) and
+ * "#" where the number goes, since a master has no number of its own.
+ */
+export function masterPreview(file: PatchworkFile, master: { header?: string; footer?: string }): PageFurniture {
+	const header = master.header ?? file.board.header;
+	const footer = master.footer ?? file.board.footer;
+	return { number: file.board.numbering.enabled ? '#' : null, pageToken: '#', header: header || null, footer: footer || null };
 }

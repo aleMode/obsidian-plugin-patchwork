@@ -12,7 +12,8 @@ import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
-import { pageFurniture } from '../model/numbering';
+import { masterPreview, pageFurniture } from '../model/numbering';
+import { outputPages, resolvePage } from '../model/masters';
 import { rulerTicks } from '../model/rulers';
 import { snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
@@ -197,7 +198,9 @@ export class BoardViewport implements BoardSurface {
 				this.pages.set(page.id, el);
 			}
 			const selected = this.items.some((it) => it.pageId === page.id && !it.moduleId);
-			el.update(page, { appTheme: file.board.useAppTheme, unit: file.board.displayUnit, selected, furniture: furniture.get(page.id), position: file.board.numbering.position, safeArea: file.board.defaultSafeArea });
+			const shown = resolvePage(file, page);
+			const pageFurniture = page.isMaster ? masterPreview(file, page) : furniture.get(page.id);
+			el.update(shown, { appTheme: file.board.useAppTheme, unit: file.board.displayUnit, selected, furniture: pageFurniture, position: file.board.numbering.position, safeArea: file.board.defaultSafeArea });
 		}
 		for (const [id, el] of this.pages) {
 			if (!seen.has(id)) {
@@ -451,7 +454,7 @@ export class BoardViewport implements BoardSurface {
 			dpi: e.dpi,
 			open: true,
 		};
-		const ctx = { pageCount: this.store.file.pages.length, selectedCount: this.selectedPageIndices().length, unit: this.store.file.board.displayUnit };
+		const ctx = { pageCount: outputPages(this.store.file).length, selectedCount: this.selectedPageIndices().length, unit: this.store.file.board.displayUnit };
 		new ExportModal(this.view.app, initial, ctx, (choices) => void this.runExport(choices)).open();
 	}
 
@@ -480,7 +483,7 @@ export class BoardViewport implements BoardSurface {
 	/** Pages of the current selection (pages, or the pages of selected modules), as output-order indices. */
 	private selectedPageIndices(): number[] {
 		const ids = new Set(this.items.map((it) => it.pageId));
-		return orderedPages(this.store.file).flatMap((p, i) => (ids.has(p.id) ? [i] : []));
+		return outputPages(this.store.file).flatMap((p, i) => (ids.has(p.id) ? [i] : []));
 	}
 
 	async runExport(choices: ExportChoices) {
@@ -492,7 +495,7 @@ export class BoardViewport implements BoardSurface {
 			return JSON.stringify(next) === JSON.stringify(e) ? f : { ...f, board: { ...f.board, export: next } };
 		});
 		const pageIndices =
-			choices.pages === 'selected' ? this.selectedPageIndices() : choices.pages === 'range' ? parseRange(choices.range, this.store.file.pages.length) ?? undefined : undefined;
+			choices.pages === 'selected' ? this.selectedPageIndices() : choices.pages === 'range' ? parseRange(choices.range, outputPages(this.store.file).length) ?? undefined : undefined;
 		const notice = new Notice('Exporting…', 0);
 		try {
 			const result = await exportBoardPdf(
@@ -790,6 +793,7 @@ export class BoardViewport implements BoardSurface {
 			}
 			if (label.textContent !== page.labelText) label.setText(page.labelText);
 			label.toggleClass('is-selected', this.items.some((it) => it.pageId === id && !it.moduleId));
+			label.toggleClass('is-master', page.el.hasClass('is-master'));
 		}
 		for (const [id, label] of this.labels) {
 			if (this.pages.has(id)) continue;

@@ -37,7 +37,8 @@ const FULL = {
 				{ type: 'hologram', id: 'm5', x: 1, y: 1, w: 1, h: 1, beam: { colour: 'blue' } },
 			],
 		},
-		{ id: 'p2', x: 230, y: 0, w: 297, h: 210, safeArea: { top: 5, right: 5, bottom: 5, left: 5 }, modules: [] },
+		{ id: 'p2', x: 230, y: 0, w: 297, h: 210, safeArea: { top: 5, right: 5, bottom: 5, left: 5 }, isMaster: true, modules: [] },
+		{ id: 'p3', x: 0, y: 400, w: 297, h: 210, master: 'p2', modules: [] },
 	],
 };
 

@@ -133,7 +133,6 @@ export interface PatchworkFile {
   meta?: { title?: string; created?: string };   // no `modified`: it would churn every save
   board: BoardSettings;
   pages: Page[];
-  masters?: Master[];                    // M4
   views?: SavedView[];                   // M3
   [extra: string]: unknown;              // unknown keys preserved on round-trip
 }
@@ -167,6 +166,8 @@ export interface Page {
   background?: string;
   numberLabel?: string | false;                  // page-number override; false hides it
   header?: string; footer?: string;
+  isMaster?: boolean;                            // M4: a master page; never exported or numbered
+  master?: string;                               // M4: ID of the master page this page uses
   modules: Module[];                             // draw order = array order unless z set
 }
 
@@ -412,6 +413,7 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Saved views live in the board file (`views`). Dark-mode PDF viewing (`board.pdfDarkMode`) is viewing only; per-module `invert` and the `inkSaver` export option force raster for the affected modules.
   - Booklet imposition: pages pad with blanks to a multiple of 4 and are placed two per side of a landscape sheet in saddle-stitch order (native sheet = two pages wide). Pages scale down to fit a half; "scale to fit" also scales them up. No bleed or crop marks in booklets.
   - Bleed is printed by Chromium (each page printed larger, its background and edge-crossing modules extending into it); crop marks, TrimBox and BleedBox are added in the pdf-lib stage. Marks need a 10 mm margin around the bleed: native sheets grow, fixed sheets centre the page. Tiles never get bleed or marks.
+  - Master pages are ordinary pages flagged `isMaster` (replacing the planned top-level `masters` list), so they are edited with the normal tools. Pages set `master` to a master's ID and inherit its modules (drawn below their own, not selectable there), header, footer, background and safe area; the page's own values win. Masters are skipped by export, numbering and page ranges, and can't use a master themselves. See `docs/open-questions.md` Q14.
   - Fixed: vector PDF regions were missing from any export that re-lays pages onto sheets (tiles, scaled pages); pdf-lib embeds lazily, so the printed pages are flushed first.
 - **v0.6 · 2026-10-20** (M1 complete)
   - Drag from the file explorer reads the `obsidian://open?…&file=…` URIs Obsidian puts on the drag (no internals).

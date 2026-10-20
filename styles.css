@@ -91,6 +91,11 @@
 	font-size: 10pt;
 }
 
+/* Masters are never exported; a dashed outline tells them apart (selection and drop styles win). */
+.pw-page.is-master .pw-page-paper {
+	outline: calc(2px / var(--pw-zoom)) dashed var(--text-faint);
+}
+
 .pw-page.is-drop-page .pw-page-paper {
 	outline: calc(3px / var(--pw-zoom)) dashed var(--interactive-accent);
 }
@@ -120,6 +125,14 @@
 	font-size: var(--font-ui-smaller);
 	color: var(--text-muted);
 	white-space: nowrap;
+}
+
+.pw-page-label.is-master {
+	color: var(--text-accent);
+}
+
+.pw-module.is-inherited {
+	pointer-events: none;
 }
 
 .pw-page-label.is-hidden {

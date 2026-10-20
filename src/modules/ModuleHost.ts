@@ -1,4 +1,5 @@
 import { Component, TAbstractFile } from 'obsidian';
+import { isInheritedId, resolvePage } from '../model/masters';
 import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
 import type { BoardStore } from '../store/BoardStore';
 import { ImageModuleRenderer } from './imageModule';
@@ -96,10 +97,13 @@ export class ModuleHost {
 	sync() {
 		const live = new Set<string>();
 		const outlined = new Set<string>();
-		const byId = new Map(this.o.store.file.pages.map((p) => [p.id, p]));
+		const file = this.o.store.file;
+		const byId = new Map(file.pages.map((p) => [p.id, p]));
 		for (const id of this.visible) {
-			const page = byId.get(id);
-			if (!page) continue;
+			const stored = byId.get(id);
+			if (!stored) continue;
+			// Master modules are mounted on every page using the master, under the page's own.
+			const page = resolvePage(file, stored);
 			const paper = this.o.paperOf(page.id);
 			if (!paper) continue;
 			if (this.detail) this.syncPage(page, paper, live);
@@ -172,7 +176,8 @@ export class ModuleHost {
 	}
 
 	private mount(m: AnyModule, pageId: string, paper: HTMLElement): Mounted {
-		const el = paper.createDiv({ cls: 'pw-module', attr: { 'data-module-id': m.id, 'data-page-id': pageId } });
+		// Inherited (master) modules get no IDs, so clicks fall through to the page.
+		const el = isInheritedId(m.id) ? paper.createDiv({ cls: 'pw-module is-inherited' }) : paper.createDiv({ cls: 'pw-module', attr: { 'data-module-id': m.id, 'data-page-id': pageId } });
 		const body = el.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
 		const mounted: Mounted = { pageId, el, body, renderer: this.createRenderer(m, body), key: '', module: m };
 		this.mounted.set(m.id, mounted);

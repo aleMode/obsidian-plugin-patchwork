@@ -67,11 +67,13 @@ export class OutlineView extends ItemView {
 		const file = board.boardStore.file;
 		this.renderViews(el, board);
 		const isSel = (pageId: string, moduleId?: string) => board.selectedItems.some((it) => it.pageId === pageId && it.moduleId === moduleId);
-		orderedPages(file).forEach((page, i) => {
+		let n = 0;
+		orderedPages(file).forEach((page) => {
 			const row = el.createDiv({ cls: 'pw-outline-row pw-outline-page' });
 			row.toggleClass('is-selected', isSel(page.id));
-			setIcon(row.createSpan({ cls: 'pw-outline-icon' }), 'file');
-			row.createSpan({ text: `${i + 1}. ${page.name ?? 'Untitled page'}` });
+			setIcon(row.createSpan({ cls: 'pw-outline-icon' }), page.isMaster ? 'layout-template' : 'file');
+			// Masters aren't exported, so they take no place in the numbering.
+			row.createSpan({ text: page.isMaster ? `Master: ${page.name ?? 'untitled'}` : `${++n}. ${page.name ?? 'Untitled page'}` });
 			row.addEventListener('click', (e) => this.reveal(e, page.id));
 			for (const m of page.modules) {
 				const mrow = el.createDiv({ cls: 'pw-outline-row pw-outline-module' });

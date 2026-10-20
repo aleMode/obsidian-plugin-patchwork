@@ -75,6 +75,10 @@ export interface Page {
 	numberLabel?: string | false;
 	header?: string;
 	footer?: string;
+	/** M4: this page is a master; it is never exported or numbered. */
+	isMaster?: boolean;
+	/** M4: ID of the master page whose modules, header, footer, background and safe area this page inherits. */
+	master?: string;
 	modules: AnyModule[];
 	[extra: string]: unknown;
 }
