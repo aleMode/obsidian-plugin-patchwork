@@ -2,10 +2,13 @@
 //   test-vault/PDFs/Sample rulebook.pdf  (4 pages, mixed sizes, /Rotate, outline, extractable text)
 //   test-vault/Images/Map.png            (small PNG with a grid, for image modules)
 // Run with `npm run fixtures`. Output is deterministic so it diffs cleanly.
+// `npm run fixtures -- --rulers` also draws millimetre rulers on the PDF pages, to check crops and printed
+// scale by eye. Off by default: they would otherwise show up in every board and export made from it.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { deflateSync } from 'node:zlib';
 
 const MM = 72 / 25.4; // PDF points per mm
+const WITH_RULERS = process.argv.includes('--rulers');
 const A4 = [210 * MM, 297 * MM];
 const LETTER = [612, 792];
 
@@ -34,6 +37,7 @@ function page(w, h) {
 		},
 		/** Millimetre ticks on all edges so crops can be checked by eye. */
 		rulers() {
+			if (!WITH_RULERS) return;
 			const wmm = w / MM, hmm = h / MM;
 			for (let mm = 0; mm <= wmm; mm += 10) {
 				const len = mm % 50 === 0 ? 5 : 2.5;
