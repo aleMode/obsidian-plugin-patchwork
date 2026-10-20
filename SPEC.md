@@ -203,6 +203,12 @@ export interface ModuleStyle {
   background?: string; opacity?: number; fontScale?: number; cssClass?: string;
 }
 
+export interface SavedView {                      // M3
+  id: string; name: string;
+  x: number; y: number;                          // board point (mm) at the centre of the view
+  zoom: number;
+}
+
 export interface ExportDefaults {
   format: "pdf" | "png";
   sheet: "native" | "A4" | "A3" | "A5" | "Letter" | "Legal" | "Tabloid" | { w: number; h: number };

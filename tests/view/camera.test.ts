@@ -63,3 +63,15 @@ describe('snapping', () => {
 		expect(snapPoint({ x: 1.2, y: 3.8 }, 1)).toEqual({ x: 1, y: 4 });
 	});
 });
+
+describe('saved view helpers', () => {
+	it('centre and centred-on are inverses', async () => {
+		const { cameraCentre, cameraCentredOn } = await import('../../src/view/camera');
+		const vp = { w: 1200, h: 800 };
+		const c = cameraCentredOn({ x: 345, y: 678 }, 0.75, vp);
+		const back = cameraCentre(c, vp);
+		expect(back.x).toBeCloseTo(345);
+		expect(back.y).toBeCloseTo(678);
+		expect(c.zoom).toBe(0.75);
+	});
+});

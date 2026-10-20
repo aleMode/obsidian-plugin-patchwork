@@ -200,6 +200,18 @@ export function validateBoard(raw: unknown): ParseResult {
 	else checkBoard(file.board, is);
 	if (!Array.isArray(file.pages)) is.errors.push('pages: expected a list');
 	else checkPages(file.pages, is);
+	if (file.views !== undefined) {
+		if (!Array.isArray(file.views)) is.errors.push('views: expected a list');
+		else
+			file.views.forEach((v, i) => {
+				const vp = `views[${i}]`;
+				if (!isObj(v)) return void is.errors.push(`${vp}: expected an object`);
+				is.required(v, 'name', vp, isStr, 'text');
+				for (const k of ['x', 'y']) is.required(v, k, vp, isNum, 'a number');
+				is.required(v, 'zoom', vp, positive, 'a positive number');
+				if (!isStr(v.id)) v.id = `view-${i}`;
+			});
+	}
 
 	if (is.errors.length) return { ok: false, errors: is.errors };
 	return { ok: true, file: file as unknown as PatchworkFile, readOnly, warnings: is.warnings };

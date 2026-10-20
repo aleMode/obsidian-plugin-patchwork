@@ -737,6 +737,47 @@
 	padding-left: var(--size-4-8);
 }
 
+.pw-outline-section {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: var(--size-4-3) 0 var(--size-2-2);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.pw-outline-view-name {
+	flex: 1;
+}
+
+.pw-outline-action {
+	opacity: 0;
+}
+
+.pw-outline-row:hover .pw-outline-action {
+	opacity: 1;
+}
+
+.pw-minimap {
+	position: absolute;
+	right: var(--size-4-3);
+	bottom: var(--size-4-3);
+	z-index: 2;
+	width: 180px;
+	height: 120px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	box-shadow: var(--shadow-s);
+	cursor: pointer;
+}
+
+.pw-minimap.is-hidden {
+	display: none;
+}
+
 .pw-outline-icon,
 .pw-outline-lock {
 	display: inline-flex;

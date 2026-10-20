@@ -23,10 +23,11 @@ import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { BoardSettingsModal } from '../ui/BoardSettingsModal';
+import { NamedPickerModal, TextPromptModal } from '../ui/prompts';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
-import { boardToScreen, type Camera, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
+import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
 
@@ -99,6 +100,9 @@ export class BoardViewport implements BoardSurface {
 	 */
 	private labelLayer: HTMLElement;
 	private labels = new Map<string, HTMLElement>();
+	private minimap: HTMLCanvasElement;
+	/** Board area the minimap shows, and its scale, from the last draw (for click-to-pan). */
+	private minimapFrame: { x: number; y: number; k: number } | null = null;
 	/** Panels (inspector, outline) listen here; the store has its own subscription for content. */
 	private selectionListeners = new Set<(sel: Selection) => void>();
 	private drag: Drag | null = null;
@@ -132,10 +136,14 @@ export class BoardViewport implements BoardSurface {
 			left: container.createEl('canvas', { cls: 'pw-ruler pw-ruler-left' }),
 		};
 		const corner = container.createDiv({ cls: 'pw-ruler-corner' });
+		this.minimap = container.createEl('canvas', { cls: 'pw-minimap' });
+		this.minimap.toggleClass('is-hidden', !minimapPreferred());
+		this.bindMinimap();
 		this.cleanups.push(() => {
 			this.rulers.top.remove();
 			this.rulers.left.remove();
 			corner.remove();
+			this.minimap.remove();
 		});
 		this.buildToolbar(container);
 		this.cleanups.push(store.subscribe(() => this.render()));
@@ -202,6 +210,7 @@ export class BoardViewport implements BoardSurface {
 		this.renderSelectionBox();
 		this.renderGrid();
 		this.renderRulers();
+		this.renderMinimap();
 		this.updateVisibility();
 		this.modules.sync();
 	}
@@ -526,6 +535,7 @@ export class BoardViewport implements BoardSurface {
 		this.renderGrid();
 		this.renderRulers();
 		this.placeLabels();
+		this.renderMinimap();
 		// Switch level of detail right away, so zooming out never mounts content it won't show.
 		this.modules.setDetail(zoom >= DETAIL_ZOOM);
 		this.updateVisibility();
@@ -591,11 +601,11 @@ export class BoardViewport implements BoardSurface {
 		this.root.style.backgroundPosition = `${this.camera.tx}px ${this.camera.ty}px`;
 	}
 
-	private rulerColors: { bg: string; fg: string } | null = null;
+	private rulerColors: { bg: string; fg: string; accent: string } | null = null;
 
 	private readRulerColors() {
 		const style = getComputedStyle(this.root);
-		return { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted') };
+		return { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted'), accent: style.getPropertyValue('--interactive-accent') };
 	}
 
 	/** Theme or CSS snippets changed: re-read colours that are cached for per-frame drawing. */
@@ -665,6 +675,104 @@ export class BoardViewport implements BoardSurface {
 		};
 		draw(this.rulers.top, true);
 		draw(this.rulers.left, false);
+	}
+
+	// ---------- saved views (SPEC 4 M3) ----------
+
+	get views() {
+		return this.store.file.views ?? [];
+	}
+
+	/** Ask for a name and store the current camera as a view in the board file. */
+	promptSaveView() {
+		if (this.store.readOnly) return;
+		new TextPromptModal(this.view.app, 'Save view', `View ${this.views.length + 1}`, (name) => this.saveView(name)).open();
+	}
+
+	saveView(name: string) {
+		const centre = cameraCentre(this.camera, this.viewportSize());
+		const id = newId(new Set(this.views.map((v) => v.id)));
+		const view = { id, name, x: Number(centre.x.toFixed(2)), y: Number(centre.y.toFixed(2)), zoom: Number(this.camera.zoom.toFixed(4)) };
+		this.store.update((f) => ({ ...f, views: [...(f.views ?? []), view] }));
+	}
+
+	goToView(id: string) {
+		const v = this.views.find((x) => x.id === id);
+		if (v) this.setCamera(cameraCentredOn(v, v.zoom, this.viewportSize()));
+	}
+
+	deleteView(id: string) {
+		this.store.update((f) => {
+			const views = (f.views ?? []).filter((v) => v.id !== id);
+			// No views left: drop the key, so the file looks as if views were never used.
+			const { views: _old, ...rest } = f;
+			return views.length ? { ...f, views } : rest;
+		});
+	}
+
+	renameView(id: string, name: string) {
+		this.store.update((f) => ({ ...f, views: (f.views ?? []).map((v) => (v.id === id ? { ...v, name } : v)) }));
+	}
+
+	pickView() {
+		if (!this.views.length) return void new Notice('No saved views yet. Save one first from the outline panel or the command palette.');
+		new NamedPickerModal(this.view.app, [...this.views], 'Go to view', (v) => this.goToView(v.id)).open();
+	}
+
+	// ---------- minimap (SPEC 5.1, M3) ----------
+
+	toggleMinimap() {
+		const show = this.minimap.hasClass('is-hidden');
+		this.minimap.toggleClass('is-hidden', !show);
+		rememberMinimap(show);
+		this.renderMinimap();
+	}
+
+	/** All pages, scaled to fit, plus the visible area. Cheap enough to redraw every camera frame. */
+	private renderMinimap() {
+		if (this.minimap.hasClass('is-hidden')) return;
+		const pages = this.store.file.pages;
+		const vp = this.viewportSize();
+		const area = visibleRect(this.camera, vp);
+		const all = bounds([...pages, area]);
+		const W = 180, H = 120, pad = 6;
+		const dpr = this.root.win.devicePixelRatio || 1;
+		if (this.minimap.width !== W * dpr) {
+			this.minimap.width = W * dpr;
+			this.minimap.height = H * dpr;
+		}
+		const c = this.minimap.getContext('2d');
+		if (!c || !all) return;
+		c.setTransform(dpr, 0, 0, dpr, 0, 0);
+		const colors = (this.rulerColors ??= this.readRulerColors());
+		c.fillStyle = colors.bg;
+		c.fillRect(0, 0, W, H);
+		const k = Math.min((W - 2 * pad) / all.w, (H - 2 * pad) / all.h);
+		const ox = pad + ((W - 2 * pad) - all.w * k) / 2 - all.x * k;
+		const oy = pad + ((H - 2 * pad) - all.h * k) / 2 - all.y * k;
+		this.minimapFrame = { x: ox, y: oy, k };
+		c.fillStyle = '#ffffff';
+		for (const p of pages) c.fillRect(ox + p.x * k, oy + p.y * k, Math.max(1, p.w * k), Math.max(1, p.h * k));
+		c.strokeStyle = colors.accent;
+		c.lineWidth = 1.5;
+		c.strokeRect(ox + area.x * k, oy + area.y * k, area.w * k, area.h * k);
+	}
+
+	private bindMinimap() {
+		const centreAt = (e: PointerEvent) => {
+			const f = this.minimapFrame;
+			if (!f) return;
+			const r = this.minimap.getBoundingClientRect();
+			const p = { x: (e.clientX - r.left - f.x) / f.k, y: (e.clientY - r.top - f.y) / f.k };
+			this.setCamera(cameraCentredOn(p, this.camera.zoom, this.viewportSize()));
+		};
+		this.minimap.addEventListener('pointerdown', (e) => {
+			this.minimap.setPointerCapture(e.pointerId);
+			centreAt(e);
+		});
+		this.minimap.addEventListener('pointermove', (e) => {
+			if (this.minimap.hasPointerCapture(e.pointerId)) centreAt(e);
+		});
 	}
 
 	/** Create, update or remove label elements to match the pages. */
@@ -1204,6 +1312,7 @@ export class BoardViewport implements BoardSurface {
 		this.zoomLabel = bar.createDiv({ cls: 'pw-zoom-label', text: '100%' });
 		button('zoom-in', 'Zoom in', () => this.zoomBy(1.25));
 		button('maximize', 'Zoom to fit', () => this.zoomToFit());
+		button('map', 'Minimap', () => this.toggleMinimap());
 		if (!this.store.readOnly) {
 			sep();
 			button('undo-2', 'Undo', () => this.store.undo());
@@ -1236,4 +1345,21 @@ export function today(): string {
 	const d = new Date();
 	const pad = (n: number) => String(n).padStart(2, '0');
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** Whether the minimap is shown: a per-viewer convenience, so browser storage (may be unavailable). */
+function minimapPreferred(): boolean {
+	try {
+		return window.localStorage.getItem('patchwork-minimap') !== 'off';
+	} catch {
+		return true;
+	}
+}
+
+function rememberMinimap(show: boolean) {
+	try {
+		window.localStorage.setItem('patchwork-minimap', show ? 'on' : 'off');
+	} catch {
+		// Storage blocked: the choice just isn't remembered.
+	}
 }

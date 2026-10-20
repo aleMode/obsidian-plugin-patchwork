@@ -195,3 +195,15 @@ describe('defaults', () => {
 		expect(parse(serializeBoard(file)).file).toEqual(file);
 	});
 });
+
+describe('saved views in the file', () => {
+	it('round-trip with a stable key order; bad views are reported', () => {
+		const file = newBoardFile();
+		file.views = [{ zoom: 0.5, name: 'Spells', y: 2, x: 1, id: 'v1', extra: true }];
+		const text = serializeBoard(file);
+		expect(Object.keys(JSON.parse(text).views[0])).toEqual(['id', 'name', 'x', 'y', 'zoom', 'extra']);
+		expect(parse(text).file.views).toEqual(file.views);
+		const bad = parseBoard(JSON.stringify({ version: 1, pages: [], views: [{ name: 'x', x: 0, y: 0, zoom: 0 }] }));
+		expect(bad.ok).toBe(false);
+	});
+});

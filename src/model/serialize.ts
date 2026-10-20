@@ -35,7 +35,8 @@ const BOARD: Shape = {
 };
 
 const PAGE_KEYS = ['id', 'name', 'x', 'y', 'w', 'h', 'safeArea', 'background', 'numberLabel', 'header', 'footer', 'modules'];
-const FILE_KEYS = ['version', 'unit', 'meta', 'board', 'pages'];
+const FILE_KEYS = ['version', 'unit', 'meta', 'board', 'pages', 'views'];
+const VIEW: Shape = { keys: ['id', 'name', 'x', 'y', 'zoom'] };
 
 const isObj = (v: unknown): v is Json => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -82,6 +83,7 @@ export function serializeBoard(file: PatchworkFile): string {
 		if (k === 'meta') return shaped(v, { keys: ['title', 'created'] });
 		if (k === 'board') return shaped(v, BOARD);
 		if (k === 'pages') return (v as Json[]).map(pageOut);
+		if (k === 'views') return (v as Json[]).map((view) => shaped(view, VIEW));
 		return v;
 	});
 	return JSON.stringify(out, null, 2) + '\n';

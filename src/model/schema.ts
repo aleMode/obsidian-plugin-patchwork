@@ -11,6 +11,17 @@ export interface PatchworkFile {
 	meta?: { title?: string; created?: string; [extra: string]: unknown };
 	board: BoardSettings;
 	pages: Page[];
+	views?: SavedView[];
+	[extra: string]: unknown;
+}
+
+/** A named camera position (SPEC 4 M3): the board point at the centre of the view, and the zoom. */
+export interface SavedView {
+	id: string;
+	name: string;
+	x: number;
+	y: number;
+	zoom: number;
 	[extra: string]: unknown;
 }
 

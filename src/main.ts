@@ -82,6 +82,9 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('arrange-row', 'Arrange pages in a row', (v) => v.autoArrange('row'), true);
 		this.addBoardCommand('arrange-grid', 'Arrange pages in a grid', (v) => v.autoArrange('grid'), true);
 		this.addBoardCommand('export-canvas', 'Export to canvas', (v) => void v.exportCanvas());
+		this.addBoardCommand('save-view', 'Save current view…', (v) => v.promptSaveView(), true);
+		this.addBoardCommand('go-to-view', 'Go to view…', (v) => v.pickView());
+		this.addBoardCommand('toggle-minimap', 'Toggle minimap', (v) => v.toggleMinimap());
 
 		this.addCommand({
 			id: 'generate-stress-board',

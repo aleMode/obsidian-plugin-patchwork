@@ -1,6 +1,7 @@
 import { ItemView, setIcon, WorkspaceLeaf } from 'obsidian';
 import { orderedPages } from '../model/ordering';
 import type { AnyModule } from '../model/schema';
+import { TextPromptModal } from '../ui/prompts';
 import type { ActiveBoard } from './activeBoard';
 
 export const VIEW_TYPE_OUTLINE = 'patchwork-outline';
@@ -64,6 +65,7 @@ export class OutlineView extends ItemView {
 			return;
 		}
 		const file = board.boardStore.file;
+		this.renderViews(el, board);
 		const isSel = (pageId: string, moduleId?: string) => board.selectedItems.some((it) => it.pageId === pageId && it.moduleId === moduleId);
 		orderedPages(file).forEach((page, i) => {
 			const row = el.createDiv({ cls: 'pw-outline-row pw-outline-page' });
@@ -80,6 +82,38 @@ export class OutlineView extends ItemView {
 				mrow.addEventListener('click', (e) => this.reveal(e, page.id, m.id));
 			}
 		});
+	}
+
+	/** Saved views: click to go there; rename or delete with the small buttons. */
+	private renderViews(el: HTMLElement, board: NonNullable<ReturnType<ActiveBoard['get']>>) {
+		const head = el.createDiv({ cls: 'pw-outline-section' });
+		head.createSpan({ text: 'Views' });
+		if (!board.boardStore.readOnly) {
+			const add = head.createSpan({ cls: 'clickable-icon', attr: { 'aria-label': 'Save current view' } });
+			setIcon(add, 'plus');
+			add.addEventListener('click', () => board.promptSaveView());
+		}
+		if (!board.views.length) el.createDiv({ cls: 'pw-panel-hint', text: 'Save a camera position to come back to it.' });
+		for (const v of board.views) {
+			const row = el.createDiv({ cls: 'pw-outline-row pw-outline-view' });
+			setIcon(row.createSpan({ cls: 'pw-outline-icon' }), 'bookmark');
+			row.createSpan({ text: v.name, cls: 'pw-outline-view-name' });
+			row.addEventListener('click', () => board.goToView(v.id));
+			if (board.boardStore.readOnly) continue;
+			const rename = row.createSpan({ cls: 'clickable-icon pw-outline-action', attr: { 'aria-label': 'Rename' } });
+			setIcon(rename, 'pencil');
+			rename.addEventListener('click', (e) => {
+				e.stopPropagation();
+				new TextPromptModal(this.app, 'Rename view', v.name, (name) => board.renameView(v.id, name)).open();
+			});
+			const del = row.createSpan({ cls: 'clickable-icon pw-outline-action', attr: { 'aria-label': 'Delete' } });
+			setIcon(del, 'trash-2');
+			del.addEventListener('click', (e) => {
+				e.stopPropagation();
+				board.deleteView(v.id);
+			});
+		}
+		el.createDiv({ cls: 'pw-outline-section', text: 'Pages' });
 	}
 
 	/** Click selects and centres the item; Shift-click adds or removes it from the selection. */

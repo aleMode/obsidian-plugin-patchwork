@@ -48,3 +48,14 @@ export function visibleRect(c: Camera, viewport: { w: number; h: number }): Rect
 	const br = screenToBoard(c, { x: viewport.w, y: viewport.h });
 	return { x: tl.x, y: tl.y, w: br.x - tl.x, h: br.y - tl.y };
 }
+
+/** The camera showing board point (x, y) at the centre of the viewport, at `zoom`. */
+export function cameraCentredOn(p: Point, zoom: number, viewport: { w: number; h: number }): Camera {
+	const z = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+	return { zoom: z, tx: viewport.w / 2 - p.x * PX_PER_MM * z, ty: viewport.h / 2 - p.y * PX_PER_MM * z };
+}
+
+/** The board point at the centre of the viewport. */
+export function cameraCentre(c: Camera, viewport: { w: number; h: number }): Point {
+	return screenToBoard(c, { x: viewport.w / 2, y: viewport.h / 2 });
+}

@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 175 checks across 16 suites, all passing; `npm test`: 162 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 181 checks across 17 suites, all passing; `npm test`: 164 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -14,6 +14,10 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - **Contents…** lists the PDF's bookmarks (indented by level, with page numbers): pick one to jump there.
 - **Search this PDF…**: type a term and press Enter. Matches across the whole PDF are listed with their page and text; click one to go there with a crop proposed around it (a column centred on the match, extending below it). Adjust and *Apply*.
 - Try "Rigged to Blow" or "Agatha" in the big rulebook: the first result should frame the purple box.
+
+### Saved views and minimap
+- **Views** (top of the outline panel): *+* saves the current camera position under a name; click a view to jump back; hover for rename and delete. Also: **Patchwork: Save current view…**, **Go to view…**. Views are stored in the board file.
+- **Minimap** (bottom right; toolbar *map* icon or **Toggle minimap**): all pages and the visible area; click or drag in it to move around. Whether it's shown is remembered on this device.
 
 ## New in M2 (session 3)
 
@@ -118,7 +122,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ## Known gaps (not bugs, not built yet)
 
-- M2 is complete. Next (M3): PDF outline picker, PDF text search to a region, saved views, minimap.
+- M3 so far: PDF contents and search, saved views, minimap. Still to come: low-resolution previews instead of outline boxes when zoomed far out.
 
 ## Fixed tonight (worth a quick re-check)
 - Deleting a board while it has unsaved changes no longer shows Obsidian's scary "Failed to save file … make a backup" notice.
