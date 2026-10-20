@@ -5,7 +5,7 @@ import { parseRange } from '../model/sheetPlan';
 import { arrangePages } from '../model/arrange';
 import { toJsonCanvas } from '../model/canvasExport';
 import { allIds } from '../model/defaults';
-import { bounds, containsPoint, type Handle, inset, intersects, type Point, type Rect, resizeRect } from '../model/geometry';
+import { bounds, containsPoint, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect } from '../model/geometry';
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
@@ -73,6 +73,8 @@ const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 const GUIDE_SNAP_PX = 6;
 /** Smallest page or module a resize can produce, in mm. */
 const MIN_SIZE_MM = 5;
+// How much of a dropped module must stay on its page so it can still be seen and grabbed.
+const MIN_VISIBLE_MM = 10;
 /** Image files Patchwork can place (what Chromium decodes). */
 const IMAGE_EXT = /^(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
 
@@ -1214,11 +1216,19 @@ export class BoardViewport implements BoardSurface {
 		const to = this.reparentTarget(d);
 		const from = this.store.file.pages.find((p) => p.id === d.pageId);
 		const m = from?.modules.find((x) => x.id === d.id);
-		if (!to || !from || !m) return;
+		if (!from || !m) return;
+		if (!to) return this.keepOnPage(from, m);
 		const grid = this.store.file.board.grid;
 		const rel = snapPoint({ x: from.x + m.x - to.x, y: from.y + m.y - to.y }, grid.snap ? grid.size : 0);
 		this.store.update((f) => moveModuleToPage(f, from.id, m.id, to.id, rel.x, rel.y), { coalesce: `move-module:${d.id}` });
 		this.select({ pageId: to.id, moduleId: m.id });
+	}
+
+	/** A module dropped off every page would vanish (it is clipped to its page); keep a strip of it on the page. */
+	private keepOnPage(page: Page, m: AnyModule) {
+		const r = keepGrabbable(m, page, MIN_VISIBLE_MM);
+		if (r.x === m.x && r.y === m.y) return;
+		this.store.update((f) => moveModule(f, page.id, m.id, r.x, r.y), { coalesce: `move-module:${m.id}` });
 	}
 
 	private resizeTo(d: Extract<Drag, { kind: 'resize' }>, p: Point, grid: number, keepAspect: boolean) {

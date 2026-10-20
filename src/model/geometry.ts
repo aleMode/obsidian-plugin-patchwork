@@ -63,6 +63,20 @@ export function fitRect(aspect: number, box: Rect, fit: Fit): Rect {
 
 export const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
+/**
+ * Pull a page-relative rect back until at least `minVisible` of it (or all of it, if smaller) is
+ * inside the page on each axis. Modules are clipped to their page, so one dropped entirely outside
+ * would be invisible and impossible to grab; poking past an edge (bleed) is still allowed.
+ */
+export function keepGrabbable(r: Rect, page: { w: number; h: number }, minVisible: number): Rect {
+	const pull = (pos: number, size: number, extent: number) => {
+		const need = Math.min(minVisible, size, extent);
+		if (Math.min(pos + size, extent) - Math.max(pos, 0) >= need) return pos;
+		return pos < 0 ? need - size : extent - need;
+	};
+	return { ...r, x: pull(r.x, r.w, page.w), y: pull(r.y, r.h, page.h) };
+}
+
 export type Handle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
 /**

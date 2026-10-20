@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { bounds, containsPoint, fitRect, intersects, toBoard } from '../../src/model/geometry';
+import { bounds, containsPoint, fitRect, intersects, keepGrabbable, toBoard } from '../../src/model/geometry';
+
+describe('keepGrabbable', () => {
+	const page = { w: 210, h: 297 };
+	it('leaves a module that is on the page alone', () => {
+		const r = { x: 10, y: 20, w: 50, h: 40 };
+		expect(keepGrabbable(r, page, 10)).toEqual(r);
+	});
+	it('allows poking past an edge while enough stays visible', () => {
+		expect(keepGrabbable({ x: -40, y: 0, w: 50, h: 40 }, page, 10)).toEqual({ x: -40, y: 0, w: 50, h: 40 });
+	});
+	it('pulls a module dropped off the left or top back to the minimum strip', () => {
+		expect(keepGrabbable({ x: -200, y: -100, w: 50, h: 40 }, page, 10)).toEqual({ x: -40, y: -30, w: 50, h: 40 });
+	});
+	it('pulls a module dropped off the right or bottom back to the minimum strip', () => {
+		expect(keepGrabbable({ x: 500, y: 900, w: 50, h: 40 }, page, 10)).toEqual({ x: 200, y: 287, w: 50, h: 40 });
+	});
+	it('needs only the whole module when it is smaller than the strip', () => {
+		expect(keepGrabbable({ x: 300, y: 0, w: 4, h: 4 }, page, 10)).toEqual({ x: 206, y: 0, w: 4, h: 4 });
+	});
+});
 
 describe('geometry', () => {
 	const a = { x: 0, y: 0, w: 10, h: 10 };

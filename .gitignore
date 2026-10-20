@@ -25,3 +25,4 @@ test-vault/PDFs/*.pdf
 
 # local Obsidian profile used for automated spike runs
 .dev/
+.dev-build.log
