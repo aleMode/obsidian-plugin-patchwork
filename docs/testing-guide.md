@@ -14,7 +14,7 @@ Tick these off; details for each are in the sections below.
 **Export (the bug you found)**
 - [x] Your `Untitled patchwork`: export again. The note shows its own text (sharp, selectable), not the PDF page.
   - [ ] works, but the text of the embedded psf that should be cut is still visible. not a huge issue, blur is gone and the .md text is selectable
-    - Looked at: what the box cuts off is not drawn, but the cut-off text stays in the file as hidden, selectable text (same as a cropped PDF module; removing it would need rewriting the PDF's content). If you saw it *drawn*, tell me which file and module.
+    - Looked at: what the box cuts off is not drawn, but the cut-off text stays in the file as hidden, selectable text (same as a cropped PDF module; removing it would need rewriting the PDF's content). Confirmed: you only saw it when selecting, so it stays as is.
 - [x] A note module showing just the `## PDF embed` section of `Spells/Spell list.md`: the page appears in the note on the board, sharpens a moment after zooming in, and exports sharp with selectable text (best quality) or as a picture (small quality).
 
 **Use mode**
@@ -25,6 +25,7 @@ Tick these off; details for each are in the sections below.
 - [x] Checkboxes: note tasks tick in `Dashboard/Session.md`; text-box tasks tick and undo; a frozen note refuses.
 - [x] Colours: palette on the context bar (Arrange) and Style tab → Colour / Custom colour; tinted cards in a PDF export.
 - [x] Plugins (enable Dataview, Tasks, Buttons, Meta Bind; Bases in core plugins): `Dashboard/Plugin blocks.patchwork`, every block responds; Bases links open to the side.
+- [ ] Embedded PDF pages looked soft in the editor at normal zoom: now drawn at twice the pixels on the board (3.5× the edge sharpness by pixel measure). Check by eye at 100 % and at a fitted zoom.
 - [x] The dashboard looked slightly blurry: Chromium kept the board layer's first raster scale and stretched it. Fixed: the layer is re-rasterised when zoom settles (text 60 % sharper by pixel measure). Check by eye on `Dashboard/Dashboard.patchwork`, then zoom in and out.
 
 **Smaller changes**

@@ -6,6 +6,9 @@ import { extractPdfEmbeds, type PdfEmbed } from '../model/pdfEmbeds';
 import { releasePdfEmbeds, renderPdfEmbeds } from './pdfEmbed';
 import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setBadge } from './types';
 
+/** Canvas pixels per displayed pixel for PDF pages in notes on the board. */
+const SCREEN_OVERSAMPLE = 2;
+
 /** Renders markdown with Obsidian's renderer; each render gets its own child component for cleanup. */
 abstract class MarkdownModule implements ModuleRenderer {
 	private child: Component | null = null;
@@ -53,8 +56,12 @@ abstract class MarkdownModule implements ModuleRenderer {
 	}
 
 	private drawEmbeds(target: HTMLElement, embeds: PdfEmbed[], sourcePath: string, generation: number) {
-		const { app, pdfDocs, resolution, pdfEmbedsAsVector } = this.ctx;
-		return renderPdfEmbeds(target, embeds, { app, pdfDocs, ...(resolution ? { resolution } : {}), sizeOnly: !!pdfEmbedsAsVector }, sourcePath, () => this.isCurrent(generation));
+		const { app, pdfDocs, resolution, pdfEmbedsAsVector, bitmaps } = this.ctx;
+		// On screen the board's zoom and offsets are fractional, so a page drawn at exactly its shown size
+		// is resampled about 1:1 and turns soft; twice the pixels get downsampled cleanly instead.
+		const oversample = bitmaps ? SCREEN_OVERSAMPLE : 1;
+		const res = resolution ? { resolution: () => resolution() * oversample } : {};
+		return renderPdfEmbeds(target, embeds, { app, pdfDocs, ...res, sizeOnly: !!pdfEmbedsAsVector }, sourcePath, () => this.isCurrent(generation));
 	}
 
 	/** Same thresholds as PDF modules: redraw when the pages are well under, or far over, what the zoom needs. */
