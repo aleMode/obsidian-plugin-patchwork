@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatLength, fromUnit, mmToPt, mmToPx, parseLength, ptToMm, pxToMm, toUnit } from '../../src/model/units';
+import { formatLength, formatLengthValue, fromUnit, mmToPt, mmToPx, parseLength, ptToMm, pxToMm, toUnit } from '../../src/model/units';
 
 describe('units', () => {
 	it('converts mm to CSS px and PDF pt using 96 and 72 per inch', () => {
@@ -20,6 +20,8 @@ describe('units', () => {
 		expect(formatLength(210, 'mm')).toBe('210 mm');
 		expect(formatLength(210, 'cm')).toBe('21 cm');
 		expect(formatLength(215.9, 'in')).toBe('8.5 in');
+		expect(formatLengthValue(210, 'cm')).toBe('21');
+		expect(formatLengthValue(215.9, 'in')).toBe('8.5');
 		expect(formatLength(12.345, 'mm')).toBe('12.3 mm');
 	});
 

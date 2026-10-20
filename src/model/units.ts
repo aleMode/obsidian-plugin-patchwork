@@ -19,10 +19,14 @@ export const fromUnit = (value: number, unit: DisplayUnit) => value * MM_PER_UNI
 
 const DECIMALS: Record<DisplayUnit, number> = { mm: 1, cm: 2, in: 2 };
 
+/** "210", "21", "8.27": the number alone, for fields that show the unit next to the input. */
+export function formatLengthValue(mm: number, unit: DisplayUnit): string {
+	return String(Number(toUnit(mm, unit).toFixed(DECIMALS[unit])));
+}
+
 /** "210 mm", "21 cm", "8.27 in". Trailing zeros are dropped so whole values read cleanly. */
 export function formatLength(mm: number, unit: DisplayUnit): string {
-	const v = toUnit(mm, unit);
-	return `${Number(v.toFixed(DECIMALS[unit]))} ${unit}`;
+	return `${formatLengthValue(mm, unit)} ${unit}`;
 }
 
 /**

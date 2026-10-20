@@ -5,7 +5,7 @@ import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule, TocModule, TrackerModule } from '../model/schema';
-import { formatLength, parseLength } from '../model/units';
+import { formatLength, formatLengthValue, parseLength } from '../model/units';
 import { MAX_PAGE_SIDE_MM } from '../model/schema';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
@@ -14,6 +14,9 @@ import { ALIGN_ACTIONS, type BoardViewport } from './BoardViewport';
 import { moduleTitle } from './OutlineView';
 
 export const VIEW_TYPE_INSPECTOR = 'patchwork-inspector';
+
+/** A bare number, comma or point as decimal separator; unit text is not accepted in length fields. */
+const PLAIN_NUMBER = /^\s*-?\d+(?:[.,]\d+)?\s*$/;
 
 const FIT = { contain: 'Contain', cover: 'Cover (crop to fill)', stretch: 'Stretch' };
 const POSITIONS: Record<NumberPosition, string> = {
@@ -45,13 +48,15 @@ class Form {
 		new Setting(this.el).setName(text).setHeading();
 	}
 
+	/** The unit is a fixed label next to the input (change it in Board settings), so the field holds a plain number. */
 	length(name: string, mm: number, set: (mm: number) => void, opts: { min?: number } = {}) {
-		new Setting(this.el).setName(name).addText((t) =>
-			t.setValue(formatLength(mm, this.unit)).onChange((v) => {
-				const parsed = parseLength(v, this.unit);
+		const s = new Setting(this.el).setName(name).addText((t) =>
+			t.setValue(formatLengthValue(mm, this.unit)).onChange((v) => {
+				const parsed = PLAIN_NUMBER.test(v) ? parseLength(v, this.unit) : null;
 				if (parsed !== null && parsed >= (opts.min ?? -Infinity)) set(Number(parsed.toFixed(4)));
 			}),
 		);
+		s.controlEl.createSpan({ cls: 'pw-unit-suffix', text: this.unit });
 	}
 
 	number(name: string, value: number | undefined, set: (v: number | undefined) => void, opts: { min?: number; max?: number; placeholder?: string } = {}) {

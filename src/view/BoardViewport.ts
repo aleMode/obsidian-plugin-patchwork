@@ -5,7 +5,7 @@ import { parseRange } from '../model/sheetPlan';
 import { arrangePages } from '../model/arrange';
 import { toJsonCanvas } from '../model/canvasExport';
 import { allIds } from '../model/defaults';
-import { bounds, containsPoint, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect } from '../model/geometry';
+import { bounds, containsPoint, containsRect, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect } from '../model/geometry';
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
@@ -336,10 +336,12 @@ export class BoardViewport implements BoardSurface {
 		this.zoomToFit(rects.length ? bounds(rects) ?? undefined : undefined);
 	}
 
+	/** Bring the selection into view; if it is already fully visible the camera stays where it is. */
 	revealSelection() {
 		const sel = this.selectedRect();
 		const vp = this.viewportSize();
 		if (!sel || vp.w === 0) return;
+		if (containsRect(visibleRect(this.camera, vp), sel.rect)) return;
 		const fit = fitCamera(sel.rect, vp, 60);
 		const zoom = Math.min(this.camera.zoom, fit.zoom);
 		const k = PX_PER_MM * zoom;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bounds, containsPoint, fitRect, intersects, keepGrabbable, toBoard } from '../../src/model/geometry';
+import { bounds, containsPoint, containsRect, fitRect, intersects, keepGrabbable, toBoard } from '../../src/model/geometry';
 
 describe('keepGrabbable', () => {
 	const page = { w: 210, h: 297 };
@@ -61,5 +61,18 @@ describe('geometry', () => {
 		it('falls back to the box for a degenerate aspect', () => {
 			expect(fitRect(0, box, 'contain')).toEqual(box);
 		});
+	});
+});
+
+describe('containsRect', () => {
+	const outer = { x: 0, y: 0, w: 100, h: 100 };
+	it('accepts a rect inside, including touching edges', () => {
+		expect(containsRect(outer, { x: 10, y: 10, w: 20, h: 20 })).toBe(true);
+		expect(containsRect(outer, outer)).toBe(true);
+	});
+	it('rejects one poking out on any side', () => {
+		expect(containsRect(outer, { x: -1, y: 10, w: 20, h: 20 })).toBe(false);
+		expect(containsRect(outer, { x: 90, y: 10, w: 20, h: 20 })).toBe(false);
+		expect(containsRect(outer, { x: 10, y: 95, w: 20, h: 20 })).toBe(false);
 	});
 });

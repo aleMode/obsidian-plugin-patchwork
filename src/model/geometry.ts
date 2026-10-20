@@ -21,6 +21,9 @@ export function intersects(a: Rect, b: Rect): boolean {
 	return a.x < right(b) && b.x < right(a) && a.y < bottom(b) && b.y < bottom(a);
 }
 
+export const containsRect = (outer: Rect, inner: Rect): boolean =>
+	inner.x >= outer.x && inner.y >= outer.y && right(inner) <= right(outer) && bottom(inner) <= bottom(outer);
+
 export function containsPoint(r: Rect, p: Point): boolean {
 	return p.x >= r.x && p.x <= right(r) && p.y >= r.y && p.y <= bottom(r);
 }
