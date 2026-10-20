@@ -42,7 +42,7 @@ try {
 	await select(null);
 	check('page: name, size, orientation, background, more', (await barText()).startsWith('A4') && (await ev(`return !!document.querySelector('.pw-cb-name') && !!document.querySelector('.pw-cb-color')`)));
 	await select('n');
-	check('note: section, overflow, freeze, open', (await barText()).startsWith('Spell index▾|Clip▾|Freeze|Open'), await barText());
+	check('note: section, overflow, freeze, edit, open', (await barText()).startsWith('Spell index▾|Clip▾|Freeze|Edit|Open'), await barText());
 	await select('p');
 	check('pdf: crop, page stepper, fit, invert', (await barText()).startsWith('Crop|') && (await barText()).includes('p. 1') && (await barText()).includes('Contain'), await barText());
 	await select('t');
