@@ -59,7 +59,7 @@ describe('sliceBounds', () => {
 	const heading = (name: string): SectionRange => {
 		const start = text.indexOf(`# ${name}`);
 		const level = /^#+/.exec(text.slice(start))![0].length;
-		const next = [...text.matchAll(/^#+ /gm)].map((m) => m.index!).find((i) => i > start && /^#+/.exec(text.slice(i))![0].length <= level);
+		const next = [...text.matchAll(/^#+ /gm)].map((m) => m.index).find((i) => i > start && /^#+/.exec(text.slice(i))![0].length <= level);
 		return { kind: 'heading', start, end: next ?? null };
 	};
 	const cases: [string, SectionRange | null, SliceOptions][] = [
