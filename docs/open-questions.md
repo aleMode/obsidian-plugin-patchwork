@@ -71,3 +71,11 @@ Questions raised while building, each with the recommended answer we are proceed
 ### Q15. What "stale-source warnings and freeze" mean
 - SPEC 4 names the feature only. **Chosen (M4):** notes can be *frozen* (markdown snapshot stored in the board, badge flags later changes to the note). PDF crops remember which version of the PDF they were made on and warn when the file is replaced, since a new rulebook version can shift pages and crops.
 - Not built: freezing PDF crops or images (would need stored image snapshots, e.g. PNGs next to the board), and stale warnings for live (unfrozen) notes, which change on purpose. **Recommendation:** wait for a real need; the stored-PNG route is straightforward if it comes up.
+
+### Q16. Interface layout: sidebar, context bar, dialogs
+- The inspector needs about 23 rows for a note or PDF module in a 300 px column, board settings live in four places (five of them duplicated), and several actions are only commands. Full inventory and proposal: `docs/ui-reorganisation.md` sections 1–3.
+- **Recommendation:** a floating context bar plus a short tabbed properties popover for pages and modules, one Board dialog, an Export menu, and the inspector kept only as an optional dock. Nothing is lost: the command palette keeps every action.
+
+### Q17. Editing notes in place (like Canvas)
+- Obsidian has no public embeddable editor. Plain CodeMirror 6 is available without a new dependency; the Live Preview look needs undocumented internals (hard rule 6). Options A (text modules), B (notes, plain editor), C (internals) in `docs/ui-reorganisation.md` section 4.
+- **Recommendation:** A, then B; spike C (S8) only if raw-markdown editing feels too bare. Double-click edits inline and "open note" moves to the context bar, right-click and Alt + double-click, which changes SPEC 5.x (changelog).
