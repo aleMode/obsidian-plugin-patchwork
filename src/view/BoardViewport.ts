@@ -1388,9 +1388,15 @@ export class BoardViewport implements BoardSurface {
 		const hit = this.hit(e, (document.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement);
 		const m = hit?.moduleId ? this.store.file.pages.find((p) => p.id === hit.pageId)?.modules.find((x) => x.id === hit.moduleId) : undefined;
 		if (hit?.moduleId && m?.type === 'pdf') return this.editCrop(hit.pageId, hit.moduleId);
-		if (m?.type !== 'note') return;
-		const note = m as NoteModule;
+		// A frame opens the note its chain starts from.
+		const note = (m?.type === 'frame' ? this.chainHead(m.id) : m) as NoteModule | undefined;
+		if (note?.type !== 'note') return;
 		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
+	}
+
+	private chainHead(moduleId: string): AnyModule | undefined {
+		const info = flowChains(this.store.file).get(moduleId);
+		return info?.ok ? info.chain[0]!.module : undefined;
 	}
 
 	/** Align, distribute and bulk actions for a multi-selection. */

@@ -46,6 +46,15 @@ abstract class MarkdownModule implements ModuleRenderer {
 		return this.el.createDiv({ cls: 'markdown-rendered pw-markdown' });
 	}
 
+	/** The "Frozen" tag, orange once the live note differs from the snapshot. Screen only. */
+	protected async flagFrozen(note: NoteModule, gen: number) {
+		const frozen = note.frozen!;
+		const live = await loadNoteContent(this.ctx.app, note).catch(() => null);
+		if (!this.isCurrent(gen)) return;
+		const changed = snapshotChanged(frozen, live?.ok ? live.markdown : null);
+		setBadge(this.el, changed ? `Frozen ${frozen.at} · note changed` : `Frozen ${frozen.at}`, changed ? 'warning' : 'info');
+	}
+
 	protected nextGeneration() {
 		return ++this.generation;
 	}
@@ -85,12 +94,8 @@ export class NoteModuleRenderer extends MarkdownModule {
 
 	/** The snapshot, rendered against the note's path (links resolve as before); flags live changes. */
 	private async showFrozen(note: NoteModule, gen: number) {
-		const frozen = note.frozen!;
-		await this.show(frozen.markdown, note.file, gen);
-		const live = await loadNoteContent(this.ctx.app, note).catch(() => null);
-		if (!this.isCurrent(gen)) return;
-		const changed = snapshotChanged(frozen, live?.ok ? live.markdown : null);
-		setBadge(this.el, changed ? `Frozen ${frozen.at} · note changed` : `Frozen ${frozen.at}`, changed ? 'warning' : 'info');
+		await this.show(note.frozen!.markdown, note.file, gen);
+		await this.flagFrozen(note, gen);
 	}
 }
 
@@ -125,6 +130,8 @@ export class FlowRenderer extends MarkdownModule {
 				if ('error' in r) return placeholder(this.el, r.error, 'missing');
 				const [start, end] = r.ranges[info.index]!;
 				await this.showBlocks(r.blocks.slice(start, end).map((b) => b.text), r.sourcePath, gen);
+				// Every frame of a frozen note's chain carries the tag, so it shows wherever the text lands.
+				if (head.type === 'note' && head.frozen) await this.flagFrozen(head as NoteModule, gen);
 				if (this.isCurrent(gen)) this.el.parentElement?.toggleClass('is-overflowing', last && r.leftover);
 			})
 			.catch((e: unknown) => {
