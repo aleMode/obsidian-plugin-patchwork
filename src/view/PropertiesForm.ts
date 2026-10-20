@@ -26,7 +26,7 @@ class Form {
 		new Setting(this.host()).setName(text).setHeading();
 	}
 
-	/** The unit is a fixed label next to the input (change it in Board settings), so the field holds a plain number. */
+	/** The unit is a fixed label next to the input (change it in Patchwork settings), so the field holds a plain number. */
 	length(name: string, mm: number, set: (mm: number) => void, opts: { min?: number } = {}) {
 		const s = new Setting(this.host()).setName(name).addText((t) =>
 			t.setValue(formatLengthValue(mm, this.unit)).onChange((v) => {
@@ -359,9 +359,9 @@ export class PropertiesForm {
 		this.el.createDiv({ cls: 'pw-panel-hint', text: 'The label (above) is its title. Click the tracker on its page to change it; each click can be undone.' });
 	}
 
-	/** Linked frame (M5): where it sits in its chain. */
+	/** Text frame (linked frame, M5): where it sits in its chain. */
 	private renderFrame(form: Form, board: BoardViewport, page: Page, m: AnyModule) {
-		form.heading('Linked frame');
+		form.heading('Text frame (continues a note)');
 		const info = flowChains(board.boardStore.file).get(m.id);
 		const text = !info ? 'Not linked.' : !info.ok ? info.reason : `Frame ${info.index + 1} of ${info.chain.length}, continuing “${moduleTitle(info.chain[0]!.module)}”. Text that doesn't fit in one frame flows into the next, a block at a time.`;
 		this.el.createDiv({ cls: 'pw-panel-hint', text });
@@ -401,14 +401,14 @@ export class PropertiesForm {
 		this.in('advanced');
 		form.number('Scale', m.scale, (v) => set('scale', (x) => withField(x, 'scale', v === 1 ? undefined : v)), { min: 0.1, max: 5, placeholder: '1' });
 		this.in('content');
-		const freeze = new Setting(this.el).setName('Freeze');
+		const freeze = new Setting(this.el).setName('Freeze text (snapshot)');
 		if (m.frozen) {
 			freeze.setDesc(`Showing a snapshot from ${m.frozen.at}; changes to the note don't appear here.`);
 			freeze.addButton((b) => b.setButtonText('Update snapshot').onClick(() => void board.freezeNote(page.id, m.id)));
 			freeze.addButton((b) => b.setButtonText('Unfreeze').onClick(() => board.unfreezeNote(page.id, m.id)));
 		} else {
 			freeze.setDesc('Keep showing the note as it is now, even if it changes later (the snapshot is stored in the patchwork).');
-			freeze.addButton((b) => b.setButtonText('Freeze').onClick(() => void board.freezeNote(page.id, m.id)));
+			freeze.addButton((b) => b.setButtonText('Freeze text').onClick(() => void board.freezeNote(page.id, m.id)));
 		}
 	}
 
@@ -426,8 +426,8 @@ export class PropertiesForm {
 		form.toggle('Invert colours', !!m.invert, (v) => set('invert', (x) => withField(x, 'invert', v ? true : undefined)), 'For dark-background pages: light on screen and in print (exported as an image).');
 		this.in('advanced');
 		form.button(
-			'Source check',
-			m.sourceId ? 'Mark as checked' : 'Start checking',
+			'Warn if this PDF changes',
+			m.sourceId ? 'Mark as checked' : 'Turn on',
 			() => void board.markPdfChecked(page.id, m.id),
 			m.sourceId
 				? 'Warns on the module when the PDF file is replaced (e.g. a new rulebook version). After checking the crop, mark it as checked.'

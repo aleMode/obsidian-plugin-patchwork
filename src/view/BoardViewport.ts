@@ -1667,7 +1667,7 @@ export class BoardViewport implements BoardSurface {
 				menu.addItem((i) => i.setTitle('Continue in a new frame').setIcon('link').onClick(() => this.continueInFrame(pageId, moduleId)));
 				menu.addItem((i) =>
 					i
-						.setTitle(frozen ? 'Unfreeze' : 'Freeze')
+						.setTitle(frozen ? 'Unfreeze' : 'Freeze text (snapshot)')
 						.setIcon(frozen ? 'flame' : 'snowflake')
 						.onClick(() => (frozen ? this.unfreezeNote(pageId, moduleId) : void this.freezeNote(pageId, moduleId))),
 				);

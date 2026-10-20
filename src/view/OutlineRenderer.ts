@@ -22,7 +22,7 @@ export function moduleTitle(m: AnyModule): string {
 		case 'toc':
 			return 'Table of contents';
 		case 'frame':
-			return 'Linked frame';
+			return 'Text frame';
 		case 'tracker':
 			return typeof m.label === 'string' && m.label ? m.label : `${String(m.kind)} tracker`;
 		default:

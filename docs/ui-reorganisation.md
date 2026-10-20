@@ -1,6 +1,6 @@
 # Interface reorganisation and inline editing (proposal, 2026-10-20)
 
-Written after the manual test rounds. **Status:** quick wins, step 1 (Patchwork settings dialog, toolbar, export menu, wording), step 2 (context bar and properties popover) and step 3 (inline editing, options A and B with a plain text area rather than CodeMirror) and the floating outline-and-views panel are built; option C (real Live Preview) is not. The decisions in section 6 were taken on 2026-10-20: optional dock, inline editing on double-click, "patchwork" in place of "board", toolbar first.
+Written after the manual test rounds. **Status:** quick wins, step 1 (Patchwork settings dialog, toolbar, export menu, wording), step 2 (context bar and properties popover) and step 3 (inline editing, options A and B with a plain text area rather than CodeMirror) the floating outline-and-views panel and step 4 (the words in section 3) are built; option C (real Live Preview) is not. The decisions in section 6 were taken on 2026-10-20: optional dock, inline editing on double-click, "patchwork" in place of "board", toolbar first.
 
 ## 1. Where everything is today
 
@@ -113,13 +113,13 @@ Labels on hover and a short label on the primary buttons.
 | Today | Proposed | Why |
 |---|---|---|
 | New board *(done)* | New patchwork | the file is a patchwork; "board" reads like Canvas |
-| Board settings | Patchwork settings | same |
-| "Open a Patchwork board to edit it here" | "Open a patchwork…" | same |
-| Untitled board | Untitled patchwork | would touch 5 e2e checks; do with the rest |
+| Board settings *(done)* | Patchwork settings | same |
+| "Open a Patchwork board to edit it here" *(done)* | "Open a patchwork…" | same |
+| Untitled board *(done)* | Untitled patchwork | |
 | Master page | keep | |
-| Freeze | Freeze text (snapshot) | says what it does |
-| Source check / Start checking | Warn if this PDF changes | |
-| Linked frame | Text frame (continues a note) | |
+| Freeze *(done)* | Freeze text (snapshot) | says what it does; "Freeze text" on the context bar |
+| Source check / Start checking *(done)* | Warn if this PDF changes (Turn on / Mark as checked) | |
+| Linked frame *(done)* | Text frame (continues a note) | the file format keeps `frame` |
 | In exports: Vector (sharp) / Image (smaller) | keep | |
 
 The command palette keeps every action (it is the keyboard route), but nothing is **only** a command.

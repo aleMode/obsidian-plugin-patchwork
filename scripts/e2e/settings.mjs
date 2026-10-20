@@ -62,7 +62,7 @@ try {
 	const exp = await menuTitles('Export');
 	check('Export menu: PDF or PNG, and canvas', exp.some((t) => t.startsWith('Export as PDF or PNG')) && exp.includes('Export to canvas'), exp);
 	const view = await menuTitles('Outline');
-	check('View menu: panels and minimap', view.includes('Inspector and outline') && view.includes('Minimap'), view);
+	check('View menu: panels and minimap', view.some((t) => t.startsWith('Inspector and outline')) && view.includes('Minimap'), view);
 
 	await cdp.evaluate(`${V} v.surface.showExport(); await new Promise((r) => setTimeout(r, 400));`);
 	const sections = await cdp.evaluate(`return [...document.querySelectorAll('.pw-export-section > summary')].map((s) => s.textContent + ':' + s.parentElement.open)`);

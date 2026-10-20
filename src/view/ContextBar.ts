@@ -268,7 +268,7 @@ export class ContextBar {
 			},
 			m.frozen
 				? { icon: 'flame', text: 'Unfreeze', tip: 'Show the live note again', onClick: () => this.board.unfreezeNote(page.id, m.id) }
-				: { icon: 'snowflake', text: 'Freeze', tip: 'Keep showing the note as it is now (snapshot)', onClick: () => void this.board.freezeNote(page.id, m.id) },
+				: { icon: 'snowflake', text: 'Freeze text', tip: 'Keep showing the note as it is now (snapshot)', onClick: () => void this.board.freezeNote(page.id, m.id) },
 			{ icon: 'pencil', text: 'Edit', tip: 'Edit the shown part of the note where it is (double-click or Enter)', onClick: () => this.board.editInline(page.id, m.id) },
 			{ icon: 'external-link', text: 'Open', tip: 'Open the note in a pane', onClick: () => this.board.openNote(page.id, m.id) },
 		];
