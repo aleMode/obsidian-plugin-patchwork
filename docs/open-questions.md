@@ -83,3 +83,7 @@ Questions raised while building, each with the recommended answer we are proceed
 
 ### Q18. Live Preview editing (option C)
 - **Dropped (2026-10-20).** The user prefers a display mode to editing in Obsidian's editor: a patchwork gets a **Use** mode where content is live (links, checkboxes, plugin buttons) and nothing moves, next to today's **Arrange**. Plan and decisions: `docs/use-mode-plan.md`. In-place editing stays the plain text area (A and B).
+
+### Q19. Text slightly soft at zooms other than 100 %
+- **Decided (2026-10-20): accepted.** The board scales one full-size layout (SPEC 8.1, Q6), so at e.g. 77 % text baselines fall between pixel rows; bold headings look softer than text laid out at its real size (measured: 49 % less edge energy, body text about equal). Laying out at each zoom (CSS `zoom` when the camera settles) would remove it but could wrap lines differently from the export and re-lays out the whole board on every zoom.
+- Fixed alongside: the layer re-rasterises when zoom settles, sits on whole device pixels, and PDF regions/embeds are oversampled on screen (1.5× / 2×).
