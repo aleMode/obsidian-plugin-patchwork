@@ -1,11 +1,11 @@
-import { ItemView, Setting, TFile, WorkspaceLeaf } from 'obsidian';
+import { ItemView, setIcon, Setting, TFile, WorkspaceLeaf } from 'obsidian';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, TextModule } from '../model/schema';
 import { formatLength, parseLength } from '../model/units';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import type { ActiveBoard } from './activeBoard';
-import type { BoardViewport } from './BoardViewport';
+import { ALIGN_ACTIONS, type BoardViewport } from './BoardViewport';
 import { moduleTitle } from './OutlineView';
 
 export const VIEW_TYPE_INSPECTOR = 'patchwork-inspector';
@@ -116,7 +116,7 @@ export class InspectorView extends ItemView {
 	/** Re-render unless the user is typing in this panel about the same target (keeps focus and caret). */
 	private refresh() {
 		const board = this.active.get();
-		const key = board ? `${board.selected?.pageId ?? ''}/${board.selected?.moduleId ?? ''}` : '';
+		const key = this.keyOf(board);
 		if (key === this.shownKey && this.contentEl.contains(this.contentEl.doc.activeElement)) return;
 		this.render();
 	}
@@ -126,7 +126,7 @@ export class InspectorView extends ItemView {
 		el.empty();
 		el.addClass('pw-inspector');
 		const board = this.active.get();
-		this.shownKey = board ? `${board.selected?.pageId ?? ''}/${board.selected?.moduleId ?? ''}` : '';
+		this.shownKey = this.keyOf(board);
 		if (!board) {
 			el.createDiv({ cls: 'pw-panel-empty', text: 'Open a Patchwork board to edit it here.' });
 			return;
@@ -138,9 +138,40 @@ export class InspectorView extends ItemView {
 		const page = file.pages.find((p) => p.id === board.selected?.pageId);
 		const mod = page?.modules.find((m) => m.id === board.selected?.moduleId);
 		if (readOnly) return;
-		if (page && mod) this.renderModule(form, board, page, mod);
+		if (board.selectedItems.length > 1) this.renderGroup(board);
+		else if (page && mod) this.renderModule(form, board, page, mod);
 		else if (page) this.renderPage(form, board, page);
 		else this.renderBoard(form, board, file);
+	}
+
+	private keyOf(board: BoardViewport | null): string {
+		return board ? board.selectedItems.map((it) => `${it.pageId}/${it.moduleId ?? ''}`).join('|') : '';
+	}
+
+	/** Several items selected: align, distribute and bulk actions. */
+	private renderGroup(board: BoardViewport) {
+		const items = board.selectedItems;
+		const kind = items[0]?.moduleId ? 'modules' : 'pages';
+		new Setting(this.contentEl).setName(`${items.length} ${kind} selected`).setHeading();
+		const grid = this.contentEl.createDiv({ cls: 'pw-align-grid' });
+		for (const [mode, title, icon] of ALIGN_ACTIONS) {
+			const b = grid.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': title } });
+			setIcon(b, icon);
+			b.addEventListener('click', () => board.align(mode));
+		}
+		new Setting(this.contentEl)
+			.setName('Distribute')
+			.setDesc(items.length < 3 ? 'Needs three or more.' : 'Equal gaps, keeping the outermost in place.')
+			.addButton((b) => b.setButtonText('Horizontally').setDisabled(items.length < 3).onClick(() => board.distribute('h')))
+			.addButton((b) => b.setButtonText('Vertically').setDisabled(items.length < 3).onClick(() => board.distribute('v')));
+		const actions = new Setting(this.contentEl).setName('Selection');
+		if (kind === 'modules') actions.addButton((b) => b.setButtonText('Lock or unlock').onClick(() => board.toggleLock()));
+		actions.addButton((b) => {
+			// What setWarning() did; setDestructive() needs Obsidian 1.13 (minAppVersion is lower).
+			b.setButtonText('Delete').onClick(() => board.deleteSelection());
+			b.buttonEl.addClass('mod-warning');
+		});
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Shift-click adds or removes items; Shift-drag on empty board selects by area.' });
 	}
 
 	private update(board: BoardViewport, field: string, recipe: (f: PatchworkFile) => PatchworkFile) {

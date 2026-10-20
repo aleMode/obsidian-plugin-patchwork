@@ -64,28 +64,31 @@ export class OutlineView extends ItemView {
 			return;
 		}
 		const file = board.boardStore.file;
-		const sel = board.selected;
+		const isSel = (pageId: string, moduleId?: string) => board.selectedItems.some((it) => it.pageId === pageId && it.moduleId === moduleId);
 		orderedPages(file).forEach((page, i) => {
 			const row = el.createDiv({ cls: 'pw-outline-row pw-outline-page' });
-			row.toggleClass('is-selected', sel?.pageId === page.id && !sel.moduleId);
+			row.toggleClass('is-selected', isSel(page.id));
 			setIcon(row.createSpan({ cls: 'pw-outline-icon' }), 'file');
 			row.createSpan({ text: `${i + 1}. ${page.name ?? 'Untitled page'}` });
-			row.addEventListener('click', () => this.reveal(page.id));
+			row.addEventListener('click', (e) => this.reveal(e, page.id));
 			for (const m of page.modules) {
 				const mrow = el.createDiv({ cls: 'pw-outline-row pw-outline-module' });
-				mrow.toggleClass('is-selected', sel?.moduleId === m.id);
+				mrow.toggleClass('is-selected', isSel(page.id, m.id));
 				setIcon(mrow.createSpan({ cls: 'pw-outline-icon' }), ICONS[m.type] ?? 'help-circle');
 				mrow.createSpan({ text: moduleTitle(m) });
 				if (m.locked) setIcon(mrow.createSpan({ cls: 'pw-outline-lock' }), 'lock');
-				mrow.addEventListener('click', () => this.reveal(page.id, m.id));
+				mrow.addEventListener('click', (e) => this.reveal(e, page.id, m.id));
 			}
 		});
 	}
 
-	private reveal(pageId: string, moduleId?: string) {
+	/** Click selects and centres the item; Shift-click adds or removes it from the selection. */
+	private reveal(e: MouseEvent, pageId: string, moduleId?: string) {
 		const board = this.active.get();
 		if (!board) return;
-		board.select({ pageId, moduleId });
+		const item = moduleId ? { pageId, moduleId } : { pageId };
+		if (e.shiftKey) return board.toggle(item);
+		board.select(item);
 		board.revealSelection();
 	}
 }

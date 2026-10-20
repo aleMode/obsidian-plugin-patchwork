@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 135 checks across 11 suites, all passing; `npm test`: 140 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 145 checks across 12 suites, all passing; `npm test`: 143 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -26,6 +26,13 @@ What to try by hand, in the order that gives the most signal. Everything here is
 - Lengths are in the board's display unit, but you can type any unit ("5 cm", "2 in"). Typing in a field updates live and undoes as one step.
 - **Outline:** pages in output order with their modules; click one to select it and centre the board on it.
 - Check: styles (padding, border, background) look the same on the board and in an exported PDF, including on PDF crops.
+
+### 1a'. Multi-select, align, distribute (new, session 3)
+- **Shift-click** modules to add or remove them; **Shift-drag** on paper or empty board draws a marquee that selects the modules it touches (or pages, if it touches no modules). Shift-click on a page's paper toggles the page.
+- Drag any selected item: the whole selection moves together (guides snap the one you hold; the rest follow). One Ctrl+Z undoes it.
+- With 2+ selected: right-click a selected item, or use the inspector, for **align** (left/centre/right, top/middle/bottom) and **distribute** (3+). Works across pages (board coordinates) and for pages themselves.
+- Arrow keys, Ctrl+D, Delete, lock/unlock act on the whole selection.
+- Also check: "zoom to fit" now keeps the page clear of the floating toolbar (it used to sit under it with the sidebar open).
 
 ### 1b. Rulers (new)
 - Top and left rulers in the board's display unit (mm by default; change it in **Board settings**, below).
@@ -86,7 +93,6 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ## Known gaps (not bugs, not built yet)
 
-- No multi-select or align/distribute yet.
 - Page numbers, headers/footers, tiled export, PNG export are M2.
 
 ## Fixed tonight (worth a quick re-check)

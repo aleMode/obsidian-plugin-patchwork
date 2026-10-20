@@ -6,6 +6,7 @@ import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
+import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
 import { rulerTicks } from '../model/rulers';
 import { snapPoint, snapValue } from '../model/snapping';
@@ -33,12 +34,28 @@ export interface BoardServices {
 }
 
 export type Selection = { pageId: string; moduleId?: string } | null;
+export type Item = NonNullable<Selection>;
+
+/** Other selected items moving along with the dragged one. */
+type Group = { pageId: string; id: string; startPos: Point }[];
 
 type Drag =
 	| { kind: 'pan'; last: Point }
-	| { kind: 'page'; id: string; startPointer: Point; startPos: Point }
-	| { kind: 'module'; pageId: string; id: string; startPointer: Point; startPos: Point }
-	| { kind: 'resize'; target: NonNullable<Selection>; handle: Handle; startPointer: Point; start: Rect };
+	| { kind: 'page'; id: string; startPointer: Point; startPos: Point; group: Group }
+	| { kind: 'module'; pageId: string; id: string; startPointer: Point; startPos: Point; group: Group }
+	| { kind: 'resize'; target: Item; handle: Handle; startPointer: Point; start: Rect }
+	| { kind: 'marquee'; start: Point; onPage: Item | null };
+
+const sameItem = (a: Item, b: Item) => a.pageId === b.pageId && a.moduleId === b.moduleId;
+
+export const ALIGN_ACTIONS: [AlignMode, string, string][] = [
+	['left', 'Align left edges', 'align-start-vertical'],
+	['hcenter', 'Align horizontal centres', 'align-center-vertical'],
+	['right', 'Align right edges', 'align-end-vertical'],
+	['top', 'Align top edges', 'align-start-horizontal'],
+	['vcenter', 'Align vertical centres', 'align-center-horizontal'],
+	['bottom', 'Align bottom edges', 'align-end-horizontal'],
+];
 
 const HANDLES: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 /** How close (screen px) an edge must come to another to snap to it. */
@@ -63,10 +80,13 @@ export class BoardViewport implements BoardSurface {
 	private guideLayer: HTMLElement;
 	private rulers: { top: HTMLCanvasElement; left: HTMLCanvasElement };
 	private zoomLabel!: HTMLElement;
+	private toolbar!: HTMLElement;
 	private pages = new Map<string, PageElement>();
 	private modules: ModuleHost;
 	private camera: Camera = { tx: 0, ty: 0, zoom: 1 };
-	private selection: Selection = null;
+	/** Selected items; the last one is the primary (inspector, resize handles, ruler origin). */
+	private items: Item[] = [];
+	private marqueeEl: HTMLElement;
 	/** Panels (inspector, outline) listen here; the store has its own subscription for content. */
 	private selectionListeners = new Set<(sel: Selection) => void>();
 	private drag: Drag | null = null;
@@ -84,6 +104,7 @@ export class BoardViewport implements BoardSurface {
 		// Above the pages so handles are never clipped by a page edge.
 		this.selectionBox = this.layer.createDiv({ cls: 'pw-selection' });
 		this.guideLayer = this.layer.createDiv({ cls: 'pw-guides' });
+		this.marqueeEl = this.layer.createDiv({ cls: 'pw-marquee is-hidden' });
 		for (const h of HANDLES) this.selectionBox.createDiv({ cls: `pw-handle pw-handle-${h}`, attr: { 'data-handle': h } });
 		this.modules = new ModuleHost({
 			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, resolution: () => this.resolution() },
@@ -128,8 +149,18 @@ export class BoardViewport implements BoardSurface {
 
 	// ---------- rendering ----------
 
+	private get selection(): Selection {
+		return this.items[this.items.length - 1] ?? null;
+	}
+
 	private render() {
 		const file = this.store.file;
+		// Items deleted meanwhile (e.g. by undo) drop out of the selection.
+		const kept = this.items.filter((it) => this.exists(it));
+		if (kept.length !== this.items.length) {
+			this.items = kept;
+			this.emitSelection();
+		}
 		const seen = new Set<string>();
 		for (const page of file.pages) {
 			seen.add(page.id);
@@ -138,7 +169,7 @@ export class BoardViewport implements BoardSurface {
 				el = new PageElement(this.layer);
 				this.pages.set(page.id, el);
 			}
-			const selected = this.selection?.pageId === page.id && !this.selection.moduleId;
+			const selected = this.items.some((it) => it.pageId === page.id && !it.moduleId);
 			el.update(page, { appTheme: file.board.useAppTheme, unit: file.board.displayUnit, selected });
 		}
 		for (const [id, el] of this.pages) {
@@ -147,12 +178,7 @@ export class BoardViewport implements BoardSurface {
 				this.pages.delete(id);
 			}
 		}
-		// A selection pointing at something deleted (e.g. by undo) is dropped.
-		if (this.selection && !this.findSelected()) {
-			this.selection = null;
-			this.emitSelection();
-		}
-		this.modules.selectedModule = this.selection?.moduleId ?? null;
+		this.modules.selectedModules = new Set(this.items.flatMap((it) => (it.moduleId ? [it.moduleId] : [])));
 		this.renderSelectionBox();
 		this.renderGrid();
 		this.renderRulers();
@@ -171,27 +197,79 @@ export class BoardViewport implements BoardSurface {
 
 	private renderSelectionBox() {
 		const sel = this.selectedRect();
-		const show = !!sel && !sel.locked && !this.store.readOnly;
+		// Handles only for a single item; a multi-selection is moved, aligned or nudged as a group.
+		const show = !!sel && !sel.locked && !this.store.readOnly && this.items.length === 1;
 		this.selectionBox.toggleClass('is-hidden', !show);
 		if (!show) return;
 		const { x, y, w, h } = sel.rect;
 		this.selectionBox.setCssProps({ '--pw-x': `${x}mm`, '--pw-y': `${y}mm`, '--pw-w': `${w}mm`, '--pw-h': `${h}mm` });
 	}
 
-	private findSelected(): Page | AnyModule | undefined {
-		const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
-		return this.selection?.moduleId ? page?.modules.find((m) => m.id === this.selection?.moduleId) : page;
+	private exists(it: Item): boolean {
+		const page = this.store.file.pages.find((p) => p.id === it.pageId);
+		return !!page && (!it.moduleId || page.modules.some((m) => m.id === it.moduleId));
+	}
+
+	/** Absolute board rect of an item (mm). */
+	private itemRect(it: Item): Rect | null {
+		const page = this.store.file.pages.find((p) => p.id === it.pageId);
+		if (!page) return null;
+		if (!it.moduleId) return page;
+		const m = page.modules.find((x) => x.id === it.moduleId);
+		return m ? { x: page.x + m.x, y: page.y + m.y, w: m.w, h: m.h } : null;
 	}
 
 	select(sel: Selection) {
-		if (sel?.pageId === this.selection?.pageId && sel?.moduleId === this.selection?.moduleId) return;
-		this.selection = sel;
+		if (this.items.length === (sel ? 1 : 0) && (!sel || sameItem(sel, this.items[0]!))) return;
+		this.setItems(sel ? [sel] : []);
+	}
+
+	/** Shift-click: add or remove an item. Pages and modules aren't mixed; a different kind starts over. */
+	toggle(it: Item) {
+		const kindMatches = this.items.every((x) => !!x.moduleId === !!it.moduleId);
+		if (!kindMatches) return this.setItems([it]);
+		const rest = this.items.filter((x) => !sameItem(x, it));
+		this.setItems(rest.length === this.items.length ? [...rest, it] : rest);
+	}
+
+	setItems(items: Item[]) {
+		this.items = items;
 		this.render();
 		this.emitSelection();
 	}
 
 	get selected(): Selection {
 		return this.selection;
+	}
+
+	get selectedItems(): readonly Item[] {
+		return this.items;
+	}
+
+	/** Align the selection to its own bounds (SPEC 5.6). Modules align in board coordinates, even across pages. */
+	align(mode: AlignMode) {
+		this.arrange((rects) => alignRects(rects, mode), `align:${mode}`);
+	}
+
+	distribute(axis: 'h' | 'v') {
+		this.arrange((rects) => distributeRects(rects, axis), `distribute:${axis}`);
+	}
+
+	private arrange(layout: (rects: Rect[]) => Point[], label: string) {
+		if (this.items.length < 2 || this.store.readOnly) return;
+		const rects = this.items.map((it) => this.itemRect(it));
+		if (rects.some((r) => !r)) return;
+		const next = layout(rects as Rect[]);
+		this.store.update((f) =>
+			this.items.reduce((acc, it, i) => {
+				const p = next[i]!;
+				if (!it.moduleId) return movePage(acc, it.pageId, p.x, p.y);
+				const page = acc.pages.find((x) => x.id === it.pageId)!;
+				return mapModule(acc, it.pageId, it.moduleId, (m) => (m.locked ? m : { ...m, x: Number((p.x - page.x).toFixed(4)), y: Number((p.y - page.y).toFixed(4)) }));
+			}, f),
+			{ coalesce: label },
+		);
+		this.store.endCoalesce();
 	}
 
 	get boardStore(): BoardStore {
@@ -390,7 +468,17 @@ export class BoardViewport implements BoardSurface {
 		const b = bounds(this.store.file.pages);
 		const vp = this.viewportSize();
 		if (!b || vp.w === 0) return;
-		this.setCamera(fitCamera(b, vp));
+		// Keep content clear of the rulers and the floating toolbar along the top.
+		const top = Math.min(vp.h / 3, this.toolbarBottom());
+		const c = fitCamera(b, { w: vp.w, h: vp.h - top });
+		this.setCamera({ ...c, ty: c.ty + top });
+	}
+
+	/** Bottom edge of the toolbar, relative to the board (px). */
+	private toolbarBottom(): number {
+		const bar = this.toolbar.getBoundingClientRect();
+		const root = this.root.getBoundingClientRect();
+		return bar.height ? bar.bottom - root.top : 0;
 	}
 
 	private zoomBy(factor: number) {
@@ -555,25 +643,53 @@ export class BoardViewport implements BoardSurface {
 			return;
 		}
 		const hit = this.hit(e);
-		if (e.button === 1 || (e.button === 0 && (this.spaceHeld || !hit))) {
+		const start = screenToBoard(this.camera, this.local(e));
+		if (e.button === 0 && e.shiftKey && !this.spaceHeld) {
+			// Shift on a module toggles it. Shift on paper or empty board draws a marquee; a Shift-click
+			// on paper without dragging toggles the page instead (see finishMarquee).
+			if (hit?.moduleId) {
+				this.toggle(hit);
+				const included = this.items.some((x) => sameItem(x, hit));
+				this.drag = included && !this.store.readOnly ? this.startDrag(hit, start) : null;
+			} else this.drag = { kind: 'marquee', start, onPage: hit };
+			if (!this.drag) return;
+		} else if (e.button === 1 || (e.button === 0 && (this.spaceHeld || !hit))) {
 			if (!hit && e.button === 0) this.select(null);
 			this.drag = { kind: 'pan', last: { x: e.clientX, y: e.clientY } };
 		} else if (e.button === 0 && hit) {
-			this.select(hit);
-			this.drag = this.store.readOnly ? null : this.startDrag(hit, screenToBoard(this.camera, this.local(e)));
+			// Clicking an item that's part of a multi-selection keeps the group (to drag it).
+			if (!this.items.some((x) => sameItem(x, hit))) this.select(hit);
+			this.drag = this.store.readOnly ? null : this.startDrag(hit, start);
 			if (!this.drag) return;
 		} else return;
 		this.root.setPointerCapture(e.pointerId);
 		this.root.addClass('is-dragging');
 	}
 
-	private startDrag(hit: NonNullable<Selection>, startPointer: Point): Drag | null {
+	private startDrag(hit: Item, startPointer: Point): Drag | null {
 		const page = this.store.file.pages.find((p) => p.id === hit.pageId);
 		if (!page) return null;
-		if (!hit.moduleId) return { kind: 'page', id: page.id, startPointer, startPos: { x: page.x, y: page.y } };
+		const group = this.groupFor(hit);
+		if (!hit.moduleId) return { kind: 'page', id: page.id, startPointer, startPos: { x: page.x, y: page.y }, group };
 		const m = page.modules.find((x) => x.id === hit.moduleId);
 		if (!m || m.locked) return null;
-		return { kind: 'module', pageId: page.id, id: m.id, startPointer, startPos: { x: m.x, y: m.y } };
+		return { kind: 'module', pageId: page.id, id: m.id, startPointer, startPos: { x: m.x, y: m.y }, group };
+	}
+
+	/** The other selected, unlocked items that move with `hit`, with their start positions. */
+	private groupFor(hit: Item): Group {
+		const out: Group = [];
+		for (const it of this.items) {
+			if (sameItem(it, hit)) continue;
+			const page = this.store.file.pages.find((p) => p.id === it.pageId);
+			if (!page) continue;
+			if (!it.moduleId) out.push({ pageId: page.id, id: page.id, startPos: { x: page.x, y: page.y } });
+			else {
+				const m = page.modules.find((x) => x.id === it.moduleId);
+				if (m && !m.locked) out.push({ pageId: page.id, id: m.id, startPos: { x: m.x, y: m.y } });
+			}
+		}
+		return out;
 	}
 
 	private onPointerMove(e: PointerEvent) {
@@ -587,13 +703,48 @@ export class BoardViewport implements BoardSurface {
 		const p = screenToBoard(this.camera, this.local(e));
 		const grid = this.store.file.board.grid;
 		if (d.kind === 'resize') return this.resizeTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
+		if (d.kind === 'marquee') return this.drawMarquee(d.start, p);
 		const raw = { x: d.startPos.x + p.x - d.startPointer.x, y: d.startPos.y + p.y - d.startPointer.y };
 		const pos = this.snapMove(d, raw, grid, e.altKey);
-		if (d.kind === 'page') this.store.update((f) => movePage(f, d.id, pos.x, pos.y), { coalesce: `move-page:${d.id}` });
-		else {
-			this.store.update((f) => moveModule(f, d.pageId, d.id, pos.x, pos.y), { coalesce: `move-module:${d.id}` });
-			this.highlightDropPage(this.reparentTarget(d));
+		// The group moves by the same (snapped) delta as the item under the pointer.
+		const dx = pos.x - d.startPos.x, dy = pos.y - d.startPos.y;
+		if (d.kind === 'page') {
+			this.store.update((f) => d.group.reduce((acc, g) => movePage(acc, g.id, g.startPos.x + dx, g.startPos.y + dy), movePage(f, d.id, pos.x, pos.y)), { coalesce: `move-page:${d.id}` });
+		} else {
+			this.store.update(
+				(f) => d.group.reduce((acc, g) => moveModule(acc, g.pageId, g.id, g.startPos.x + dx, g.startPos.y + dy), moveModule(f, d.pageId, d.id, pos.x, pos.y)),
+				{ coalesce: `move-module:${d.id}` },
+			);
+			if (d.group.length === 0) this.highlightDropPage(this.reparentTarget(d));
 		}
+	}
+
+	private marqueeRect(a: Point, b: Point): Rect {
+		return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(a.x - b.x), h: Math.abs(a.y - b.y) };
+	}
+
+	private drawMarquee(a: Point, b: Point) {
+		const r = this.marqueeRect(a, b);
+		this.marqueeEl.removeClass('is-hidden');
+		this.marqueeEl.setCssProps({ '--pw-x': `${r.x}mm`, '--pw-y': `${r.y}mm`, '--pw-w': `${r.w}mm`, '--pw-h': `${r.h}mm` });
+	}
+
+	/** Select modules touched by the marquee; if it touches none, the pages it touches. */
+	private finishMarquee(d: Extract<Drag, { kind: 'marquee' }>, b: Point) {
+		this.marqueeEl.addClass('is-hidden');
+		const r = this.marqueeRect(d.start, b);
+		// Barely moved: it was a Shift-click, on a page (toggle it) or on empty board (nothing).
+		if (r.w * PX_PER_MM * this.camera.zoom < 4 && r.h * PX_PER_MM * this.camera.zoom < 4) {
+			if (d.onPage) this.toggle(d.onPage);
+			return;
+		}
+		const modules: Item[] = [];
+		const pages: Item[] = [];
+		for (const page of this.store.file.pages) {
+			if (intersects(page, r)) pages.push({ pageId: page.id });
+			for (const m of page.modules) if (intersects({ x: page.x + m.x, y: page.y + m.y, w: m.w, h: m.h }, r)) modules.push({ pageId: page.id, moduleId: m.id });
+		}
+		this.setItems(modules.length ? modules : pages);
 	}
 
 	/**
@@ -605,14 +756,16 @@ export class BoardViewport implements BoardSurface {
 		let size: { w: number; h: number } | undefined;
 		let others: Rect[] = [];
 		let offset = { x: 0, y: 0 };
+		// Items moving together are not guides for each other.
+		const moving = new Set([d.id, ...d.group.map((g) => g.id)]);
 		if (d.kind === 'page') {
 			size = file.pages.find((p) => p.id === d.id);
-			others = file.pages.filter((p) => p.id !== d.id);
+			others = file.pages.filter((p) => !moving.has(p.id));
 		} else {
 			const page = file.pages.find((p) => p.id === d.pageId);
 			size = page?.modules.find((m) => m.id === d.id);
 			if (page) {
-				others = [{ x: 0, y: 0, w: page.w, h: page.h }, ...page.modules.filter((m) => m.id !== d.id)];
+				others = [{ x: 0, y: 0, w: page.w, h: page.h }, ...page.modules.filter((m) => !moving.has(m.id))];
 				offset = page;
 			}
 		}
@@ -676,7 +829,8 @@ export class BoardViewport implements BoardSurface {
 
 	private onPointerUp(e: PointerEvent) {
 		if (!this.drag) return;
-		if (this.drag.kind === 'module') this.reparent(this.drag);
+		if (this.drag.kind === 'module' && this.drag.group.length === 0) this.reparent(this.drag);
+		if (this.drag.kind === 'marquee') this.finishMarquee(this.drag, screenToBoard(this.camera, this.local(e)));
 		this.drag = null;
 		this.guideLayer.empty();
 		this.store.endCoalesce();
@@ -704,45 +858,54 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	private duplicateSelection() {
-		const sel = this.selection;
-		if (!sel || this.store.readOnly) return;
+		if (this.items.length === 0 || this.store.readOnly) return;
 		const taken = allIds(this.store.file);
 		const ids = () => {
 			const id = newId(taken);
 			taken.add(id);
 			return id;
 		};
-		if (sel.moduleId) {
-			const id = ids();
-			this.store.update((f) => duplicateModule(f, sel.pageId, sel.moduleId!, id));
-			this.select({ pageId: sel.pageId, moduleId: id });
-		} else {
-			this.store.update((f) => duplicatePage(f, sel.pageId, ids));
-			const added = this.store.file.pages[this.store.file.pages.length - 1];
-			if (added) this.select({ pageId: added.id });
-		}
+		const copies: Item[] = [];
+		this.store.update((f) =>
+			this.items.reduce((acc, it) => {
+				if (it.moduleId) {
+					const id = ids();
+					copies.push({ pageId: it.pageId, moduleId: id });
+					return duplicateModule(acc, it.pageId, it.moduleId, id);
+				}
+				const next = duplicatePage(acc, it.pageId, ids);
+				const added = next.pages[next.pages.length - 1];
+				if (added && next !== acc) copies.push({ pageId: added.id });
+				return next;
+			}, f),
+		);
+		this.setItems(copies);
 	}
 
 	/** Arrow keys move the selection by 1 mm (Shift: 10 mm). Consecutive presses undo as one step. */
 	private nudge(key: string, step: number) {
-		const sel = this.selection;
-		if (!sel || this.store.readOnly) return;
+		if (this.items.length === 0 || this.store.readOnly) return;
 		const dx = key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0;
 		const dy = key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0;
 		const shift = <T extends Point>(o: T): T => ({ ...o, x: o.x + dx, y: o.y + dy });
 		this.store.update(
-			(f) => (sel.moduleId ? mapModule(f, sel.pageId, sel.moduleId, (m) => (m.locked ? m : shift(m))) : mapPage(f, sel.pageId, shift)),
-			{ coalesce: `nudge:${sel.moduleId ?? sel.pageId}` },
+			(f) => this.items.reduce((acc, it) => (it.moduleId ? mapModule(acc, it.pageId, it.moduleId, (m) => (m.locked ? m : shift(m))) : mapPage(acc, it.pageId, shift)), f),
+			{ coalesce: `nudge:${this.items.map((it) => it.moduleId ?? it.pageId).join(',')}` },
 		);
 	}
 
-	private deleteSelection() {
-		const sel = this.selection;
-		if (!sel) return;
-		const { pageId, moduleId } = sel;
-		if (moduleId) this.store.update((f) => removeModule(f, pageId, moduleId));
-		else this.store.update((f) => removePage(f, pageId));
-		this.select(null);
+	deleteSelection() {
+		if (this.items.length === 0 || this.store.readOnly) return;
+		const items = this.items;
+		this.store.update((f) => items.reduce((acc, it) => (it.moduleId ? removeModule(acc, it.pageId, it.moduleId) : removePage(acc, it.pageId)), f));
+		this.setItems([]);
+	}
+
+	/** Lock or unlock every selected module (locked if any is unlocked). */
+	toggleLock() {
+		const mods = this.items.filter((it) => it.moduleId);
+		const anyUnlocked = mods.some((it) => !this.store.file.pages.find((p) => p.id === it.pageId)?.modules.find((m) => m.id === it.moduleId)?.locked);
+		this.store.update((f) => mods.reduce((acc, it) => mapModule(acc, it.pageId, it.moduleId!, (m) => ({ ...m, locked: anyUnlocked ? true : undefined })), f));
 	}
 
 	private onDragOver(e: DragEvent) {
@@ -811,10 +974,25 @@ export class BoardViewport implements BoardSurface {
 		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
 	}
 
+	/** Align, distribute and bulk actions for a multi-selection. */
+	private showGroupMenu(e: MouseEvent) {
+		const menu = new Menu();
+		for (const [mode, title, icon] of ALIGN_ACTIONS) menu.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => this.align(mode)));
+		menu.addSeparator();
+		menu.addItem((i) => i.setTitle('Distribute horizontally').setIcon('align-horizontal-distribute-center').setDisabled(this.items.length < 3).onClick(() => this.distribute('h')));
+		menu.addItem((i) => i.setTitle('Distribute vertically').setIcon('align-vertical-distribute-center').setDisabled(this.items.length < 3).onClick(() => this.distribute('v')));
+		menu.addSeparator();
+		if (this.items.some((it) => it.moduleId)) menu.addItem((i) => i.setTitle('Lock or unlock').setIcon('lock').onClick(() => this.toggleLock()));
+		menu.addItem((i) => i.setTitle('Duplicate').setIcon('copy').onClick(() => this.duplicateSelection()));
+		menu.addItem((i) => i.setTitle(`Delete ${this.items.length} items`).setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
+		menu.showAtMouseEvent(e);
+	}
+
 	private onContextMenu(e: MouseEvent) {
 		const hit = this.hit(e);
 		if (!hit || this.store.readOnly) return;
 		e.preventDefault();
+		if (this.items.length > 1 && this.items.some((x) => sameItem(x, hit))) return this.showGroupMenu(e);
 		this.select(hit);
 		const menu = new Menu();
 		const { pageId, moduleId } = hit;
@@ -865,6 +1043,7 @@ export class BoardViewport implements BoardSurface {
 
 	private buildToolbar(container: HTMLElement) {
 		const bar = container.createDiv({ cls: 'pw-toolbar' });
+		this.toolbar = bar;
 		const button = (icon: string, label: string, onClick: (e: MouseEvent) => void) => {
 			const b = bar.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': label } });
 			setIcon(b, icon);

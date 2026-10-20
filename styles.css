@@ -413,6 +413,28 @@
 .pw-crop-handle.pw-handle-se { left: 100%; top: 100%; cursor: nwse-resize; }
 .pw-crop-handle.pw-handle-sw { left: 0; top: 100%; cursor: nesw-resize; }
 
+.pw-marquee {
+	position: absolute;
+	left: var(--pw-x);
+	top: var(--pw-y);
+	width: var(--pw-w);
+	height: var(--pw-h);
+	border: calc(1px / var(--pw-zoom)) dashed var(--interactive-accent);
+	background: rgba(var(--interactive-accent-rgb, 120, 80, 220), 0.08);
+	pointer-events: none;
+	z-index: 12;
+}
+
+.pw-marquee.is-hidden {
+	display: none;
+}
+
+.pw-align-grid {
+	display: flex;
+	gap: var(--size-2-2);
+	padding: var(--size-4-2) 0;
+}
+
 .pw-guides {
 	position: absolute;
 	left: 0;

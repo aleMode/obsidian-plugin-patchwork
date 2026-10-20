@@ -62,7 +62,7 @@ export class ModuleHost {
 	private frame = 0;
 	private component = new Component();
 	private ctx: ModuleContext;
-	selectedModule: string | null = null;
+	selectedModules: ReadonlySet<string> = new Set();
 
 	constructor(private o: ModuleHostOptions) {
 		this.ctx = { ...o.ctx, component: this.component };
@@ -199,7 +199,7 @@ export class ModuleHost {
 	private layout(mounted: Mounted, m: AnyModule, rank: number) {
 		const resized = mounted.module.w !== m.w || mounted.module.h !== m.h;
 		mounted.el.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
-		mounted.el.toggleClass('is-selected', m.id === this.selectedModule);
+		mounted.el.toggleClass('is-selected', this.selectedModules.has(m.id));
 		mounted.el.toggleClass('is-locked', !!m.locked);
 		applyModuleStyle(mounted.el, m);
 		if (resized && m.type === 'note') this.updateOverflow({ ...mounted, module: m });
