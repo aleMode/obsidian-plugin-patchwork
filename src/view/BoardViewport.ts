@@ -17,6 +17,7 @@ import { masterPreview, pageFurniture } from '../model/numbering';
 import { outputPages, resolvePage } from '../model/masters';
 import { rulerTicks } from '../model/rulers';
 import { gridDrawStep, snapPoint, snapValue } from '../model/snapping';
+import { stepByKey } from '../model/tracker';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import type { BitmapCache } from '../render/bitmapCache';
@@ -1041,6 +1042,12 @@ export class BoardViewport implements BoardSurface {
 		// Tracker controls take plain clicks; Shift and the other buttons still select and drag.
 		if (e.button === 0 && !e.shiftKey && !this.spaceHeld && (e.target as HTMLElement).closest('.pw-interactive')) return;
 		const handle = (e.target as HTMLElement).closest<HTMLElement>('.pw-handle')?.dataset.handle as Handle | undefined;
+		// A handle sitting on a tracker control (content that fills the module) must not swallow the click.
+		const control = handle && e.button === 0 && !e.shiftKey ? document.elementsFromPoint(e.clientX, e.clientY).find((el): el is HTMLElement => el.instanceOf(HTMLElement) && el.classList.contains('pw-interactive')) : undefined;
+		if (control) {
+			control.click();
+			return;
+		}
 		if (handle && e.button === 0 && this.selection) {
 			const sel = this.selectedRect();
 			const page = this.store.file.pages.find((p) => p.id === this.selection?.pageId);
@@ -1271,8 +1278,22 @@ export class BoardViewport implements BoardSurface {
 		} else if (mod && e.key.toLowerCase() === 'y') this.store.redo();
 		else if ((e.key === 'Delete' || e.key === 'Backspace') && this.selection) this.deleteSelection();
 		else if (e.key.startsWith('Arrow') && this.selection) this.nudge(e.key, e.shiftKey ? 10 : 1);
+		else if (!mod && ['+', '=', '-'].includes(e.key)) {
+			if (!this.stepSelectedTracker(e.key === '-' ? -1 : 1)) return;
+		}
 		else return;
 		e.preventDefault();
+	}
+
+	/** The + / − keys on a selected counter or boxes tracker; false when there is nothing to step. */
+	private stepSelectedTracker(direction: 1 | -1): boolean {
+		const sel = this.selection;
+		if (!sel?.moduleId || this.items.length !== 1 || this.store.readOnly) return false;
+		const m = this.store.file.pages.find((p) => p.id === sel.pageId)?.modules.find((x) => x.id === sel.moduleId);
+		const next = m?.type === 'tracker' ? stepByKey(m as TrackerModule, direction) : null;
+		if (!next) return false;
+		this.store.update((f) => mapModule(f, sel.pageId, sel.moduleId!, () => next));
+		return true;
 	}
 
 	private duplicateSelection() {

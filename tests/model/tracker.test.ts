@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TrackerModule } from '../../src/model/schema';
-import { boxCount, bump, clickBox, itemsFromText, printedState, toggleItem, trackerValue } from '../../src/model/tracker';
+import { boxCount, bump, clickBox, itemsFromText, printedState, stepByKey, toggleItem, trackerValue } from '../../src/model/tracker';
 
 const t = (extra: Partial<TrackerModule>): TrackerModule => ({ id: 'x', type: 'tracker', kind: 'counter', x: 0, y: 0, w: 10, h: 10, ...extra });
 
@@ -36,5 +36,13 @@ describe('tracker', () => {
 		expect(printedState(t({ kind: 'boxes', value: 3, printBlank: true })).value).toBe(0);
 		const kept = t({ value: 7 });
 		expect(printedState(kept)).toBe(kept);
+	});
+
+	it('the + and - keys step a counter and fill or empty one box', () => {
+		expect(stepByKey(t({ value: 3 }), 1)?.value).toBe(4);
+		expect(stepByKey(t({ kind: 'boxes', max: 4, value: 2 }), 1)?.value).toBe(3);
+		expect(stepByKey(t({ kind: 'boxes', max: 4, value: 4 }), 1)?.value).toBe(4);
+		expect(stepByKey(t({ kind: 'boxes', max: 4, value: 0 }), -1)?.value).toBe(0);
+		expect(stepByKey(t({ kind: 'checklist' }), 1)).toBeNull();
 	});
 });

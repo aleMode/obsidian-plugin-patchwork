@@ -66,3 +66,13 @@ export function printedState(m: TrackerModule): TrackerModule {
 	if (!m.printBlank) return m;
 	return { ...m, value: m.kind === 'counter' ? undefined : 0, items: m.items?.map((it) => withDone(it, false)) };
 }
+
+/**
+ * The + / − keys: a counter steps, boxes fill or empty one box. Checklists have nothing to step, so
+ * they return null (the key is then left alone).
+ */
+export function stepByKey(m: TrackerModule, direction: 1 | -1): TrackerModule | null {
+	if (m.kind === 'counter') return bump(m, direction);
+	if (m.kind === 'boxes') return { ...m, value: clamp(trackerValue(m) + direction, 0, boxCount(m)) };
+	return null;
+}

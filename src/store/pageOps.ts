@@ -25,8 +25,10 @@ export function movePage(file: PatchworkFile, id: string, x: number, y: number):
 }
 
 export function removePage(file: PatchworkFile, id: string): PatchworkFile {
-	const pages = file.pages.filter((p) => p.id !== id);
-	return pages.length === file.pages.length ? file : { ...file, pages };
+	// Take its modules out one by one first, so linked frames on this page close up their chains.
+	const emptied = (file.pages.find((p) => p.id === id)?.modules ?? []).reduce((acc, m) => removeModule(acc, id, m.id), file);
+	const pages = emptied.pages.filter((p) => p.id !== id);
+	return pages.length === emptied.pages.length ? emptied : { ...emptied, pages };
 }
 
 export function addModule(file: PatchworkFile, pageId: string, module: AnyModule): PatchworkFile {
