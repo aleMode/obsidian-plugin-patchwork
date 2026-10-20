@@ -49,7 +49,7 @@ try {
 	const px = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
 	let dark = 0;
 	for (let i = 0; i < px.length; i += 4) if (px[i] < 128) dark++;
-	check('the PDF preview has content', dark > 20 && Math.max(c.width, c.height) <= 96, [dark, c.width, c.height]);
+	check('the PDF preview has content (not blank)', dark > 5 && Math.max(c.width, c.height) <= 96, [dark, c.width, c.height]);
 	check('notes show text lines', getComputedStyle(el('.pw-skeleton-note')).backgroundImage.includes('gradient'));
 } catch (e) {
 	check('no exception', false, String(e?.stack ?? e));

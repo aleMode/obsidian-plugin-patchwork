@@ -21,6 +21,11 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - **Toolbar → Settings** is for the whole patchwork only (units, grid, numbering, header and footer, appearance, title).
 - **Right-click a page** → Page settings, Size and position, Page numbers, header and footer. **Right-click an item** → Item settings, Size and position, Style. They open the same popover as the ⋯ button, on the right tab.
 
+### Text formatting
+- A text box's bar has **Alignment ▾**, a **text colour** swatch and **A−** / **A+** (text size). The popover's **Style** tab has the same plus **Font**. They apply to the whole box, headings and bold included, on screen and in exports.
+- While editing, a **formatting toolbar** floats above the box: bold, italic, strikethrough, code, headings 1–3, bulleted and numbered lists, quote, link. It wraps the selection or marks the lines you have selected, and Ctrl+Z undoes it. Clicking it never ends the edit. (Ctrl+B and Ctrl+I also work when Obsidian lets them through.)
+- Text boxes and notes now carry the same classes Obsidian's reading view has (`markdown-rendered`, `markdown-preview-view`), so theme and snippet rules written for notes apply to both, and a note's `cssclasses` frontmatter is applied to its module.
+
 ### Editing in place
 - Double-click a text box or a note (or select it and press **Enter**, or press **Edit** on the bar): a text area with the raw markdown opens over it, in the module's own padding and border; the rendered text is hidden meanwhile. **Escape** or clicking elsewhere finishes. (Ctrl+Enter is not used: Obsidian's own hotkeys take it.)
 - **Text box:** saved into the patchwork; one Ctrl+Z undoes the whole edit.

@@ -11,7 +11,7 @@ const INSETS: Shape = { keys: ['top', 'right', 'bottom', 'left'] };
 const FROZEN: Shape = { keys: ['at', 'markdown'] };
 const ITEM: Shape = { keys: ['text', 'done'] };
 const STYLE: Shape = {
-	keys: ['padding', 'border', 'background', 'opacity', 'fontScale', 'cssClass'],
+	keys: ['padding', 'border', 'background', 'opacity', 'fontScale', 'color', 'align', 'fontFamily', 'cssClass'],
 	children: { border: { keys: ['width', 'color', 'radius'] } },
 };
 

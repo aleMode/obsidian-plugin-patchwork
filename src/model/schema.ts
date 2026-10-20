@@ -201,6 +201,11 @@ export interface ModuleStyle {
 	background?: string;
 	opacity?: number;
 	fontScale?: number;
+	/** Text colour (CSS colour) for the module's content. */
+	color?: string;
+	align?: 'left' | 'center' | 'right' | 'justify';
+	/** CSS font-family for the module's content; absent: the page's font. */
+	fontFamily?: string;
 	cssClass?: string;
 	[extra: string]: unknown;
 }

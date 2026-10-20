@@ -58,6 +58,15 @@ describe('round trip', () => {
 		expect(JSON.parse(text)).toEqual(FULL);
 	});
 
+	it('text formatting keys of a module style survive, in a stable order, next to unknown ones', () => {
+		const withStyle = structuredClone(FULL) as { pages: { modules: { style?: Record<string, unknown> }[] }[] };
+		withStyle.pages[0]!.modules[0]!.style = { futureKey: 1, fontFamily: 'Georgia, serif', align: 'center', color: '#aa0000', padding: 2 };
+		const { file } = parse(JSON.stringify(withStyle));
+		const style = JSON.parse(serializeBoard(file)).pages[0].modules[0].style;
+		expect(Object.keys(style)).toEqual(['padding', 'color', 'align', 'fontFamily', 'futureKey']);
+		expect(style).toMatchObject({ color: '#aa0000', align: 'center', fontFamily: 'Georgia, serif', futureKey: 1 });
+	});
+
 	it('save → load → save is byte-identical', () => {
 		const text = serializeBoard(parse(FULL).file);
 		expect(serializeBoard(parse(text).file)).toBe(text);

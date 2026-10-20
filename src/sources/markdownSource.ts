@@ -1,5 +1,6 @@
 import { App, getLinkpath, resolveSubpath, TFile } from 'obsidian';
 import type { NoteModule } from '../model/schema';
+import { parseCssClasses } from './cssClasses';
 import { sliceNote } from './noteSlice';
 
 export type NoteContent =
@@ -18,6 +19,13 @@ export async function loadNoteContent(app: App, m: Pick<NoteModule, 'file' | 'su
 	if (!hit || hit.type === 'footnote') return { ok: false, reason: `Section not found: ${m.file}${m.subpath}`, missingFile: false };
 	const range = { kind: hit.type, start: hit.start.offset, end: hit.end?.offset ?? null };
 	return { ok: true, file, markdown: sliceNote(text, range, { includeHeading: m.includeHeading, lines: m.lines }) };
+}
+
+/** The classes a note asks for in its frontmatter (`cssclasses`, or the older `cssclass`). */
+export function noteCssClasses(app: App, path: string): string[] {
+	const file = app.vault.getAbstractFileByPath(path);
+	const fm = file instanceof TFile ? app.metadataCache.getFileCache(file)?.frontmatter : undefined;
+	return parseCssClasses(fm?.cssclasses ?? fm?.cssclass);
 }
 
 /**

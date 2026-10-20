@@ -98,7 +98,7 @@ export class FlowLayout {
 				const box = contentBox(member.module);
 				const body = root.createDiv({ cls: 'pw-flow-measure-body' });
 				body.setCssProps({ '--pw-w': `${box.w}mm`, '--pw-text-scale': String(textScale(member.module)) });
-				const md = body.createDiv({ cls: 'markdown-rendered pw-markdown' });
+				const md = body.createDiv({ cls: 'markdown-rendered markdown-preview-view pw-markdown' });
 				const top = md.getBoundingClientRect().top;
 				const bottoms: number[] = [];
 				for (let i = start; i < blocks.length; i++) {

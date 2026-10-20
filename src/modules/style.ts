@@ -9,6 +9,9 @@ export function applyModuleStyle(el: HTMLElement, m: AnyModule) {
 	const s = m.style ?? {};
 	el.toggleClass('has-border', !!s.border && s.border.width > 0);
 	el.toggleClass('has-background', !!s.background);
+	el.toggleClass('has-text-color', !!s.color);
+	el.toggleClass('has-align', !!s.align);
+	el.toggleClass('has-font-family', !!s.fontFamily);
 	el.setCssProps({
 		'--pw-pad': `${Math.max(0, s.padding ?? 0)}mm`,
 		'--pw-border-w': `${Math.max(0, s.border?.width ?? 0)}mm`,
@@ -17,6 +20,9 @@ export function applyModuleStyle(el: HTMLElement, m: AnyModule) {
 		'--pw-bg': s.background ?? 'transparent',
 		'--pw-opacity': String(typeof s.opacity === 'number' ? Math.min(1, Math.max(0, s.opacity)) : 1),
 		'--pw-text-scale': String(textScale(m)),
+		'--pw-color': s.color ?? '',
+		'--pw-align': s.align ?? '',
+		'--pw-font-family': s.fontFamily ?? '',
 	});
 	// A user CSS class (for snippets). Remember it so a change removes the old one.
 	const prev = el.dataset.pwClass;

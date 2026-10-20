@@ -228,7 +228,7 @@ export class ContextBar {
 			case 'pdf':
 				return this.pdf(page, m as PdfModule);
 			case 'text':
-				return [{ icon: 'pencil', text: 'Edit', tip: 'Edit the text where it is (double-click or Enter)', onClick: () => this.board.editInline(page.id, m.id) }];
+				return this.textBox(page, m);
 			case 'image':
 				return this.image(page, m as ImageModule);
 			case 'frame':
@@ -295,6 +295,49 @@ export class ContextBar {
 				},
 			},
 			{ icon: 'contrast', tip: 'Invert colours (for dark-background pages)', active: !!m.invert, onClick: () => this.set(page, m, (x) => withField(x, 'invert', m.invert ? undefined : true)) },
+		];
+	}
+
+	/** A style key set or removed (an empty style object is dropped). */
+	private setStyle(page: Page, m: AnyModule, key: string, value: unknown) {
+		this.set(page, m, (x) => {
+			const style = withField(x.style ?? {}, key, value);
+			return withField(x, 'style', Object.keys(style).length ? style : undefined);
+		});
+	}
+
+	private textBox(page: Page, m: AnyModule): Ctl[] {
+		const s = m.style ?? {};
+		const aligns = [
+			['', 'Default', 'align-left'],
+			['left', 'Left', 'align-left'],
+			['center', 'Centre', 'align-center'],
+			['right', 'Right', 'align-right'],
+			['justify', 'Justify', 'align-justify'],
+		] as const;
+		const size = (d: number) => {
+			const next = Math.round(Math.min(4, Math.max(0.3, (s.fontScale ?? 1) + d)) * 100) / 100;
+			this.setStyle(page, m, 'fontScale', Math.abs(next - 1) < 0.001 ? undefined : next);
+		};
+		return [
+			{ icon: 'pencil', text: 'Edit', tip: 'Edit the text where it is (double-click or Enter)', onClick: () => this.board.editInline(page.id, m.id) },
+			{
+				icon: aligns.find(([id]) => id === (s.align ?? ''))![2],
+				tip: 'Alignment',
+				menu: (menu) => {
+					for (const [id, label, icon] of aligns) menu.addItem((i) => i.setTitle(label).setIcon(icon).setChecked((s.align ?? '') === id).onClick(() => this.setStyle(page, m, 'align', id === '' ? undefined : id)));
+				},
+			},
+			{
+				tip: 'Text colour',
+				custom: (p) => {
+					const input = p.createEl('input', { cls: 'pw-cb-color', type: 'color', attr: { 'aria-label': 'Text colour' } });
+					input.value = s.color ?? '#222222';
+					input.addEventListener('change', () => this.setStyle(page, m, 'color', input.value));
+				},
+			},
+			{ text: 'A−', tip: 'Smaller text', onClick: () => size(-0.1) },
+			{ text: 'A+', tip: 'Larger text', onClick: () => size(0.1) },
 		];
 	}
 

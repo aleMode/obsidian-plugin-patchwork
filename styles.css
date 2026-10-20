@@ -273,6 +273,30 @@
 	background: var(--pw-bg);
 }
 
+/* Text formatting of a module's content (style.color, align, fontFamily). Headings and bold take their own
+   colours from the theme, so the theme variables are redefined for the module as well. */
+.pw-module.has-text-color {
+	color: var(--pw-color);
+	--text-normal: var(--pw-color);
+	--h1-color: var(--pw-color);
+	--h2-color: var(--pw-color);
+	--h3-color: var(--pw-color);
+	--h4-color: var(--pw-color);
+	--h5-color: var(--pw-color);
+	--h6-color: var(--pw-color);
+	--bold-color: var(--pw-color);
+	--italic-color: var(--pw-color);
+}
+
+.pw-module.has-align .pw-module-body {
+	text-align: var(--pw-align);
+}
+
+.pw-module.has-font-family .pw-module-body {
+	--font-text: var(--pw-font-family);
+	font-family: var(--pw-font-family);
+}
+
 .pw-module.is-grow {
 	height: var(--pw-grow-h, var(--pw-h));
 }
@@ -327,6 +351,15 @@ body.pw-hide-overflow-marker .pw-board .pw-module.is-overflowing::before {
 	/* While editing, content is not interactive: clicks select and drag the module. */
 	pointer-events: none;
 	user-select: none;
+}
+
+/* Obsidian pads and scrolls its reading view; inside a module the box is the module. */
+.pw-markdown.markdown-preview-view {
+	padding: 0;
+	overflow: visible;
+	/* The wrapper grows with its content (note overflow is measured on it), not with the module. */
+	height: auto;
+	min-height: 0;
 }
 
 .pw-markdown {
@@ -1314,6 +1347,53 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 }
 
 /* ---------- editing text in place ---------- */
+
+.pw-format-bar {
+	position: absolute;
+	left: var(--pw-fb-x, 0);
+	top: var(--pw-fb-y, 0);
+	z-index: 6;
+	display: flex;
+	align-items: center;
+	gap: 1px;
+	padding: 3px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+}
+
+.pw-format-bar .pw-fb-sep {
+	width: 1px;
+	align-self: stretch;
+	margin: 2px 3px;
+	background: var(--background-modifier-border);
+}
+
+.pw-format-bar button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius-s);
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.pw-format-bar button:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.pw-format-bar svg {
+	width: 15px;
+	height: 15px;
+}
 
 .pw-module.is-editing > .pw-module-body > *:not(.pw-inline-editor) {
 	display: none;

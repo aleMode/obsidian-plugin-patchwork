@@ -1,6 +1,6 @@
 import { Component, MarkdownRenderer } from 'obsidian';
 import type { AnyModule, NoteModule, TextModule } from '../model/schema';
-import { loadNoteContent, noteDependencies } from '../sources/markdownSource';
+import { loadNoteContent, noteCssClasses, noteDependencies } from '../sources/markdownSource';
 import { snapshotChanged } from '../model/freshness';
 import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setBadge } from './types';
 
@@ -24,26 +24,28 @@ abstract class MarkdownModule implements ModuleRenderer {
 	}
 
 	/** Render markdown unless a newer render started meanwhile (renders are async). */
-	protected async show(markdown: string, sourcePath: string, generation: number) {
-		const target = this.begin(generation);
+	protected async show(markdown: string, sourcePath: string, generation: number, classes: readonly string[] = []) {
+		const target = this.begin(generation, classes);
 		if (target) await MarkdownRenderer.render(this.ctx.app, markdown, target, sourcePath, this.child!);
 	}
 
 	/** Render blocks one wrapper each, the same structure FlowLayout measured. */
-	protected async showBlocks(blocks: readonly string[], sourcePath: string, generation: number) {
-		const target = this.begin(generation);
+	protected async showBlocks(blocks: readonly string[], sourcePath: string, generation: number, classes: readonly string[] = []) {
+		const target = this.begin(generation, classes);
 		if (!target) return;
 		for (const b of blocks) await MarkdownRenderer.render(this.ctx.app, b, target.createDiv({ cls: 'pw-flow-block' }), sourcePath, this.child!);
 	}
 
-	private begin(generation: number): HTMLElement | null {
+	private begin(generation: number, classes: readonly string[]): HTMLElement | null {
 		if (generation !== this.generation) return null;
 		this.clearChild();
 		const child = new Component();
 		this.ctx.component.addChild(child);
 		this.child = child;
 		this.el.empty();
-		return this.el.createDiv({ cls: 'markdown-rendered pw-markdown' });
+		// `markdown-preview-view` is what themes and snippets target for reading-view styling; styles.css
+		// takes back its padding and scrolling. A note's `cssclasses` go on the same element, like Obsidian does.
+		return this.el.createDiv({ cls: ['markdown-rendered', 'markdown-preview-view', 'pw-markdown', ...classes] });
 	}
 
 	/** The "Frozen" tag, orange once the live note differs from the snapshot. Screen only. */
@@ -85,7 +87,7 @@ export class NoteModuleRenderer extends MarkdownModule {
 			.then((content) => {
 				if (!this.isCurrent(gen)) return;
 				if (!content.ok) return placeholder(this.el, content.reason, content.missingFile ? 'missing' : 'error', pickAnother(this.ctx, note.id));
-				return this.show(content.markdown, content.file.path, gen);
+				return this.show(content.markdown, content.file.path, gen, noteCssClasses(this.ctx.app, content.file.path));
 			})
 			.catch((e: unknown) => {
 				if (this.isCurrent(gen)) placeholder(this.el, `Could not render ${note.file}: ${e instanceof Error ? e.message : String(e)}`);
@@ -94,7 +96,7 @@ export class NoteModuleRenderer extends MarkdownModule {
 
 	/** The snapshot, rendered against the note's path (links resolve as before); flags live changes. */
 	private async showFrozen(note: NoteModule, gen: number) {
-		await this.show(note.frozen!.markdown, note.file, gen);
+		await this.show(note.frozen!.markdown, note.file, gen, noteCssClasses(this.ctx.app, note.file));
 		await this.flagFrozen(note, gen);
 	}
 }
@@ -129,7 +131,7 @@ export class FlowRenderer extends MarkdownModule {
 				if (!this.isCurrent(gen)) return;
 				if ('error' in r) return placeholder(this.el, r.error, 'missing');
 				const [start, end] = r.ranges[info.index]!;
-				await this.showBlocks(r.blocks.slice(start, end).map((b) => b.text), r.sourcePath, gen);
+				await this.showBlocks(r.blocks.slice(start, end).map((b) => b.text), r.sourcePath, gen, head.type === 'note' ? noteCssClasses(this.ctx.app, head.file as string) : []);
 				// Every frame of a frozen note's chain carries the tag, so it shows wherever the text lands.
 				if (head.type === 'note' && head.frozen) await this.flagFrozen(head as NoteModule, gen);
 				if (this.isCurrent(gen)) this.el.parentElement?.toggleClass('is-overflowing', last && r.leftover);

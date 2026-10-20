@@ -1519,7 +1519,7 @@ export class BoardViewport implements BoardSurface {
 
 	/** Edit a text box or note in place (double-click, Enter, or Edit on the context bar). */
 	editInline(pageId: string, moduleId: string) {
-		void startInlineEdit({ app: this.view.app, store: this.store, modules: this.modules, done: () => this.focusBoard() }, pageId, moduleId);
+		void startInlineEdit({ app: this.view.app, store: this.store, modules: this.modules, done: () => this.focusBoard(), host: this.host, topInset: () => this.toolbarBottom() }, pageId, moduleId);
 	}
 
 	/** Enter on a selected text box or note starts editing it; false when the selection is something else. */

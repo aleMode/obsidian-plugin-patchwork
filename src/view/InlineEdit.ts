@@ -1,4 +1,5 @@
-import { type App, Notice, resolveSubpath, TFile } from 'obsidian';
+import { type App, Notice, resolveSubpath, setIcon, TFile } from 'obsidian';
+import { insertLink, type LineStyle, type Replace, toggleLines, toggleWrap } from '../model/mdFormat';
 import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import type { ModuleHost } from '../modules/ModuleHost';
 import { type SectionRange, sliceBounds } from '../sources/noteSlice';
@@ -11,6 +12,9 @@ export interface InlineEditDeps {
 	modules: ModuleHost;
 	/** Called when editing ends (to give the keyboard back to the board). */
 	done: () => void;
+	/** The board host the formatting toolbar floats in, and the lowest y it may use (below the rulers and toolbar). */
+	host: HTMLElement;
+	topInset: () => number;
 }
 
 /** Modules whose text can be edited where they sit: a text box (its markdown lives in the patchwork) or a note. */
@@ -114,6 +118,7 @@ function open(d: InlineEditDeps, moduleId: string, initial: string, save: (value
 	}
 	const ta = host.body.createEl('textarea', { cls: 'pw-inline-editor', attr: { spellcheck: 'true', 'aria-label': 'Edit the text' } });
 	ta.value = initial;
+	const format = createFormatBar(d, ta, host.el);
 
 	// Obsidian's own hotkey handling sees keys first; Escape is taken at the window so it always ends the edit.
 	const win = ta.win;
@@ -129,6 +134,7 @@ function open(d: InlineEditDeps, moduleId: string, initial: string, save: (value
 		if (finished) return;
 		finished = true;
 		win.removeEventListener('keydown', onWindowKey, true);
+		format.remove();
 		const value = ta.value;
 		// Stays visible (read-only) while a note is being saved, so there is no flash of the old text.
 		ta.readOnly = true;
@@ -151,6 +157,11 @@ function open(d: InlineEditDeps, moduleId: string, initial: string, save: (value
 	});
 	ta.addEventListener('keydown', (e) => {
 		e.stopPropagation();
+		if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'b' || e.key === 'i')) {
+			e.preventDefault();
+			format.run(toggleWrap(ta.value, ta.selectionStart, ta.selectionEnd, e.key === 'b' ? '**' : '*'));
+			return;
+		}
 		// Not Ctrl+Enter: Obsidian's own hotkeys take it before this field sees it.
 		if (e.key === 'Escape') {
 			e.preventDefault();
@@ -165,4 +176,70 @@ function open(d: InlineEditDeps, moduleId: string, initial: string, save: (value
 	ta.focus();
 	ta.setSelectionRange(ta.value.length, ta.value.length);
 	return true;
+}
+
+/**
+ * The formatting toolbar that floats above the module being edited: wraps the selection or marks the
+ * lines it touches. Its buttons never take the focus (that would end the edit).
+ */
+function createFormatBar(d: InlineEditDeps, ta: HTMLTextAreaElement, moduleEl: HTMLElement) {
+	const bar = d.host.createDiv({ cls: 'pw-format-bar' });
+	// The board listens for pointers, wheel and keys: none of that may reach it from here.
+	for (const type of ['pointerdown', 'click', 'dblclick', 'contextmenu', 'wheel', 'keydown', 'keyup']) bar.addEventListener(type, (e) => e.stopPropagation());
+	bar.addEventListener('mousedown', (e) => e.preventDefault());
+
+	/** Apply a replacement as a normal edit, so the text area's undo history keeps working. */
+	const run = (r: Replace) => {
+		ta.focus();
+		ta.setSelectionRange(r.from, r.to);
+		// execCommand is deprecated (lint warns) but is the one way to insert text and keep the text area's native undo history.
+		if (!ta.ownerDocument.execCommand('insertText', false, r.insert)) ta.setRangeText(r.insert, r.from, r.to, 'end');
+		ta.setSelectionRange(r.selStart, r.selEnd);
+		ta.dispatchEvent(new Event('input', { bubbles: true }));
+	};
+	const button = (icon: string, tip: string, make: () => Replace) => {
+		const b = bar.createEl('button', { attr: { 'aria-label': tip } });
+		setIcon(b, icon);
+		b.addEventListener('click', () => run(make()));
+	};
+	const sep = () => bar.createDiv({ cls: 'pw-fb-sep' });
+	const wrap = (mark: string) => () => toggleWrap(ta.value, ta.selectionStart, ta.selectionEnd, mark);
+	const lines = (style: LineStyle) => () => toggleLines(ta.value, ta.selectionStart, ta.selectionEnd, style);
+	button('bold', 'Bold', wrap('**'));
+	button('italic', 'Italic', wrap('*'));
+	button('strikethrough', 'Strikethrough', wrap('~~'));
+	button('code', 'Code', wrap('`'));
+	sep();
+	button('heading-1', 'Heading 1', lines('h1'));
+	button('heading-2', 'Heading 2', lines('h2'));
+	button('heading-3', 'Heading 3', lines('h3'));
+	sep();
+	button('list', 'Bulleted list', lines('bullet'));
+	button('list-ordered', 'Numbered list', lines('ordered'));
+	button('quote', 'Quote', lines('quote'));
+	button('link', 'Link', () => insertLink(ta.value, ta.selectionStart, ta.selectionEnd));
+
+	// Above the module (below it when there is no room); follows it if the camera moves.
+	const win = ta.win;
+	let frame = 0;
+	const place = () => {
+		const m = moduleEl.getBoundingClientRect();
+		const h = d.host.getBoundingClientRect();
+		const w = bar.offsetWidth;
+		const t = bar.offsetHeight;
+		const gap = 8;
+		let y = m.top - h.top - t - gap;
+		if (y < d.topInset() + gap) y = m.bottom - h.top + gap;
+		const x = Math.min(Math.max(gap, m.left - h.left + m.width / 2 - w / 2), Math.max(gap, h.width - w - gap));
+		bar.setCssProps({ '--pw-fb-x': `${Math.round(x)}px`, '--pw-fb-y': `${Math.round(y)}px` });
+		frame = win.requestAnimationFrame(place);
+	};
+	place();
+	return {
+		run,
+		remove: () => {
+			win.cancelAnimationFrame(frame);
+			bar.remove();
+		},
+	};
 }

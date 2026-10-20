@@ -454,6 +454,9 @@ export class PropertiesForm {
 		form.color('Background', s.background, (v) => setStyle('background', 'background', v));
 		form.number('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v), { min: 0, max: 1, placeholder: '1' });
 		form.number('Text scale', s.fontScale, (v) => setStyle('fontScale', 'fontScale', v === 1 ? undefined : v), { min: 0.1, max: 5, placeholder: '1' });
+		form.color('Text colour', s.color, (v) => setStyle('color', 'color', v));
+		form.dropdown('Alignment', { '': 'Default', left: 'Left', center: 'Centre', right: 'Right', justify: 'Justify' }, s.align ?? '', (v) => setStyle('align', 'align', v === '' ? undefined : v));
+		form.text('Font', s.fontFamily, (v) => setStyle('fontFamily', 'fontFamily', v), 'Same as the page');
 		this.in('advanced');
 		form.text('CSS class', s.cssClass, (v) => setStyle('cssClass', 'cssClass', v), 'For CSS snippets');
 	}
