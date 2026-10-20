@@ -2,6 +2,8 @@ import { Menu, Notice, setIcon, TFile } from 'obsidian';
 import { exportBoardPdf } from '../export/exportPdf';
 import { pdfToPngs } from '../export/exportPng';
 import { parseRange } from '../model/sheetPlan';
+import { arrangePages } from '../model/arrange';
+import { toJsonCanvas } from '../model/canvasExport';
 import { allIds } from '../model/defaults';
 import { bounds, containsPoint, type Handle, inset, intersects, type Point, type Rect, resizeRect } from '../model/geometry';
 import { newId } from '../model/ids';
@@ -428,6 +430,28 @@ export class BoardViewport implements BoardSurface {
 		};
 		const ctx = { pageCount: this.store.file.pages.length, selectedCount: this.selectedPageIndices().length, unit: this.store.file.board.displayUnit };
 		new ExportModal(this.view.app, initial, ctx, (choices) => void this.runExport(choices)).open();
+	}
+
+	/** Auto-arrange pages in output order (SPEC 5.4), as one undo step. */
+	autoArrange(layout: 'row' | 'grid') {
+		if (this.store.readOnly) return;
+		const pos = arrangePages(this.store.file, layout);
+		this.store.update((f) => [...pos].reduce((acc, [id, p]) => movePage(acc, id, p.x, p.y), f));
+		this.zoomToFit();
+	}
+
+	/** One-way, lossy export to a .canvas next to the board (SPEC 9.3). */
+	async exportCanvas() {
+		const file = this.view.file;
+		if (!file) return;
+		const app = this.view.app;
+		const { canvas, dropped } = toJsonCanvas(this.store.file);
+		const path = file.path.replace(/\.patchwork$/, '.canvas');
+		const text = JSON.stringify(canvas, null, '\t');
+		const existing = app.vault.getAbstractFileByPath(path);
+		const out = existing instanceof TFile ? (await app.vault.modify(existing, text), existing) : await app.vault.create(path, text);
+		new Notice(`Exported to ${out.path}.${dropped.length ? ` Not carried over: ${dropped.join(', ')}.` : ''}`, dropped.length ? 8000 : 4000);
+		return out;
 	}
 
 	/** Pages of the current selection (pages, or the pages of selected modules), as output-order indices. */

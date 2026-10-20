@@ -218,6 +218,15 @@ export class InspectorView extends ItemView {
 		form.text('Header', file.board.header, (v) => setBoard('header', withField(file.board, 'header', v)), '{title}');
 		form.text('Footer', file.board.footer, (v) => setBoard('footer', withField(file.board, 'footer', v)), '{page} / {pages}');
 		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'Tokens: {page}, {pages}, {title}, {date}. Pages can override these.' });
+		new Setting(this.contentEl)
+			.setName('Arrange pages')
+			.setDesc('In output order.')
+			.addButton((b) => b.setButtonText('In a row').onClick(() => board.autoArrange('row')))
+			.addButton((b) => b.setButtonText('In a grid').onClick(() => board.autoArrange('grid')));
+		new Setting(this.contentEl)
+			.setName('Canvas')
+			.setDesc('Write a .canvas next to the board (one-way; crops and styles are dropped).')
+			.addButton((b) => b.setButtonText('Export to canvas').onClick(() => void board.exportCanvas()));
 		form.heading('Guides');
 		form.length('Safe area', uniformInset(file.board.defaultSafeArea), (mm) => setBoard('safe', withField(file.board, 'defaultSafeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
 		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: `A dashed margin guide on every page; never printed. ${file.pages.length} page(s) on this board.` });

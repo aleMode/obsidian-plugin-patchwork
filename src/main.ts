@@ -70,6 +70,9 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
 		this.addBoardCommand('export', 'Export…', (v) => v.showExport());
 		this.addBoardCommand('board-settings', 'Board settings…', (v) => v.showBoardSettings(), true);
+		this.addBoardCommand('arrange-row', 'Arrange pages in a row', (v) => v.autoArrange('row'), true);
+		this.addBoardCommand('arrange-grid', 'Arrange pages in a grid', (v) => v.autoArrange('grid'), true);
+		this.addBoardCommand('export-canvas', 'Export to canvas', (v) => void v.exportCanvas());
 
 		this.addCommand({
 			id: 'generate-stress-board',
