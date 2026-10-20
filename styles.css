@@ -80,6 +80,8 @@
 	width: var(--pw-w);
 	height: var(--pw-h);
 	cursor: move;
+	/* Module z-indexes order modules within their page only; without this they would climb above overlapping pages. */
+	isolation: isolate;
 }
 
 .pw-page-paper {
