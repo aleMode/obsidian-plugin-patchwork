@@ -16,7 +16,7 @@ import { snapToGuides } from '../model/guides';
 import { masterPreview, pageFurniture } from '../model/numbering';
 import { outputPages, resolvePage } from '../model/masters';
 import { rulerTicks } from '../model/rulers';
-import { snapPoint, snapValue } from '../model/snapping';
+import { gridDrawStep, snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import type { BitmapCache } from '../render/bitmapCache';
@@ -756,9 +756,8 @@ export class BoardViewport implements BoardSurface {
 		const grid = this.store.file.board.grid;
 		this.root.toggleClass('has-grid', grid.visible);
 		if (!grid.visible) return;
-		let step = grid.size * PX_PER_MM * this.camera.zoom;
 		// Coarsen the grid when zoomed out, so lines never get denser than every 8 px.
-		while (step > 0 && step < 8) step *= 5;
+		const step = gridDrawStep(grid.size * PX_PER_MM * this.camera.zoom, 8);
 		// Plain properties, not custom ones: those would be inherited by the whole board (see applyCamera).
 		this.root.style.backgroundSize = `${step}px ${step}px`;
 		this.root.style.backgroundPosition = `${this.camera.tx}px ${this.camera.ty}px`;
@@ -1030,8 +1029,7 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** What's under the pointer: a module (with its page), a page, or empty board. */
-	private hit(e: MouseEvent): Selection {
-		const target = e.target as HTMLElement;
+	private hit(e: MouseEvent, target = e.target as HTMLElement): Selection {
 		const mod = target.closest<HTMLElement>('.pw-module');
 		if (mod?.dataset.moduleId && mod.dataset.pageId) return { pageId: mod.dataset.pageId, moduleId: mod.dataset.moduleId };
 		const page = target.closest<HTMLElement>('.pw-page');
@@ -1386,7 +1384,8 @@ export class BoardViewport implements BoardSurface {
 
 	/** Double-click: a note module opens its source at that section; a PDF module opens the crop editor (SPEC 5.6). */
 	private onDoubleClick(e: MouseEvent) {
-		const hit = this.hit(e);
+		// The pointer is captured by the board on press, which retargets the click events to the board itself.
+		const hit = this.hit(e, (document.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement);
 		const m = hit?.moduleId ? this.store.file.pages.find((p) => p.id === hit.pageId)?.modules.find((x) => x.id === hit.moduleId) : undefined;
 		if (hit?.moduleId && m?.type === 'pdf') return this.editCrop(hit.pageId, hit.moduleId);
 		if (m?.type !== 'note') return;

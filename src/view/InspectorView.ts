@@ -42,7 +42,8 @@ function withField<T extends object>(o: T, key: string, value: unknown): T {
 
 /** Small form builder on top of Obsidian's Setting, in the board's display unit. */
 class Form {
-	constructor(private el: HTMLElement, private unit: DisplayUnit) {}
+	/** `settle` closes the undo group after a discrete choice, so two picks of the same field are two undo steps. */
+	constructor(private el: HTMLElement, private unit: DisplayUnit, private settle: () => void = () => {}) {}
 
 	heading(text: string) {
 		new Setting(this.el).setName(text).setHeading();
@@ -81,12 +82,12 @@ class Form {
 	}
 
 	toggle(name: string, value: boolean, set: (v: boolean) => void, desc?: string) {
-		const s = new Setting(this.el).setName(name).addToggle((t) => t.setValue(value).onChange(set));
+		const s = new Setting(this.el).setName(name).addToggle((t) => t.setValue(value).onChange((v) => this.choose(set, v)));
 		if (desc) s.setDesc(desc);
 	}
 
 	dropdown(name: string, options: Record<string, string>, value: string, set: (v: string) => void) {
-		new Setting(this.el).setName(name).addDropdown((d) => d.addOptions(options).setValue(value).onChange(set));
+		new Setting(this.el).setName(name).addDropdown((d) => d.addOptions(options).setValue(value).onChange((v) => this.choose(set, v)));
 	}
 
 	color(name: string, value: string | undefined, set: (v: string | undefined) => void) {
@@ -94,6 +95,11 @@ class Form {
 			.setName(name)
 			.addColorPicker((c) => c.setValue(value ?? '#ffffff').onChange((v) => set(v)))
 			.addExtraButton((b) => b.setIcon('x').setTooltip('Clear').onClick(() => set(undefined)));
+	}
+
+	private choose<T>(set: (v: T) => void, v: T) {
+		set(v);
+		this.settle();
 	}
 
 	button(name: string, label: string, onClick: () => void, desc?: string) {
@@ -154,7 +160,7 @@ export class InspectorView extends ItemView {
 			return;
 		}
 		const file = board.boardStore.file;
-		const form = new Form(el, file.board.displayUnit);
+		const form = new Form(el, file.board.displayUnit, () => board.boardStore.endCoalesce());
 		const readOnly = board.boardStore.readOnly;
 		if (readOnly) el.createDiv({ cls: 'pw-panel-empty', text: 'This board is read-only.' });
 		const page = file.pages.find((p) => p.id === board.selected?.pageId);
@@ -189,7 +195,7 @@ export class InspectorView extends ItemView {
 		if (kind === 'pages') {
 			const pages = board.boardStore.file.pages.filter((p) => items.some((it) => it.pageId === p.id));
 			const first = pages[0]?.master;
-			this.masterDropdown(new Form(this.contentEl, board.boardStore.file.board.displayUnit), board, pages.map((p) => p.id), pages.every((p) => p.master === first) ? first : undefined);
+			this.masterDropdown(new Form(this.contentEl, board.boardStore.file.board.displayUnit, () => board.boardStore.endCoalesce()), board, pages.map((p) => p.id), pages.every((p) => p.master === first) ? first : undefined);
 		}
 		const actions = new Setting(this.contentEl).setName('Selection');
 		if (kind === 'modules') actions.addButton((b) => b.setButtonText('Lock or unlock').onClick(() => board.toggleLock()));
