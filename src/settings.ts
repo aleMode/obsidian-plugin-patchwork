@@ -4,10 +4,13 @@ import type PatchworkPlugin from './main';
 export interface PatchworkSettings {
 	/** Memory for cached PDF renders (SPEC 8: default 512 MB). */
 	bitmapBudgetMB: number;
+	/** The red dashed line on a box whose text doesn't fit. Screen only; never exported. */
+	showOverflowMarker: boolean;
 }
 
 export const DEFAULT_SETTINGS: PatchworkSettings = {
 	bitmapBudgetMB: 512,
+	showOverflowMarker: true,
 };
 
 export class PatchworkSettingTab extends PluginSettingTab {
@@ -31,5 +34,9 @@ export class PatchworkSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				});
 			});
+		new Setting(containerEl)
+			.setName('Overflow marker')
+			.setDesc('Show a red dashed line along the bottom of a box whose text does not fit. On screen only; it is never exported.')
+			.addToggle((t) => t.setValue(this.plugin.settings.showOverflowMarker).onChange((v) => void this.plugin.setOverflowMarker(v)));
 	}
 }

@@ -129,7 +129,7 @@ function findProblems(host: HTMLElement): string[] {
 	const problems: string[] = [];
 	host.querySelectorAll('.pw-module-placeholder').forEach((p) => problems.push((p as HTMLElement).innerText.trim()));
 	if (host.querySelector('.mermaid-wrapper.is-guarded')) {
-		problems.push('Mermaid diagrams are not allowed in this vault yet; open a note with a diagram and choose "Allow" first.');
+		problems.push('A Mermaid diagram was left blank: Obsidian asks once per vault before it draws diagrams. Open a note that has one in a normal tab, choose "Allow" on the diagram, then export again.');
 	}
 	return problems;
 }

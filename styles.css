@@ -259,6 +259,11 @@
 	pointer-events: none;
 }
 
+/* Settings → Overflow marker off (a class on body keeps every open board in step). */
+body.pw-hide-overflow-marker .pw-board .pw-module.is-overflowing::before {
+	display: none;
+}
+
 .pw-module.is-pending {
 	background: #f3f3f3;
 }
@@ -732,6 +737,16 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 
 .pw-skeleton-thumb.is-inverted {
 	filter: invert(1) hue-rotate(180deg);
+}
+
+/* Zoomed-out previews follow the same rule as the live canvas: the board's dark-PDF mode inverts, a
+   module's own invert inverts again, and the two cancel out. */
+body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb {
+	filter: invert(1) hue-rotate(180deg);
+}
+
+body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inverted {
+	filter: none;
 }
 
 .pw-suggest-detail {

@@ -43,6 +43,8 @@ export interface BoardServices {
 	/** Called when this board goes away, so side panels stop following it. */
 	closed?: (board: BoardViewport) => void;
 	openPanels?: () => void;
+	/** The device-wide preference for the red "text does not fit" line. */
+	overflowMarker?: { shown: () => boolean; set: (show: boolean) => void };
 }
 
 export type Selection = { pageId: string; moduleId?: string } | null;
@@ -1449,6 +1451,11 @@ export class BoardViewport implements BoardSurface {
 			if (m?.type === 'pdf') menu.addItem((i) => i.setTitle('Edit crop…').setIcon('crop').onClick(() => this.editCrop(pageId, moduleId)));
 			if (m?.type === 'text' || m?.type === 'frame') {
 				menu.addItem((i) => i.setTitle('Continue in a new frame').setIcon('link').onClick(() => this.continueInFrame(pageId, moduleId)));
+				menu.addSeparator();
+			}
+			const marker = this.services.overflowMarker;
+			if (marker && (m?.type === 'note' || m?.type === 'text' || m?.type === 'frame')) {
+				menu.addItem((i) => i.setTitle('Show overflow marker').setIcon('alert-triangle').setChecked(marker.shown()).onClick(() => marker.set(!marker.shown())));
 				menu.addSeparator();
 			}
 			if (m?.type === 'note') {

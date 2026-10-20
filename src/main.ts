@@ -26,6 +26,8 @@ export default class PatchworkPlugin extends Plugin {
 
 	async onload() {
 		this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<PatchworkSettings> | null) };
+		this.applyOverflowMarker();
+		this.register(() => activeDocument.body.removeClass('pw-hide-overflow-marker'));
 		this.pdfDocs = new PdfDocCache(this.app);
 		this.bitmaps = new BitmapCache(this.settings.bitmapBudgetMB);
 		// A modified PDF must not show stale renders (keys include mtime; this frees the memory too).
@@ -43,6 +45,7 @@ export default class PatchworkPlugin extends Plugin {
 			thumbs: this.thumbs,
 			closed: (b: BoardViewport) => this.activeBoard.closed(b),
 			openPanels: () => void this.openPanels(),
+			overflowMarker: { shown: () => this.settings.showOverflowMarker, set: (show: boolean) => void this.setOverflowMarker(show) },
 		};
 		this.registerView(VIEW_TYPE_BOARD, (leaf) =>
 			new PatchworkView(leaf, (el, store, view) => {
@@ -142,6 +145,17 @@ export default class PatchworkPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	/** One body class hides the marker on every open board at once; the CSS does the rest. */
+	applyOverflowMarker() {
+		activeDocument.body.toggleClass('pw-hide-overflow-marker', !this.settings.showOverflowMarker);
+	}
+
+	async setOverflowMarker(show: boolean) {
+		this.settings.showOverflowMarker = show;
+		this.applyOverflowMarker();
+		await this.saveSettings();
 	}
 
 	/** A command that only shows up while a board is the active view. */
