@@ -1,13 +1,18 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 235 checks across 23 suites, all passing; `npm test`: 198 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 247 checks across 24 suites, all passing; `npm test`: 202 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
-## New in M5 (latest)
+## New in M5 (latest, M5 complete)
+
+### Trackers
+- Toolbar → **Add tracker** (checklist icon) → Counter, Boxes or Checklist. Click − / + on a counter, click boxes (clicking the last filled one empties it), tick checklist items. Every click is one undo step and is saved.
+- Clicking the tracker anywhere except its controls selects it; drag to move. Lock it to keep it in place while playing.
+- Inspector: kind, value, min/max/step, number of boxes, checklist items (one per line; ticks stay with their line), **Print blank**. Export: the state prints without the −/+ buttons; with Print blank, empty boxes and an empty value to fill in by pencil.
 
 ### Linked text frames
 - Right-click a note or text module → **Continue in a new frame** (or command *Continue selected text in a new frame*). A frame of the same size appears at the same spot on the next page (a new page if needed). Text that doesn't fit the first box continues there, a paragraph/list/table at a time; the last frame gets the red overflow marker if text is still left.

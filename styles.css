@@ -700,6 +700,80 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	margin-left: var(--size-4-2);
 }
 
+/* ---------- trackers ---------- */
+
+.pw-tracker {
+	padding: 0.4em 0.5em;
+	font-size: 1.2em;
+}
+
+.pw-tracker-label {
+	font-weight: 600;
+	margin-bottom: 0.3em;
+}
+
+.pw-tracker-row {
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+	flex-wrap: wrap;
+}
+
+.pw-tracker-value {
+	min-width: 2.5em;
+	min-height: 1.4em;
+	text-align: center;
+	font-size: 1.6em;
+	font-variant-numeric: tabular-nums;
+	border-bottom: 1px solid currentColor;
+}
+
+.pw-tracker-step {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.6em;
+	height: 1.6em;
+	border: 1px solid currentColor;
+	border-radius: 50%;
+	font-weight: 600;
+}
+
+.pw-tracker-box {
+	display: inline-block;
+	flex: none;
+	width: 1.2em;
+	height: 1.2em;
+	border: 1.5px solid currentColor;
+	border-radius: 0.15em;
+}
+
+.pw-tracker-box.is-filled {
+	background: currentColor;
+}
+
+.pw-tracker-item {
+	display: flex;
+	align-items: center;
+	gap: 0.5em;
+	line-height: 1.6;
+}
+
+.pw-tracker-item.is-done .pw-tracker-text {
+	text-decoration: line-through;
+	opacity: 0.6;
+}
+
+/* Module content ignores the pointer while editing; tracker controls are the exception. */
+.pw-board .pw-interactive {
+	pointer-events: auto;
+	cursor: pointer;
+}
+
+.pw-board .pw-interactive:hover {
+	box-shadow: 0 0 0 calc(2px / var(--pw-zoom)) var(--interactive-accent);
+}
+
 /* ---------- table of contents ---------- */
 
 .pw-toc {

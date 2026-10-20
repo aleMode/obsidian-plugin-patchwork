@@ -171,7 +171,7 @@ export interface Page {
   modules: Module[];                             // draw order = array order unless z set
 }
 
-export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule;
+export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule | TrackerModule;
 
 export interface BaseModule {
   id: string; x: number; y: number; w: number; h: number;   // mm, relative to page
@@ -203,6 +203,13 @@ export interface TextModule extends BaseModule { type: "text"; markdown: string 
 export interface ImageModule extends BaseModule { type: "image"; file: string; fit?: "contain" | "cover" | "stretch" }
 export interface TocModule extends BaseModule { type: "toc"; heading?: string }   // M4; heading default "Contents", "" = none
 export interface FrameModule extends BaseModule { type: "frame"; from: string }   // M5: continues the note, text or frame `from`
+export interface TrackerModule extends BaseModule {   // M5: interactive; state saved in the board
+  type: "tracker"; kind: "counter" | "boxes" | "checklist";
+  value?: number;                                // counter value / boxes filled
+  min?: number; max?: number; step?: number;     // boxes: max = how many
+  items?: { text: string; done?: boolean }[];    // checklist
+  printBlank?: boolean;                          // exports show it empty
+}
 
 export interface ModuleStyle {
   padding?: number; border?: { width: number; color: string; radius?: number };
@@ -413,7 +420,8 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - PNG export rasterizes the final PDF; sheets above 8192 px per side become several files (`-r1c1`, …), resolving Q11 with option (a).
   - Export dialog adds page selection (all / selected / range) and remembers its choices in `board.export` (new optional `fitSmallPages`, `tileLabels`).
   - Auto-arrange keeps the first page in place and lays pages out in output order (row, or a grid of ⌈√n⌉ columns).
-- **v0.9 · 2026-10-20** (M5 in progress)
+- **v0.9 · 2026-10-20** (M5 complete)
+  - Interactive modules are one `tracker` type with three kinds: counter (−/+ within min/max, decimal steps), boxes (click fills up to a box; clicking the last filled one empties it) and checklist. The module's `label` is its title. Clicks are ordinary store edits (undo, save); Shift-click and drags still select and move it, and locking keeps it in place during play. Exports print the state without the −/+ buttons, or blank with `printBlank` for pencil play.
   - Linked text frames: a `frame` module continues a note or text module (or another frame) via `from`, on any page. The text is cut into whole markdown blocks (paragraphs, lists, tables, fenced code, callouts; headings on their own), measured offscreen at each frame's width, and handed out greedily; a heading is never left last in a frame. Lines are never split and nothing reflows across pages, so hard rule 7 holds. The last frame shows the overflow marker when text is left over. Deleting a middle frame links its neighbours. Known limits: content that grows after rendering (late images, Dataview) isn't re-measured until the next change; footnotes and reference links don't cross block boundaries.
 - **v0.8 · 2026-10-20** (M3 and M4 complete)
   - Saved views live in the board file (`views`). Dark-mode PDF viewing (`board.pdfDarkMode`) is viewing only; per-module `invert` and the `inkSaver` export option force raster for the affected modules.

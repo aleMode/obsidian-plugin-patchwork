@@ -155,7 +155,29 @@ export interface FrameModule extends BaseModule {
 	from: string;
 }
 
-export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule;
+/** M5: interactive play aid; its state lives in the board. */
+export interface TrackerModule extends BaseModule {
+	type: 'tracker';
+	kind: 'counter' | 'boxes' | 'checklist';
+	label?: string;
+	/** Counter value, or how many boxes are filled. */
+	value?: number;
+	/** Counter bounds; for boxes, `max` is how many there are. */
+	min?: number;
+	max?: number;
+	step?: number;
+	items?: TrackerItem[];
+	/** Exports show the tracker empty (zero, no boxes or items ticked), to fill in by hand. */
+	printBlank?: boolean;
+}
+
+export interface TrackerItem {
+	text: string;
+	done?: boolean;
+	[extra: string]: unknown;
+}
+
+export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule | TrackerModule;
 
 /**
  * A module whose `type` this version doesn't know (written by a newer plugin, or hand-edited).
@@ -167,7 +189,7 @@ export interface ForeignModule extends BaseModule {
 
 export type AnyModule = Module | ForeignModule;
 
-export const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame'] as const;
+export const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame', 'tracker'] as const;
 
 export function isKnownModule(m: AnyModule): m is Module {
 	return (MODULE_TYPES as readonly string[]).includes(m.type);

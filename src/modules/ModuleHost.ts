@@ -1,6 +1,6 @@
 import { Component, TAbstractFile } from 'obsidian';
 import { isInheritedId, resolvePage } from '../model/masters';
-import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
+import { type AnyModule, isKnownModule, type NoteModule, type Page, type TrackerModule } from '../model/schema';
 import type { BoardStore } from '../store/BoardStore';
 import { ImageModuleRenderer } from './imageModule';
 import { FlowRenderer, NoteModuleRenderer, TextModuleRenderer } from './noteModule';
@@ -10,6 +10,8 @@ import { applyOverflow } from './overflow';
 import { applyModuleStyle } from './style';
 import { PdfModuleRenderer } from './pdfModule';
 import { TocModuleRenderer } from './tocModule';
+import { TrackerRenderer } from './trackerModule';
+import { mapModule } from '../store/pageOps';
 import { tocEntries } from '../model/toc';
 import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
 
@@ -20,6 +22,7 @@ const CONTENT_KEYS: Record<string, readonly string[]> = {
 	text: ['markdown'],
 	image: ['file', 'fit'],
 	toc: ['heading'],
+	tracker: ['kind', 'label', 'value', 'min', 'max', 'step', 'items'],
 };
 
 /**
@@ -236,6 +239,11 @@ export class ModuleHost {
 				return new TocModuleRenderer(body, () => tocEntries(this.o.store.file, pageId));
 			case 'frame':
 				return new FlowRenderer(body, this.ctx);
+			case 'tracker': {
+				const store = this.o.store;
+				// Clicks are ordinary edits: undoable and saved with the board.
+				return new TrackerRenderer(body, store.readOnly ? undefined : (fn) => store.update((f) => mapModule(f, pageId, m.id, (x) => fn(x as TrackerModule))));
+			}
 		}
 	}
 

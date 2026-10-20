@@ -10,6 +10,7 @@ import type { FlowContext } from '../modules/flowLayout';
 import { applyOverflow } from '../modules/overflow';
 import { PdfModuleRenderer } from '../modules/pdfModule';
 import { TocModuleRenderer } from '../modules/tocModule';
+import { TrackerRenderer } from '../modules/trackerModule';
 import type { Rect } from '../model/geometry';
 import type { TocEntry } from '../model/toc';
 import { applyModuleStyle } from '../modules/style';
@@ -82,6 +83,8 @@ function createRenderer(m: AnyModule, body: HTMLElement, ctx: ModuleContext, o: 
 			return new TocModuleRenderer(body, () => o.tocEntries(pageId));
 		case 'frame':
 			return new FlowRenderer(body, ctx);
+		case 'tracker':
+			return new TrackerRenderer(body);
 	}
 }
 

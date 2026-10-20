@@ -145,6 +145,13 @@ function checkModule(m: Json, path: string, is: Issues) {
 		case 'frame':
 			is.required(m, 'from', path, isStr, 'a module ID');
 			break;
+		case 'tracker':
+			is.required(m, 'kind', path, oneOf('counter', 'boxes', 'checklist'), '"counter", "boxes" or "checklist"');
+			is.optional(m, 'label', path, isStr, 'text');
+			for (const k of ['value', 'min', 'max', 'step']) is.optional(m, k, path, isNum, 'a number');
+			is.optional(m, 'items', path, (v) => Array.isArray(v) && v.every((it) => isObj(it) && isStr(it.text) && (it.done === undefined || isBool(it.done))), 'a list of {text, done}');
+			is.optional(m, 'printBlank', path, isBool, 'true/false');
+			break;
 		default:
 			if (isStr(m.type)) is.warnings.push(`${path}: unknown module type "${m.type}" kept as is`);
 	}

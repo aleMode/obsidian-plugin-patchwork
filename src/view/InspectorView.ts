@@ -2,8 +2,9 @@ import { ItemView, setIcon, Setting, TFile, WorkspaceLeaf } from 'obsidian';
 import { pagesUsing } from '../model/masters';
 import { flowChains } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
+import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule, TocModule } from '../model/schema';
+import type { AnyModule, BoardSettings, DisplayUnit, ImageModule, Insets, ModuleStyle, NoteModule, NumberFormat, NumberPosition, Page, PatchworkFile, PdfModule, TextModule, TocModule, TrackerModule } from '../model/schema';
 import { formatLength, parseLength } from '../model/units';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
@@ -362,6 +363,9 @@ export class InspectorView extends ItemView {
 			case 'frame':
 				this.renderFrame(form, board, page, m);
 				break;
+			case 'tracker':
+				this.renderTracker(form, m as TrackerModule, set);
+				break;
 			case 'toc':
 				form.heading('Table of contents');
 				this.overrideRow('Heading', (m as TocModule).heading === '' ? 'none' : (m as TocModule).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
@@ -369,6 +373,31 @@ export class InspectorView extends ItemView {
 				break;
 		}
 		this.renderStyle(form, m, set);
+	}
+
+	/** Tracker (M5): what it tracks; its state is changed by clicking it on the board. */
+	private renderTracker(form: Form, m: TrackerModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
+		form.heading('Tracker');
+		form.dropdown('Kind', { counter: 'Counter', boxes: 'Boxes', checklist: 'Checklist' }, m.kind, (v) => {
+			set('kind', (x) => ({ ...x, kind: v as TrackerModule['kind'] }));
+			this.render();
+		});
+		const num = (name: string, key: 'value' | 'min' | 'max' | 'step', placeholder: string, min?: number) =>
+			form.number(name, m[key], (v) => set(key, (x) => withField(x, key, v)), { ...(min === undefined ? {} : { min }), placeholder });
+		if (m.kind === 'counter') {
+			num('Value', 'value', '0');
+			num('Minimum', 'min', 'none');
+			num('Maximum', 'max', 'none');
+			num('Step', 'step', '1', 0);
+		} else if (m.kind === 'boxes') {
+			num('Boxes', 'max', String(DEFAULT_BOXES), 1);
+			num('Filled', 'value', '0', 0);
+		} else {
+			form.textarea('Items', (m.items ?? []).map((it) => it.text).join('\n'), (v) => set('items', (x) => ({ ...x, items: itemsFromText(v, (x as TrackerModule).items) })));
+			this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'One item per line. Ticks stay with their line.' });
+		}
+		form.toggle('Print blank', !!m.printBlank, (v) => set('printBlank', (x) => withField(x, 'printBlank', v ? true : undefined)), 'Exports show it empty, to fill in by hand.');
+		this.contentEl.createDiv({ cls: 'pw-panel-hint', text: 'The label (above) is its title. Click the tracker on the board to change it; each click can be undone.' });
 	}
 
 	/** Linked frame (M5): where it sits in its chain. */

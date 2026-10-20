@@ -6,7 +6,7 @@ import type { ActiveBoard } from './activeBoard';
 
 export const VIEW_TYPE_OUTLINE = 'patchwork-outline';
 
-const ICONS: Record<string, string> = { note: 'file-text', pdf: 'book-open', text: 'type', image: 'image', toc: 'list-ordered', frame: 'link' };
+const ICONS: Record<string, string> = { note: 'file-text', pdf: 'book-open', text: 'type', image: 'image', toc: 'list-ordered', frame: 'link', tracker: 'list-checks' };
 
 /** A short name for a module: its label, else what it shows. */
 export function moduleTitle(m: AnyModule): string {
@@ -25,6 +25,8 @@ export function moduleTitle(m: AnyModule): string {
 			return 'Table of contents';
 		case 'frame':
 			return 'Linked frame';
+		case 'tracker':
+			return typeof m.label === 'string' && m.label ? m.label : `${String(m.kind)} tracker`;
 		default:
 			return m.type;
 	}

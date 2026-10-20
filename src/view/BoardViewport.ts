@@ -9,7 +9,7 @@ import { bounds, containsPoint, type Handle, inset, intersects, type Point, type
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule } from '../model/schema';
+import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule, TrackerModule } from '../model/schema';
 import { flowChains } from '../model/flow';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
@@ -377,6 +377,27 @@ export class BoardViewport implements BoardSurface {
 	addText() {
 		this.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '**New text**\n\nEdit me in the inspector.' }));
 		this.services.openPanels?.();
+	}
+
+	/** Interactive tracker (M5): a counter, a row of boxes or a checklist, edited in the inspector. */
+	addTracker(kind: TrackerModule['kind'] = 'counter') {
+		const presets: Record<TrackerModule['kind'], Partial<TrackerModule> & { w: number; h: number }> = {
+			counter: { label: 'Hit points', value: 10, min: 0, w: 50, h: 25 },
+			boxes: { label: 'Spell slots', max: 4, value: 0, w: 60, h: 18 },
+			checklist: { label: 'Quests', items: [{ text: 'Find the queen' }, { text: 'Return the crown' }], w: 70, h: 30 },
+		};
+		const { w, h, ...rest } = presets[kind];
+		this.placeModule((page, id) => ({ id, type: 'tracker', kind, ...defaultModuleRect(page, { w, h }), ...rest }));
+		this.services.openPanels?.();
+	}
+
+	showTrackerMenu(e?: MouseEvent) {
+		const menu = new Menu();
+		menu.addItem((i) => i.setTitle('Counter').setIcon('plus-minus').onClick(() => this.addTracker('counter')));
+		menu.addItem((i) => i.setTitle('Boxes').setIcon('square').onClick(() => this.addTracker('boxes')));
+		menu.addItem((i) => i.setTitle('Checklist').setIcon('list-checks').onClick(() => this.addTracker('checklist')));
+		if (e) menu.showAtMouseEvent(e);
+		else menu.showAtPosition({ x: this.root.getBoundingClientRect().left + 80, y: this.root.getBoundingClientRect().top + 80 });
 	}
 
 	/** Table of contents (M4): fills the page inside its margins; lists named pages live. */
@@ -967,6 +988,8 @@ export class BoardViewport implements BoardSurface {
 
 	private onPointerDown(e: PointerEvent) {
 		this.root.focus();
+		// Tracker controls take plain clicks; Shift and the other buttons still select and drag.
+		if (e.button === 0 && !e.shiftKey && !this.spaceHeld && (e.target as HTMLElement).closest('.pw-interactive')) return;
 		const handle = (e.target as HTMLElement).closest<HTMLElement>('.pw-handle')?.dataset.handle as Handle | undefined;
 		if (handle && e.button === 0 && this.selection) {
 			const sel = this.selectedRect();
@@ -1405,6 +1428,7 @@ export class BoardViewport implements BoardSurface {
 			button('book-open', 'Add PDF', () => this.pickPdf());
 			button('type', 'Add text', () => this.addText());
 			button('image', 'Add image', () => this.pickImage());
+			button('list-checks', 'Add tracker', (e) => this.showTrackerMenu(e));
 			sep();
 		}
 		button('file-output', 'Export to PDF', () => this.showExport());

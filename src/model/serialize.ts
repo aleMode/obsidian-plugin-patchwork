@@ -9,6 +9,7 @@ type Shape = { keys: readonly string[]; children?: Record<string, Shape> };
 
 const INSETS: Shape = { keys: ['top', 'right', 'bottom', 'left'] };
 const FROZEN: Shape = { keys: ['at', 'markdown'] };
+const ITEM: Shape = { keys: ['text', 'done'] };
 const STYLE: Shape = {
 	keys: ['padding', 'border', 'background', 'opacity', 'fontScale', 'cssClass'],
 	children: { border: { keys: ['width', 'color', 'radius'] } },
@@ -21,6 +22,7 @@ const MODULE_KEYS: Record<string, readonly string[]> = {
 	image: ['file', 'fit'],
 	toc: ['heading'],
 	frame: ['from'],
+	tracker: ['kind', 'label', 'value', 'min', 'max', 'step', 'items', 'printBlank'],
 };
 const MODULE_BASE = ['id', 'type', 'x', 'y', 'w', 'h', 'z', 'locked', 'label'];
 
@@ -69,7 +71,12 @@ function moduleOut(m: Json): Json {
 	const typeKeys = MODULE_KEYS[m.type as string];
 	// Modules of unknown type are written verbatim (key order included).
 	if (!typeKeys) return m;
-	return ordered(m, [...MODULE_BASE, ...typeKeys, 'style'], (k, v) => (k === 'style' ? shaped(v, STYLE) : k === 'frozen' ? shaped(v, FROZEN) : tidy(v)));
+	return ordered(m, [...MODULE_BASE, ...typeKeys, 'style'], (k, v) => {
+		if (k === 'style') return shaped(v, STYLE);
+		if (k === 'frozen') return shaped(v, FROZEN);
+		if (k === 'items' && Array.isArray(v)) return v.map((it: Json) => shaped(it, ITEM));
+		return tidy(v);
+	});
 }
 
 function pageOut(p: Json): Json {
