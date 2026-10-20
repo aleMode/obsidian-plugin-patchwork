@@ -28,6 +28,11 @@ export async function connect({ port = process.env.CDP_PORT ?? '9222', title = p
 			ws.send(JSON.stringify({ id, method, params }));
 		});
 
+	// A minimised or fully covered window reports visibilityState "hidden": no animation frames, and pointer
+	// drags then stall. Tell the page it is active and focused for as long as this session is attached.
+	await send('Page.setWebLifecycleState', { state: 'active' });
+	await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+
 	/** Evaluate an async function body in the page; returns its value or throws the page's exception. */
 	async function evaluate(body) {
 		const res = await send('Runtime.evaluate', {
@@ -62,10 +67,16 @@ export async function connect({ port = process.env.CDP_PORT ?? '9222', title = p
 		await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, modifiers });
 	}
 
-	async function screenshot(path) {
+	/**
+	 * Save a screenshot. A minimised window produces no compositor frames, so the capture can wait
+	 * forever; after a few seconds it is skipped (returns false) instead of hanging the caller.
+	 */
+	async function screenshot(path, waitMs = 8000) {
 		const { writeFileSync } = await import('node:fs');
-		const shot = await send('Page.captureScreenshot', { format: 'png' });
+		const shot = await Promise.race([send('Page.captureScreenshot', { format: 'png' }), new Promise((r) => setTimeout(() => r(null), waitMs))]);
+		if (!shot?.result?.data) return false;
 		writeFileSync(path, Buffer.from(shot.result.data, 'base64'));
+		return true;
 	}
 
 	return { send, evaluate, mouse, drag, wheel, key, screenshot, close: () => ws.close() };
