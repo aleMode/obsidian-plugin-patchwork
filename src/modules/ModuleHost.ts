@@ -79,6 +79,9 @@ export class ModuleHost {
 	/** Linked-frame chains of the current file, recomputed when the file changes. */
 	private chains: { file: unknown; map: Map<string, FlowInfo> } = { file: null, map: new Map() };
 	selectedModules: ReadonlySet<string> = new Set();
+	/** Modules being edited in place: left alone by re-renders; `commit` runs if they must unmount. */
+	private editing = new Map<string, { commit: () => void }>();
+	private unmounting = new Set<string>();
 
 	constructor(private o: ModuleHostOptions) {
 		const layout = new FlowLayout(o.ctx.app, o.boardPath, () => o.store.file.board.fontFamily);
@@ -290,6 +293,7 @@ export class ModuleHost {
 	}
 
 	private renderContent(mounted: Mounted) {
+		if (this.editing.has(mounted.module.id)) return;
 		try {
 			mounted.renderer?.render(mounted.module);
 		} catch (e) {
@@ -321,7 +325,7 @@ export class ModuleHost {
 	private sourceChanged(...paths: string[]) {
 		for (const m of this.mounted.values()) {
 			const deps = m.renderer?.dependencies();
-			if (!deps || !paths.some((p) => deps.has(p))) continue;
+			if (!deps || !paths.some((p) => deps.has(p)) || this.editing.has(m.module.id)) continue;
 			m.renderer?.destroy();
 			m.renderer = this.createRenderer(m.module, m.body, m.pageId, m.kind);
 			this.renderContent(m);
@@ -329,10 +333,42 @@ export class ModuleHost {
 	}
 
 	private unmount(id: string, m: Mounted) {
+		// A module scrolled away or zoomed out while being edited keeps what was typed.
+		const session = this.editing.get(id);
+		this.editing.delete(id);
+		this.unmounting.add(id);
+		try {
+			session?.commit();
+		} finally {
+			this.unmounting.delete(id);
+		}
 		m.sizeWatch?.disconnect();
 		m.renderer?.destroy();
 		m.el.remove();
 		this.mounted.delete(id);
+	}
+
+	/**
+	 * Start editing a module in place: its rendered content stops updating and its body is handed to the
+	 * editor. Returns null when the module is not on screen (not mounted).
+	 */
+	beginEdit(id: string, session: { commit: () => void }): { el: HTMLElement; body: HTMLElement } | null {
+		const m = this.mounted.get(id);
+		if (!m || this.editing.has(id)) return null;
+		this.editing.set(id, session);
+		m.el.addClass('is-editing');
+		return { el: m.el, body: m.body };
+	}
+
+	/** Editing is over: show the module again, rendered from the (possibly updated) source. */
+	endEdit(id: string) {
+		this.editing.delete(id);
+		const m = this.mounted.get(id);
+		if (!m || this.unmounting.has(id)) return;
+		m.el.removeClass('is-editing');
+		m.renderer?.destroy();
+		m.renderer = this.createRenderer(m.module, m.body, m.pageId, m.kind);
+		this.renderContent(m);
 	}
 
 	destroy() {

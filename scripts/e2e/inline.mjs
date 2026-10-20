@@ -1,0 +1,136 @@
+// End-to-end check of editing text boxes and notes in place: the text area, saving (one undo step for a
+// text box; only the shown slice for a note), conflicts, renamed headings, frozen notes, unmounting
+// mid-edit, and the double-click and Enter triggers. Page-level actions plus synthetic double-clicks.
+import { connect } from '../cdpClient.mjs';
+
+const cdp = await connect();
+const results = [];
+const check = (name, ok, detail) => results.push({ name, ok: !!ok, ...(ok ? {} : { detail }) });
+const V = `const L = app.workspace.getLeavesOfType('patchwork-board').find((l) => l.view.file?.path.startsWith('_e2e/')); const v = L.view; const s = v.surface; const mod = (id) => v.store.file.pages[0].modules.find((m) => m.id === id);`;
+const ev = (body) => cdp.evaluate(`${V} ${body}`);
+const wait = (ms) => `await new Promise((r) => setTimeout(r, ${ms}));`;
+const NOTE = '---\ntitle: scratch\n---\n\n# One\nalpha line\n\n## Two\nbeta line\ngamma line\n\n# Three\nomega\n';
+const readNote = () => cdp.evaluate(`return await app.vault.read(app.vault.getAbstractFileByPath('_e2e/scratch.md'))`);
+const editing = () => ev(`return !!document.querySelector('.pw-inline-editor')`);
+/** Poll until `fn` is true: saves and re-parsing are timer-driven, and a hidden window throttles timers. */
+const until = async (fn, ms = 60000) => {
+	const t = Date.now();
+	while (Date.now() - t < ms) {
+		if (await fn()) return true;
+		await new Promise((r) => setTimeout(r, 400));
+	}
+	return false;
+};
+const editorGone = () => until(async () => !(await editing()));
+const type = (value) => ev(`const ta = document.querySelector('.pw-inline-editor'); ta.value = ${JSON.stringify(value)}; ta.dispatchEvent(new Event('input', { bubbles: true }));`);
+const key = (k, extra = {}) => ev(`document.querySelector('.pw-inline-editor').dispatchEvent(new KeyboardEvent('keydown', { key: '${k}', bubbles: true, ...${JSON.stringify(extra)} })); ${wait(300)}`);
+const open = async (id) => {
+	await ev(`s.editInline('a', '${id}');`);
+	return until(editing, 15000);
+};
+const dbl = (id) =>
+	ev(`const r = document.querySelector('.pw-module[data-module-id="${id}"]').getBoundingClientRect(); const x = r.x + r.width / 2, y = r.y + r.height / 2; const el = document.elementFromPoint(x, y); el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: x, clientY: y })); ${wait(300)}`);
+const text = (id) => ev(`return document.querySelector('.pw-module[data-module-id="${id}"]').innerText`);
+
+try {
+	await cdp.evaluate(`
+		const vv = app.vault;
+		for (const l of app.workspace.getLeavesOfType('patchwork-board')) l.detach();
+		await new Promise((r) => setTimeout(r, 400));
+		if (vv.getAbstractFileByPath('_e2e')) await vv.delete(vv.getAbstractFileByPath('_e2e'), true);
+		await vv.createFolder('_e2e');
+		await vv.create('_e2e/scratch.md', ${JSON.stringify(NOTE)});
+		await app.plugins.plugins.patchwork.createBoard(vv.getAbstractFileByPath('_e2e'));
+		await new Promise((r) => setTimeout(r, 800));
+		${V} app.workspace.setActiveLeaf(L, { focus: true });
+		v.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], id: 'a', modules: [
+			{ id: 't', type: 'text', markdown: 'hello', x: 10, y: 10, w: 90, h: 30 },
+			{ id: 'n', type: 'note', file: '_e2e/scratch.md', subpath: '#Two', includeHeading: false, x: 10, y: 50, w: 90, h: 40 },
+			{ id: 'h', type: 'note', file: '_e2e/scratch.md', subpath: '#One', x: 110, y: 10, w: 80, h: 40 },
+			{ id: 'z', type: 'note', file: '_e2e/scratch.md', x: 110, y: 60, w: 80, h: 40, frozen: { at: '2026-01-01', markdown: 'old' } },
+			{ id: 'pdf', type: 'pdf', file: 'PDFs/Sample rulebook.pdf', page: 1, x: 10, y: 100, w: 60, h: 80 }] }] }));
+		s.zoomToFit(); await new Promise((r) => setTimeout(r, 1500));`);
+
+	// ---- text box
+	check('text box: a text area opens over it', await open('t'));
+	check('the rendered text is hidden and the area holds the markdown', await ev(`return document.querySelector('.pw-module[data-module-id="t"]').classList.contains('is-editing') && document.querySelector('.pw-inline-editor').value === 'hello'`));
+	check('the context bar steps aside while editing', await ev(`const b = document.querySelector('.pw-context-bar'); return getComputedStyle(b).display === 'none' || b.classList.contains('is-hidden')`));
+	const before = await ev(`return JSON.stringify([v.store.file.pages[0].modules.length, mod('t').x, mod('t').y])`);
+	await ev(`const ta = document.querySelector('.pw-inline-editor'); for (const k of ['Delete', 'Backspace', 'ArrowRight']) ta.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); ${wait(200)}`);
+	check('Delete, Backspace and arrows typed in it do not reach the board', before === (await ev(`return JSON.stringify([v.store.file.pages[0].modules.length, mod('t').x, mod('t').y])`)) && (await editing()));
+	await type('**changed** text');
+	await key('Escape');
+	check('Escape saves into the patchwork', (await editorGone()) && (await ev(`return mod('t').markdown`)) === '**changed** text');
+	check('and the module shows the rendered result', await until(async () => (await text('t')).includes('changed')));
+	await ev(`v.store.undo();`);
+	check('the edit is one undo step', await until(async () => (await ev(`return mod('t').markdown`)) === 'hello'));
+
+	// ---- note slice
+	check('note section: a text area opens', await open('n'));
+	check('it holds exactly the shown part', (await ev(`return document.querySelector('.pw-inline-editor').value`)) === 'beta line\ngamma line');
+	await type('BETA\nGAMMA\nDELTA');
+	await key('Escape');
+	const expected = NOTE.replace('beta line\ngamma line', 'BETA\nGAMMA\nDELTA');
+	check('only that section was rewritten in the file', await until(async () => (await readNote()) === expected), await readNote());
+	await editorGone();
+	check('the module renders the new text', await until(async () => (await text('n')).includes('DELTA')));
+
+	// ---- heading renamed: the module keeps following its section
+	check('note with its heading: a text area opens', await open('h'));
+	const heading = await ev(`return document.querySelector('.pw-inline-editor').value`);
+	check('it starts with the heading', heading.startsWith('# One'), heading);
+	await type(heading.replace('# One', '# Uno'));
+	await key('Escape');
+	check('a retyped heading updates the module link and the file', await until(async () => (await ev(`return mod('h').subpath`)) === '#Uno' && (await readNote()).includes('# Uno\n')), await ev(`return mod('h').subpath`));
+	await editorGone();
+	check('and the module still shows its section', await until(async () => (await text('h')).includes('alpha')));
+
+	// ---- changed underneath: nothing is overwritten
+	check('opening again', await open('n'));
+	await type('MINE');
+	const external = (await readNote()).replace('DELTA', 'EXTERNAL');
+	await cdp.evaluate(`await app.vault.modify(app.vault.getAbstractFileByPath('_e2e/scratch.md'), ${JSON.stringify(external)}); await new Promise((r) => setTimeout(r, 300));`);
+	await key('Escape');
+	await editorGone();
+	check('a file changed under the editor is not overwritten', (await readNote()) === external, await readNote());
+
+	// ---- frozen and unmounting
+	await ev(`s.editInline('a', 'z'); ${wait(800)}`);
+	check('a frozen note cannot be edited', !(await editing()));
+	check('a text box opens again', await open('t'));
+	await type('typed then scrolled away');
+	await ev(`s.setCamera({ ...s.camera, tx: s.camera.tx - 100000 });`);
+	check('a module that unmounts mid-edit keeps what was typed', await until(async () => (await ev(`return mod('t').markdown`)) === 'typed then scrolled away'), await ev(`return mod('t').markdown`));
+	await ev(`s.zoomToFit(); ${wait(1200)}`);
+	await until(async () => !!(await ev(`return document.querySelector('.pw-module[data-module-id="t"]')`)));
+
+	// ---- triggers
+	await editorGone();
+	await dbl('t');
+	check('double-click on a text box edits it', await until(editing, 15000));
+	await key('Escape');
+	await editorGone();
+	await dbl('n');
+	check('double-click on a note edits it', await until(editing, 15000));
+	await key('Escape');
+	await editorGone();
+	await dbl('pdf');
+	check('double-click on a PDF still opens the crop editor', await until(() => ev(`return !!document.querySelector('.pw-crop-modal')`), 15000));
+	await ev(`for (let k = 0; k < 10 && document.querySelector('.modal-container'); k++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); ${wait(100)} }`);
+	await ev(`s.select({ pageId: 'a', moduleId: 't' }); s.focusBoard(); ${wait(300)} document.querySelector('.pw-board').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));`);
+	check('Enter on a selected text box edits it', await until(editing, 15000));
+	await key('Escape');
+} catch (e) {
+	check('no exception', false, String(e.stack ?? e));
+} finally {
+	await cdp
+		.evaluate(`for (let k = 0; k < 10 && (document.querySelector('.modal-container') || document.querySelector('.menu')); k++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise((r) => setTimeout(r, 80)); }
+			for (const l of app.workspace.getLeavesOfType('patchwork-board')) if (l.view.file?.path.startsWith('_e2e/')) l.detach();
+			await new Promise((r) => setTimeout(r, 500));
+			const d = app.vault.getAbstractFileByPath('_e2e'); if (d) await app.vault.delete(d, true);`)
+		.catch(() => {});
+	cdp.close();
+}
+const failed = results.filter((r) => !r.ok);
+console.log(JSON.stringify({ passed: results.length - failed.length, failed }, null, 2));
+process.exitCode = failed.length ? 1 : 0;

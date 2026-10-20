@@ -116,7 +116,7 @@ PDF module rules:
 
 ### 5.6 Editing interactions
 - Drag a file from the file explorer onto a page: `.md` becomes a `note` module, `.pdf` becomes a `pdf` module (page 1, with a page picker), images become `image` modules.
-- Double-click a note module opens a source side-pane at that section. Double-click a PDF module opens the crop editor.
+- Double-click a text box or a note module (or Enter on it) edits it in place as raw markdown in a text area over the module; Escape or clicking away finishes. A text box saves into the patchwork as one undo step; a note is written back to its file, only the part the module shows (section, lines). Frozen notes cannot be edited, and nothing is written if the note changed while the text area was open. The "Open" button on the context bar, and double-click on a linked frame, open the note in a side pane. Double-click a PDF module opens the crop editor.
 - Inspector panel (right side) edits the selection. Outline panel lists pages and modules.
 - Multi-select, align, distribute, duplicate, lock, z-order, smart guides, arrow-key nudge, undo/redo.
 
@@ -468,3 +468,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - A floating **context bar** above the selection holds the few controls used every time (page: name, size, orientation, background, master; note: section, overflow, freeze, open; PDF: crop, page stepper, fit, invert; text, image, tracker, frame, table of contents; several items: align, distribute, lock, delete). The `⋯` button opens a **properties popover** with the rest in tabs: Content, Layout, Style, Advanced for a module; Page, Layout, Numbers for a page.
   - The sidebar inspector is now an optional dock (View menu) that shows the same forms; it is no longer opened automatically when adding text, a tracker or a table of contents (the popover opens instead).
   - Double-click on a note still opens it in a pane for now; decision pending implementation: it will edit inline, and open-in-pane stays on the bar's Open button.
+  - Built (step 3): inline editing of text boxes and notes as above, with a plain text area (no new dependency). Ctrl+Enter is not used to finish: Obsidian's own hotkeys take it first. Retyping a section's heading updates the module's section link. `sliceBounds` (pure, tested) gives the file range a note module shows.

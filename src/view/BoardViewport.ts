@@ -21,6 +21,7 @@ import { stepByKey } from '../model/tracker';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import { ContextBar } from './ContextBar';
+import { canEditInline, editInline as startInlineEdit } from './InlineEdit';
 import { PropertiesPopover } from './PropertiesPopover';
 import type { PropertiesSection } from './PropertiesForm';
 import type { BitmapCache } from '../render/bitmapCache';
@@ -1373,6 +1374,8 @@ export class BoardViewport implements BoardSurface {
 		else if (e.key.startsWith('Arrow') && this.selection) this.nudge(e.key, e.shiftKey ? 10 : 1);
 		else if (!mod && ['+', '=', '-'].includes(e.key)) {
 			if (!this.stepSelectedTracker(e.key === '-' ? -1 : 1)) return;
+		} else if (e.key === 'Enter' && !mod && !e.shiftKey) {
+			if (!this.editSelection()) return;
 		}
 		else return;
 		e.preventDefault();
@@ -1502,11 +1505,27 @@ export class BoardViewport implements BoardSurface {
 		const hit = this.hit(e, (document.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement);
 		const m = hit?.moduleId ? this.store.file.pages.find((p) => p.id === hit.pageId)?.modules.find((x) => x.id === hit.moduleId) : undefined;
 		if (hit?.moduleId && m?.type === 'pdf') return this.editCrop(hit.pageId, hit.moduleId);
+		if (hit?.moduleId && canEditInline(m)) return this.editInline(hit.pageId, hit.moduleId);
 		// A frame opens the note its chain starts from.
 		const note = (m?.type === 'frame' ? this.chainHead(m.id) : m) as NoteModule | undefined;
 		if (note?.type !== 'note') return;
 		const page = this.store.file.pages.find((p) => p.modules.some((x) => x.id === note.id));
 		if (page) this.openNote(page.id, note.id);
+	}
+
+	/** Edit a text box or note in place (double-click, Enter, or Edit on the context bar). */
+	editInline(pageId: string, moduleId: string) {
+		void startInlineEdit({ app: this.view.app, store: this.store, modules: this.modules, done: () => this.focusBoard() }, pageId, moduleId);
+	}
+
+	/** Enter on a selected text box or note starts editing it; false when the selection is something else. */
+	private editSelection(): boolean {
+		const sel = this.selection;
+		if (!sel?.moduleId || this.items.length !== 1 || this.store.readOnly) return false;
+		const m = this.store.file.pages.find((p) => p.id === sel.pageId)?.modules.find((x) => x.id === sel.moduleId);
+		if (!canEditInline(m)) return false;
+		this.editInline(sel.pageId, sel.moduleId);
+		return true;
 	}
 
 	private chainHead(moduleId: string): AnyModule | undefined {

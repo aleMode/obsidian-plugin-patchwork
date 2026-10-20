@@ -1277,3 +1277,35 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 .pw-prop-section.is-hidden {
 	display: none;
 }
+
+/* ---------- editing text in place ---------- */
+
+.pw-module.is-editing > .pw-module-body > *:not(.pw-inline-editor) {
+	display: none;
+}
+
+.pw-module .pw-inline-editor {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+	resize: none;
+	overflow: auto;
+	border: none;
+	border-radius: 0;
+	outline: none;
+	box-shadow: none;
+	background: transparent;
+	color: inherit;
+	font-family: var(--font-monospace);
+	font-size: 0.85em;
+	line-height: 1.5;
+}
+
+/* The bar would sit on the text being typed. */
+.pw-surface-host:has(.pw-module.is-editing) .pw-context-bar {
+	display: none;
+}

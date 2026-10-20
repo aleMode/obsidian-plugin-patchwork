@@ -17,6 +17,13 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - Check: the bar follows the item while you pan and zoom, hides while you drag, comes back where the item lands, and stays reachable for a page bigger than the screen. Typing Delete or the arrow keys in a popover field must not delete or move the item.
 - Adding text, a tracker or a table of contents opens the popover on it. The sidebar inspector no longer opens by itself: **View → Inspector and outline** if you want the dock.
 
+### Editing in place
+- Double-click a text box or a note (or select it and press **Enter**, or press **Edit** on the bar): a text area with the raw markdown opens over it, in the module's own padding and border; the rendered text is hidden meanwhile. **Escape** or clicking elsewhere finishes. (Ctrl+Enter is not used: Obsidian's own hotkeys take it.)
+- **Text box:** saved into the patchwork; one Ctrl+Z undoes the whole edit.
+- **Note:** only the part the module shows is rewritten in the note's file (a section, a line range, whole note); the rest of the file is untouched. Try a section with *Include heading* on, retype its heading: the module follows the new heading. Editing a note that someone else (or Sync) changed while the text area was open must not overwrite it: you get a notice and your text on the clipboard.
+- A **frozen** note says to unfreeze first. Scroll or zoom away mid-edit: what you typed is kept.
+- Typing Delete, Backspace or arrows in the text area must not delete or move the item.
+
 ## New in M5 (latest, M5 complete)
 
 ### Zoomed-out previews (M3 leftover)
@@ -139,7 +146,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - While dragging, the module stays clipped to its old page (you see it jump on release); tell me if that's confusing.
 
 ### 3. Double-click actions
-- **Note module:** opens the note at that section in a split pane.
+- **Text box or note module:** edits it **in place** (see "Editing in place" above). To open the note in a pane instead: the **Open** button on the bar, or double-click a linked frame.
 - **PDF module:** opens the **crop editor** (also: right-click → *Edit crop…*).
 
 ### 3b. Crop editor (new)

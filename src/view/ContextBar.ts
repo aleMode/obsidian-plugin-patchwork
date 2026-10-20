@@ -154,7 +154,7 @@ export class ContextBar {
 			case 'pdf':
 				return this.pdf(page, m as PdfModule);
 			case 'text':
-				return [{ icon: 'pencil', text: 'Edit', tip: 'Edit the text', onClick: () => this.board.showProperties('content') }];
+				return [{ icon: 'pencil', text: 'Edit', tip: 'Edit the text where it is (double-click or Enter)', onClick: () => this.board.editInline(page.id, m.id) }];
 			case 'image':
 				return this.image(page, m as ImageModule);
 			case 'frame':
@@ -195,6 +195,7 @@ export class ContextBar {
 			m.frozen
 				? { icon: 'flame', text: 'Unfreeze', tip: 'Show the live note again', onClick: () => this.board.unfreezeNote(page.id, m.id) }
 				: { icon: 'snowflake', text: 'Freeze', tip: 'Keep showing the note as it is now (snapshot)', onClick: () => void this.board.freezeNote(page.id, m.id) },
+			{ icon: 'pencil', text: 'Edit', tip: 'Edit the shown part of the note where it is (double-click or Enter)', onClick: () => this.board.editInline(page.id, m.id) },
 			{ icon: 'external-link', text: 'Open', tip: 'Open the note in a pane', onClick: () => this.board.openNote(page.id, m.id) },
 		];
 	}
