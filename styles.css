@@ -700,6 +700,38 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	background: #e6dfd0;
 }
 
+/* Notes and text: faint lines suggesting text. */
+.pw-skeleton-note,
+.pw-skeleton-text,
+.pw-skeleton-frame {
+	background: repeating-linear-gradient(180deg, #fff 0 2.5mm, #dcdcdc 2.5mm 4.5mm);
+}
+
+/* A preview kept from an earlier render. */
+.pw-module-skeleton.has-thumb {
+	background: none;
+	border: none;
+}
+
+.pw-skeleton-thumb {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+
+.pw-skeleton-thumb.pw-fit-cover {
+	object-fit: cover;
+}
+
+.pw-skeleton-thumb.pw-fit-stretch {
+	object-fit: fill;
+}
+
+.pw-skeleton-thumb.is-inverted {
+	filter: invert(1) hue-rotate(180deg);
+}
+
 .pw-suggest-detail {
 	color: var(--text-faint);
 	margin-left: var(--size-4-2);

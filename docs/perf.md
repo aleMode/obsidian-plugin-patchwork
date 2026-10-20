@@ -71,3 +71,7 @@ The dev window now runs at **60 Hz** (16.7 ms frames; the M0 numbers were at 144
 ## Linked frames (M5, 2026-10-20)
 
 Each chain is measured by rendering its blocks offscreen at every frame's width. A chain of 80 paragraphs across 5 frames, resized 30 times in a row (once per animation frame, like a drag): **1** measurement in total, **~16 ms** per move (60 fps). Layouts wait for 120 ms of quiet and are cached per chain, content and font, so panning, revisits and other edits don't re-measure.
+
+## Zoomed-out previews (M3 leftover, 2026-10-20)
+
+Below 25 % zoom, outline boxes show previews kept from earlier renders (≤ 96 px PNG blob URLs, 32 MB budget; images are decoded from their bytes once). A first version used one `<canvas>` per preview: whole-board panning fell to **p50 24 ms (~40 fps)**, since each canvas gets composited. As `<img>`: **p50 16.7 ms, p95 19.6 ms** on the 100-page stress board, same as before previews.

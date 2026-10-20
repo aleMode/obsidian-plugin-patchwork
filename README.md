@@ -2,15 +2,22 @@
 
 An Obsidian desktop plugin for composing **boards** of fixed-size pages from live references to notes and PDF regions, and exporting them to PDF or PNG. See [`SPEC.md`](SPEC.md) for scope and design.
 
-Status: pre-alpha. Milestones M0, M1 and M2 are done. M2 adds page numbers, headers and footers, a safe-area guide, auto-arrange, an export dialog with sheet sizes, vector tiling, page ranges and PNG, and `.canvas` export. Earlier: boards and pages with rulers, grid, snapping and smart guides; note / PDF / text / image modules with styles, a crop editor and overflow policies; inspector and outline panels; multi-select with align and distribute; drag files from the explorer; renames follow; and PDF export with vector text and vector PDF crops. See `docs/testing-guide.md`.
+Status: pre-alpha, feature-complete against the SPEC milestones M0–M5. See `docs/testing-guide.md` for what to try.
 
-## Using it (M0)
+## What it does
+
+- **Boards and pages:** fixed-size pages (A3–A6, Letter, Legal, Tabloid, 16:9, square, custom) on an infinite board with rulers, grid, snapping, smart guides, minimap, saved views, auto-arrange, and zoomed-out previews.
+- **Modules:** live note sections (heading, block or line range, with clip / shrink / grow overflow), PDF regions (crop editor with the PDF's contents and text search), free markdown text, images, a table of contents, linked text frames that flow across pages, and trackers (counters, boxes, checklists) you can click during play.
+- **Editing:** inspector and outline panels, multi-select, align and distribute, lock, z-order, duplicate, undo/redo, drag files from the explorer, renames followed, master pages, page numbers and headers/footers with tokens, a board font, frozen note snapshots, and warnings when a PDF behind a crop is replaced.
+- **Export:** PDF with vector text and vector PDF regions (or smaller raster), page ranges, sheet sizes with poster tiling, booklets, bleed and crop marks, bookmarks, page labels and clickable contents; PNG; ink saver; `.canvas`.
+
+## Using it
 
 - **Patchwork: New board** (or right-click a folder → *New board*) creates an A4 board and opens it.
-- Toolbar: add a page (presets, portrait or landscape), a note section, a PDF region (crop editor), a text box or an image; export; board settings; inspector and outline; zoom; undo/redo. You can also drag notes, PDFs and images from the file explorer onto a page.
-- Drag pages and modules to move them (5 mm grid; hold Alt to place freely). Right-click for orientation, z-order and delete. Delete key removes the selection; Ctrl+Z / Ctrl+Shift+Z undo and redo.
+- Toolbar: add a page, a note section, a PDF region, a text box, an image or a tracker; export; board settings; inspector and outline; zoom; undo/redo. Drag notes, PDFs and images from the file explorer onto a page.
+- Drag pages and modules to move them (5 mm grid; hold Alt to place freely). Right-click for more: crop, freeze, continue in a new frame, z-order, zoom to page, delete.
 - Pan with the wheel, by dragging empty space, or holding Space; zoom with Ctrl+wheel or a pinch.
-- **Patchwork: Export…** writes a PDF next to the board. "Best quality" keeps PDF crops as sharp, selectable vector content; "Smallest file" turns them into images.
+- **Patchwork: Export…** writes a PDF (or PNGs) next to the board.
 
 ## Development
 

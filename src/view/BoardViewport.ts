@@ -20,6 +20,7 @@ import { snapPoint, snapValue } from '../model/snapping';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import type { BitmapCache } from '../render/bitmapCache';
+import type { ThumbnailCache } from '../render/thumbnails';
 import { linkpathsFromDrop } from '../sources/dropLinks';
 import { type PdfDocCache, pdfSourceId } from '../sources/pdfSource';
 import { loadNoteContent } from '../sources/markdownSource';
@@ -37,6 +38,7 @@ import type { BoardSurface, PatchworkView } from './PatchworkView';
 export interface BoardServices {
 	pdfDocs: PdfDocCache;
 	bitmaps: BitmapCache;
+	thumbs?: ThumbnailCache;
 	/** Called when this board goes away, so side panels stop following it. */
 	closed?: (board: BoardViewport) => void;
 	openPanels?: () => void;
@@ -129,7 +131,7 @@ export class BoardViewport implements BoardSurface {
 		this.marqueeEl = this.layer.createDiv({ cls: 'pw-marquee is-hidden' });
 		for (const h of HANDLES) this.selectionBox.createDiv({ cls: `pw-handle pw-handle-${h}`, attr: { 'data-handle': h } });
 		this.modules = new ModuleHost({
-			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, resolution: () => this.resolution() },
+			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, ...(services.thumbs ? { thumbs: services.thumbs } : {}), resolution: () => this.resolution() },
 			store,
 			paperOf: (id) => this.pages.get(id)?.paper,
 			boardPath: () => view.file?.path ?? '',

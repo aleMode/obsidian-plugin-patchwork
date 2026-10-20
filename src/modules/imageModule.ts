@@ -1,5 +1,6 @@
 import { TFile } from 'obsidian';
 import type { AnyModule, ImageModule } from '../model/schema';
+import { ThumbnailCache } from '../render/thumbnails';
 import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder } from './types';
 
 export class ImageModuleRenderer implements ModuleRenderer {
@@ -26,7 +27,14 @@ export class ImageModuleRenderer implements ModuleRenderer {
 			cls: `pw-image pw-fit-${mod.fit ?? 'contain'}`,
 			attr: { src: this.ctx.app.vault.getResourcePath(file), alt: file.basename, draggable: 'false' },
 		});
-		this.done = img.decode().catch(() => placeholder(this.el, `Could not load image: ${mod.file}`));
+		this.done = img
+			.decode()
+			.then(() => {
+				const thumbs = this.ctx.thumbs;
+				const key = thumbs && ThumbnailCache.key(this.ctx.app, mod);
+				if (key) void thumbs.storeFile(key, this.ctx.app, file);
+			})
+			.catch(() => placeholder(this.el, `Could not load image: ${mod.file}`));
 	}
 
 	destroy() {

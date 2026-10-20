@@ -6,6 +6,7 @@ import { generateStressBoard, type StressSources } from './model/stress';
 import { CropModal } from './ui/CropModal';
 import { StressBoardModal } from './ui/StressBoardModal';
 import { BitmapCache } from './render/bitmapCache';
+import { ThumbnailCache } from './render/thumbnails';
 import { DEFAULT_SETTINGS, type PatchworkSettings, PatchworkSettingTab } from './settings';
 import { onVaultRename } from './sources/linkTracker';
 import { PdfDocCache } from './sources/pdfSource';
@@ -19,6 +20,7 @@ import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from './view/Patchwor
 export default class PatchworkPlugin extends Plugin {
 	pdfDocs!: PdfDocCache;
 	bitmaps!: BitmapCache;
+	thumbs = new ThumbnailCache();
 	settings: PatchworkSettings = { ...DEFAULT_SETTINGS };
 	activeBoard = new ActiveBoard();
 
@@ -27,12 +29,18 @@ export default class PatchworkPlugin extends Plugin {
 		this.pdfDocs = new PdfDocCache(this.app);
 		this.bitmaps = new BitmapCache(this.settings.bitmapBudgetMB);
 		// A modified PDF must not show stale renders (keys include mtime; this frees the memory too).
-		this.registerEvent(this.app.vault.on('modify', (f) => this.bitmaps.invalidateFile(f.path)));
+		this.registerEvent(
+			this.app.vault.on('modify', (f) => {
+				this.bitmaps.invalidateFile(f.path);
+				this.thumbs.invalidateFile(f.path);
+			}),
+		);
 		this.addSettingTab(new PatchworkSettingTab(this.app, this));
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => void onVaultRename(this.app, oldPath, file.path)));
 		const services = {
 			pdfDocs: this.pdfDocs,
 			bitmaps: this.bitmaps,
+			thumbs: this.thumbs,
 			closed: (b: BoardViewport) => this.activeBoard.closed(b),
 			openPanels: () => void this.openPanels(),
 		};
@@ -114,6 +122,7 @@ export default class PatchworkPlugin extends Plugin {
 		removePaperScope();
 		this.pdfDocs.destroyAll();
 		this.bitmaps.clear();
+		this.thumbs.clear();
 	}
 
 	/** Show the inspector and outline in the right sidebar (creating them once). */

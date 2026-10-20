@@ -5,6 +5,7 @@ import type { AnyModule, Crop, PdfModule } from '../model/schema';
 import { contentBox } from '../model/style';
 import { PX_PER_MM } from '../model/units';
 import { BitmapCache, bucketResolution } from '../render/bitmapCache';
+import { ThumbnailCache } from '../render/thumbnails';
 import { pdfChanged } from '../model/freshness';
 import { type PdfDocument, type PdfPage, pdfSourceId } from '../sources/pdfSource';
 import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setBadge } from './types';
@@ -87,7 +88,10 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		const layout = this.layout(page, m);
 		const key = this.cacheKey(m, layout);
 		const cached = key ? this.ctx.bitmaps?.take(key) : undefined;
-		if (cached && key) return this.show(cached, key, layout, !!m.invert);
+		if (cached && key) {
+			this.keepThumbnail(m, cached);
+			return this.show(cached, key, layout, !!m.invert);
+		}
 		// Rendering waits for a free slot; a newer render may have started meanwhile.
 		await this.ctx.pdfDocs.schedule(async () => {
 			if (gen !== this.generation) return;
@@ -97,6 +101,7 @@ export class PdfModuleRenderer implements ModuleRenderer {
 					canvas.width = canvas.height = 0;
 					return;
 				}
+				this.keepThumbnail(m, canvas);
 				const owned = key && this.ctx.bitmaps?.put(key, canvas) ? key : null;
 				this.show(canvas, owned, layout, !!m.invert);
 			} finally {
@@ -155,6 +160,12 @@ export class PdfModuleRenderer implements ModuleRenderer {
 			this.task = null;
 		}
 		return canvas;
+	}
+
+	private keepThumbnail(m: PdfModule, canvas: HTMLCanvasElement) {
+		const thumbs = this.ctx.thumbs;
+		const key = thumbs && ThumbnailCache.key(this.ctx.app, m);
+		if (key) thumbs.store(key, canvas, canvas.width, canvas.height);
 	}
 
 	private show(canvas: HTMLCanvasElement, key: string | null, l: Layout, invert: boolean) {

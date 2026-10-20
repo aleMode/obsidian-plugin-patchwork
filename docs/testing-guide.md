@@ -1,6 +1,6 @@
 # Testing guide (state as of 2026-10-20, morning)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 252 checks across 25 suites, all passing; `npm test`: 202 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 257 checks across 26 suites, all passing; `npm test`: 202 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
@@ -8,6 +8,9 @@ What to try by hand, in the order that gives the most signal. Everything here is
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
 ## New in M5 (latest, M5 complete)
+
+### Zoomed-out previews (M3 leftover)
+- Zoom out below 25 %: PDF regions and images you've seen at working zoom show as small previews instead of flat boxes; notes and text show faint lines. Panning a 100-page board stays at 60 fps (`docs/perf.md`).
 
 ### Small spec items filled in
 - Inspector (nothing selected) → **Font**, e.g. `Georgia, serif`: notes, text and headers on the pages use it, on screen, in exports, and when linked frames measure their text.
@@ -167,7 +170,7 @@ What to try by hand, in the order that gives the most signal. Everything here is
 
 ## Known gaps (not bugs, not built yet)
 
-- M3 so far: PDF contents and search, saved views, minimap. Still to come: low-resolution previews instead of outline boxes when zoomed far out.
+- All SPEC milestones (M0–M5) are built. Not built, by decision: freezing PDF crops or images (Q15); stale warnings for live notes (Q15). Open questions worth a look: Q1, Q2, Q12, Q14, Q15 in `docs/open-questions.md`.
 
 ## Fixed tonight (worth a quick re-check)
 - Deleting a board while it has unsaved changes no longer shows Obsidian's scary "Failed to save file … make a backup" notice.

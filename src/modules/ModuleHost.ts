@@ -11,6 +11,7 @@ import { applyModuleStyle } from './style';
 import { PdfModuleRenderer } from './pdfModule';
 import { TocModuleRenderer } from './tocModule';
 import { TrackerRenderer } from './trackerModule';
+import { ThumbnailCache } from '../render/thumbnails';
 import { mapModule } from '../store/pageOps';
 import { tocEntries } from '../model/toc';
 import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
@@ -95,6 +96,18 @@ export class ModuleHost {
 		this.component.registerEvent(app.vault.on('rename', (file: TAbstractFile, old: string) => this.sourceChanged(old, file.path)));
 		this.component.registerEvent(app.vault.on('modify', (file) => o.ctx.pdfDocs.invalidate(file.path)));
 		this.component.register(o.ctx.pdfDocs.onInvalidate((path) => this.sourceChanged(path)));
+		// Zoomed out right after rendering: show previews as they finish encoding (once per frame).
+		const thumbs = o.ctx.thumbs;
+		if (thumbs) {
+			let queued = 0;
+			this.component.register(thumbs.onStored(() => {
+				if (this.detail || queued) return;
+				queued = window.requestAnimationFrame(() => {
+					queued = 0;
+					if (!this.detail) this.sync();
+				});
+			}));
+		}
 	}
 
 	private flowInfo(): Map<string, FlowInfo> {
@@ -157,16 +170,28 @@ export class ModuleHost {
 		}
 	}
 
-	/** Cheap stand-ins for modules when zoomed far out: one box each, no rendering. */
+	/**
+	 * Cheap stand-ins for modules when zoomed far out: a box each, with a small preview for PDF crops
+	 * and images that were rendered before. Nothing is rendered or decoded here.
+	 */
 	private syncSkeleton(page: Page, paper: HTMLElement) {
-		const key = JSON.stringify(page.modules.map((m) => [m.type, m.x, m.y, m.w, m.h]));
+		const { app } = this.o.ctx;
+		const thumbs = this.o.ctx.thumbs;
+		const thumbKeys = page.modules.map((m) => (thumbs ? ThumbnailCache.key(app, m) : undefined));
+		const key = JSON.stringify(page.modules.map((m, i) => [m.type, m.x, m.y, m.w, m.h, m.fit, m.invert, thumbKeys[i] && thumbs?.has(thumbKeys[i])]));
 		const existing = this.skeletons.get(page.id);
 		if (existing?.key === key && existing.el.parentElement === paper) return;
 		existing?.el.remove();
 		const el = paper.createDiv({ cls: 'pw-skeletons' });
-		for (const m of page.modules) {
-			el.createDiv({ cls: `pw-module-skeleton pw-skeleton-${m.type}` }).setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm` });
-		}
+		page.modules.forEach((m, i) => {
+			const box = el.createDiv({ cls: `pw-module-skeleton pw-skeleton-${m.type}` });
+			box.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm` });
+			const url = thumbKeys[i] ? thumbs?.url(thumbKeys[i]) : undefined;
+			if (!url) return;
+			const img = box.createEl('img', { cls: ['pw-skeleton-thumb', `pw-fit-${typeof m.fit === 'string' ? m.fit : 'contain'}`], attr: { src: url, alt: '', draggable: 'false' } });
+			img.toggleClass('is-inverted', !!m.invert);
+			box.addClass('has-thumb');
+		});
 		this.skeletons.set(page.id, { el, key });
 	}
 
