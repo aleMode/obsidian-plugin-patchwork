@@ -27,9 +27,16 @@ export interface FlowContext {
 const PX_PER_MM_CSS = 96 / 25.4;
 /** Layouts kept; a board rarely has more chains than this on screen. */
 const CACHE_SIZE = 32;
+/**
+ * Wait this long before measuring a changed chain: resizing a frame changes it on every pointer
+ * move, and each measurement renders the whole text offscreen (hard rule 9).
+ */
+const QUIET_MS = 120;
 
 export class FlowLayout {
 	private cache = new Map<string, Promise<FlowOutcome>>();
+	/** The newest layout key asked for, per chain head. */
+	private latest = new Map<string, string>();
 
 	constructor(
 		private app: App,
@@ -43,13 +50,24 @@ export class FlowLayout {
 		if ('error' in content) return content;
 		const font = this.font();
 		const key = chainSignature(chain) + '\n' + (font ?? '') + '\n' + content.markdown;
+		const head = chain[0]!.module.id;
+		this.latest.set(head, key);
 		let result = this.cache.get(key);
 		if (!result) {
-			result = this.measure(splitBlocks(content.markdown), chain, content.sourcePath, font);
+			result = this.afterQuiet(key, head, () => this.measure(splitBlocks(content.markdown), chain, content.sourcePath, font));
 			this.cache.set(key, result);
 			if (this.cache.size > CACHE_SIZE) this.cache.delete(this.cache.keys().next().value!);
 		}
 		return result;
+	}
+
+	/** Measure unless a newer layout of the same chain was asked for meanwhile; then that one answers. */
+	private async afterQuiet(key: string, head: string, measure: () => Promise<FlowOutcome>): Promise<FlowOutcome> {
+		await new Promise((r) => window.setTimeout(r, QUIET_MS));
+		const newest = this.latest.get(head);
+		if (newest === key) return measure();
+		this.cache.delete(key);
+		return (newest && this.cache.get(newest)) || measure();
 	}
 
 	private async content(head: FlowMember): Promise<{ markdown: string; sourcePath: string } | { error: string }> {

@@ -67,3 +67,7 @@ The dev window now runs at **60 Hz** (16.7 ms frames; the M0 numbers were at 144
 | Renderer memory start / end / after close | ~640 / 650 / 650 MB | bounded ✅ |
 
 **Regression found and fixed:** whole-board panning had dropped to ~30 fps since M1. Cause: page labels lived inside the zoomed layer with a counter-scaled font (≈170 px glyphs at 7 % zoom), which Chromium re-rasterized every frame. Labels now sit in a screen-space overlay without `will-change` (giving each of 100 labels its own compositor layer also cost ~8 ms per frame). Ruler colours are cached instead of read with `getComputedStyle` every frame.
+
+## Linked frames (M5, 2026-10-20)
+
+Each chain is measured by rendering its blocks offscreen at every frame's width. A chain of 80 paragraphs across 5 frames, resized 30 times in a row (once per animation frame, like a drag): **1** measurement in total, **~16 ms** per move (60 fps). Layouts wait for 120 ms of quiet and are cached per chain, content and font, so panning, revisits and other edits don't re-measure.
