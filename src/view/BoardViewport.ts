@@ -893,6 +893,19 @@ export class BoardViewport implements BoardSurface {
 		this.settledZoom = this.camera.zoom;
 		this.layer.setCssProps({ '--pw-zoom': String(this.settledZoom) });
 		this.modules.resolutionChanged(this.resolution());
+		this.rerasterise();
+	}
+
+	/**
+	 * `will-change: transform` makes Chromium keep the layer's raster scale from when it was first
+	 * painted and stretch it on the GPU, so the text of notes turns soft at any other zoom. Dropping the
+	 * hint for two frames re-rasterises at the settled zoom; putting it back keeps that sharp raster
+	 * and the compositor layer that keeps panning smooth.
+	 */
+	private rerasterise() {
+		const win = this.root.win;
+		this.layer.addClass('is-reraster');
+		win.requestAnimationFrame(() => win.requestAnimationFrame(() => this.layer.removeClass('is-reraster')));
 	}
 
 	/** Canvas pixels per mm needed at the current zoom (clamped; MAX_CANVAS_SIDE caps it too). */

@@ -73,6 +73,11 @@
 	will-change: transform;
 }
 
+/* Dropped for two frames after a zoom settles, so the layer is rasterised again at the new scale. */
+.pw-board-layer.is-reraster {
+	will-change: auto;
+}
+
 .pw-page {
 	position: absolute;
 	left: var(--pw-x);

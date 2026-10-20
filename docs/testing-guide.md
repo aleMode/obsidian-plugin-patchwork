@@ -12,27 +12,30 @@ What to try by hand, in the order that gives the most signal. Everything here is
 Tick these off; details for each are in the sections below.
 
 **Export (the bug you found)**
-- [ ] Your `Untitled patchwork`: export again. The note shows its own text (sharp, selectable), not the PDF page.
-- [ ] A note module showing just the `## PDF embed` section of `Spells/Spell list.md`: the page appears in the note on the board, sharpens a moment after zooming in, and exports sharp with selectable text (best quality) or as a picture (small quality).
+- [x] Your `Untitled patchwork`: export again. The note shows its own text (sharp, selectable), not the PDF page.
+  - [ ] works, but the text of the embedded psf that should be cut is still visible. not a huge issue, blur is gone and the .md text is selectable
+    - Looked at: what the box cuts off is not drawn, but the cut-off text stays in the file as hidden, selectable text (same as a cropped PDF module; removing it would need rewriting the PDF's content). If you saw it *drawn*, tell me which file and module.
+- [x] A note module showing just the `## PDF embed` section of `Spells/Spell list.md`: the page appears in the note on the board, sharpens a moment after zooming in, and exports sharp with selectable text (best quality) or as a picture (small quality).
 
 **Use mode**
-- [ ] `Dashboard/Dashboard.patchwork` opens in Use: no rulers, grid, labels or handles; faint panels; coloured cards. Try light and dark themes.
-- [ ] Arrange | Use switch: reopen the file, it keeps the mode; Ctrl+Z doesn't switch back.
-- [ ] Nothing moves: drags on text select text, drags elsewhere pan; right-click, double-click, Delete, arrows do nothing.
-- [ ] Links open in one side pane, reused by the next link; Ctrl/Cmd-click opens a new tab; Ctrl/Cmd-hover previews.
-- [ ] Checkboxes: note tasks tick in `Dashboard/Session.md`; text-box tasks tick and undo; a frozen note refuses.
-- [ ] Colours: palette on the context bar (Arrange) and Style tab → Colour / Custom colour; tinted cards in a PDF export.
-- [ ] Plugins (enable Dataview, Tasks, Buttons, Meta Bind; Bases in core plugins): `Dashboard/Plugin blocks.patchwork`, every block responds; Bases links open to the side.
+- [x] `Dashboard/Dashboard.patchwork` opens in Use: no rulers, grid, labels or handles; faint panels; coloured cards. Try light and dark themes.
+- [x] Arrange | Use switch: reopen the file, it keeps the mode; Ctrl+Z doesn't switch back.
+- [x] Nothing moves: drags on text select text, drags elsewhere pan; right-click, double-click, Delete, arrows do nothing.
+- [x] Links open in one side pane, reused by the next link; Ctrl/Cmd-click opens a new tab; Ctrl/Cmd-hover previews.
+- [x] Checkboxes: note tasks tick in `Dashboard/Session.md`; text-box tasks tick and undo; a frozen note refuses.
+- [x] Colours: palette on the context bar (Arrange) and Style tab → Colour / Custom colour; tinted cards in a PDF export.
+- [x] Plugins (enable Dataview, Tasks, Buttons, Meta Bind; Bases in core plugins): `Dashboard/Plugin blocks.patchwork`, every block responds; Bases links open to the side.
+- [x] The dashboard looked slightly blurry: Chromium kept the board layer's first raster scale and stretched it. Fixed: the layer is re-rasterised when zoom settles (text 60 % sharper by pixel measure). Check by eye on `Dashboard/Dashboard.patchwork`, then zoom in and out.
 
 **Smaller changes**
-- [ ] Opening a patchwork always fits it to the view (it sometimes opened at 2 % zoom).
-- [ ] Words: "Freeze text", "Warn if this PDF changes", "Text frame" in menus, the bar and the properties.
-- [ ] 16:9 slide pages show "16:9 slide" as their size, not "Custom".
-- [ ] Ruler numbers use the interface font (small, crisp).
-- [ ] Properties popover open while dragging an item: smooth, values update.
-- [ ] Editing a text box in place: the formatting bar follows the box when you pan or zoom (Ctrl+wheel).
-- [ ] PNG export of several pages writes every image (now written one at a time).
-- [ ] Close every patchwork, wait a minute: Obsidian's memory drops (render cache freed); reopening re-renders.
+- [x] Opening a patchwork always fits it to the view (it sometimes opened at 2 % zoom).
+- [x] Words: "Freeze text", "Warn if this PDF changes", "Text frame" in menus, the bar and the properties.
+- [x] 16:9 slide pages show "16:9 slide" as their size, not "Custom".
+- [x] Ruler numbers use the interface font (small, crisp).
+- [x] Properties popover open while dragging an item: smooth, values update.
+- [x] Editing a text box in place: the formatting bar follows the box when you pan or zoom (Ctrl+wheel).
+- [x] PNG export of several pages writes every image (now written one at a time).
+- [x] Close every patchwork, wait a minute: Obsidian's memory drops (render cache freed); reopening re-renders.
 
 ## New: Use mode (a patchwork as a dashboard)
 
