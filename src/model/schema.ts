@@ -124,6 +124,8 @@ export interface NoteModule extends BaseModule {
 	lines?: [number, number];
 	includeHeading?: boolean;
 	overflow?: 'clip' | 'fit' | 'grow';
+	/** How far the content is scrolled up inside a box too small for it (mm). Only with `clip`. */
+	scrollY?: number;
 	scale?: number;
 	/** M4: shows this snapshot instead of the live note. */
 	frozen?: FrozenNote;

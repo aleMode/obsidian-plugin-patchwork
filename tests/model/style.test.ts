@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AnyModule } from '../../src/model/schema';
-import { contentBox, moduleInset, textScale } from '../../src/model/style';
+import { clampScroll, contentBox, moduleInset, textScale } from '../../src/model/style';
 
 const m = (extra: Partial<AnyModule> = {}): AnyModule => ({ id: 'a', type: 'text', markdown: '', x: 0, y: 0, w: 50, h: 30, ...extra });
 
@@ -24,5 +24,13 @@ describe('module style geometry', () => {
 		expect(textScale(m({ style: { fontScale: 0.8 } }))).toBeCloseTo(0.8);
 		expect(textScale({ id: 'n', type: 'note', file: 'a.md', x: 0, y: 0, w: 1, h: 1, scale: 0.5, style: { fontScale: 1.2 } })).toBeCloseTo(0.6);
 		expect(textScale(m({ style: { fontScale: -1 } }))).toBe(1);
+	});
+
+	it('clamps a scroll offset to the part of the content that does not fit', () => {
+		expect(clampScroll(10, 100, 40)).toBe(10);
+		expect(clampScroll(80, 100, 40)).toBe(60);
+		expect(clampScroll(-5, 100, 40)).toBe(0);
+		expect(clampScroll(10, 30, 40)).toBe(0);
+		expect(clampScroll(Number.NaN, 100, 40)).toBe(0);
 	});
 });

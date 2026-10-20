@@ -394,7 +394,7 @@ export class ContextBar {
 		const label = info?.ok ? `Frame ${info.index + 1} of ${info.chain.length}` : 'Frame';
 		return [
 			{ text: label, tip: 'Position in the chain of linked frames', custom: (p) => p.createSpan({ cls: 'pw-cb-label', text: label }) },
-			{ icon: 'plus', text: 'Next frame', tip: 'Continue the text in another frame on the next page', onClick: () => this.board.continueInFrame(page.id, m.id) },
+			{ icon: 'plus', text: 'Next frame', tip: 'Continue the text in another frame on this page', onClick: () => this.board.continueInFrame(page.id, m.id) },
 		];
 	}
 

@@ -1,3 +1,4 @@
+import { clampScroll } from '../model/style';
 import { PX_PER_MM } from '../model/units';
 
 /** Smallest scale "fit" will shrink a note to before it clips (SPEC 5.3). */
@@ -9,13 +10,15 @@ export type OverflowPolicy = 'clip' | 'fit' | 'grow';
 /**
  * Apply a note module's overflow policy to its rendered markdown. Layout sizes (offsetHeight,
  * clientHeight) ignore the board's zoom transform, so this works at any zoom.
- * Returns whether content is still cut off (shown as an indicator on screen, never in export).
+ * With `clip`, `scrollMm` moves the content up so a later part of it shows in a box too small for
+ * all of it. Returns whether content is still cut off (shown as an indicator on screen, never in export).
  */
-export function applyOverflow(moduleEl: HTMLElement, body: HTMLElement, policy: OverflowPolicy): boolean {
+export function applyOverflow(moduleEl: HTMLElement, body: HTMLElement, policy: OverflowPolicy, scrollMm = 0): boolean {
 	const content = body.querySelector<HTMLElement>(':scope > .pw-markdown');
 	moduleEl.toggleClass('is-grow', policy === 'grow');
 	if (!content) return false;
 	content.removeClass('is-fit');
+	content.setCssProps({ '--pw-scroll': '0mm' });
 	if (policy === 'grow') {
 		// The grown height is display-only; the stored `h` never changes (SPEC 5.3).
 		// Border and padding sit around the body; keep them when growing to the content.
@@ -25,7 +28,10 @@ export function applyOverflow(moduleEl: HTMLElement, body: HTMLElement, policy: 
 	}
 	const box = body.clientHeight;
 	if (content.offsetHeight <= box + 1) return false;
-	if (policy === 'clip') return true;
+	if (policy === 'clip') {
+		content.setCssProps({ '--pw-scroll': `${clampScroll(scrollMm, content.offsetHeight / PX_PER_MM, box / PX_PER_MM)}mm` });
+		return true;
+	}
 	return fit(content, box);
 }
 

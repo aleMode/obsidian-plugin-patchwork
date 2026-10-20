@@ -16,6 +16,12 @@ export function contentBox(m: AnyModule): Rect {
 	return { x: i, y: i, w: m.w - 2 * i, h: m.h - 2 * i };
 }
 
+/** A scroll offset (mm) kept inside what the content allows: 0 up to the part of it that doesn't fit. */
+export function clampScroll(scroll: number, contentH: number, boxH: number): number {
+	const max = Math.max(0, contentH - boxH);
+	return Math.min(max, Math.max(0, Number.isFinite(scroll) ? scroll : 0));
+}
+
 /** Effective text scale of a module: style.fontScale times a note's own `scale`. */
 export function textScale(m: AnyModule): number {
 	const fontScale = m.style?.fontScale ?? 1;

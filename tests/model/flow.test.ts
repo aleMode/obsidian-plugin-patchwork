@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chainSignature, fitCount, flowChains, splitBlocks } from '../../src/model/flow';
+import { chainSignature, fitCount, flowChains, placeNextFrame, splitBlocks } from '../../src/model/flow';
 import type { AnyModule } from '../../src/model/schema';
 
 describe('splitBlocks', () => {
@@ -78,5 +78,36 @@ describe('chainSignature', () => {
 		expect(chainSignature([head, { ...frame, module: { ...frame.module, x: 99 } }])).toBe(base);
 		expect(chainSignature([head, { ...frame, module: { ...frame.module, h: 60 } }])).not.toBe(base);
 		expect(chainSignature([{ ...head, module: { ...head.module, markdown: 'b' } }, frame])).not.toBe(base);
+	});
+});
+
+describe('placeNextFrame', () => {
+	const page = { w: 210, h: 297 };
+
+	it('goes under the source, same size, when there is room', () => {
+		expect(placeNextFrame({ x: 10, y: 10, w: 90, h: 60 }, [], page)).toEqual({ x: 10, y: 75, w: 90, h: 60 });
+	});
+
+	it('goes beside the source when under it is taken or off the page', () => {
+		const source = { x: 10, y: 200, w: 90, h: 80 };
+		expect(placeNextFrame(source, [source], page)).toEqual({ x: 105, y: 200, w: 90, h: 80 });
+	});
+
+	it('skips spots that overlap other modules', () => {
+		const source = { x: 10, y: 10, w: 90, h: 60 };
+		const blocker = { x: 0, y: 70, w: 210, h: 40 };
+		expect(placeNextFrame(source, [source, blocker], page)).toEqual({ x: 105, y: 10, w: 90, h: 60 });
+	});
+
+	it('shrinks to the space left when the full size does not fit', () => {
+		const source = { x: 10, y: 10, w: 190, h: 200 };
+		expect(placeNextFrame(source, [source], page)).toEqual({ x: 10, y: 215, w: 190, h: 82 });
+	});
+
+	it('stays on the page, offset from the source, when nothing is free', () => {
+		const source = { x: 0, y: 0, w: 210, h: 297 };
+		expect(placeNextFrame(source, [source], page)).toEqual({ x: 0, y: 0, w: 210, h: 297 });
+		const wide = { x: 0, y: 0, w: 210, h: 280 };
+		expect(placeNextFrame(wide, [wide], page)).toEqual({ x: 0, y: 10, w: 210, h: 280 });
 	});
 });

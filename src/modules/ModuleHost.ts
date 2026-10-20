@@ -286,7 +286,7 @@ export class ModuleHost {
 	}
 
 	private layout(mounted: Mounted, m: AnyModule, rank: number) {
-		const resized = mounted.module.w !== m.w || mounted.module.h !== m.h;
+		const resized = mounted.module.w !== m.w || mounted.module.h !== m.h || (mounted.module as NoteModule).scrollY !== (m as NoteModule).scrollY;
 		mounted.el.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
 		mounted.el.toggleClass('is-selected', this.selectedModules.has(m.id));
 		mounted.el.toggleClass('is-locked', !!m.locked);
@@ -316,8 +316,8 @@ export class ModuleHost {
 	}
 
 	private updateOverflow(m: Mounted) {
-		const policy = (m.module as NoteModule).overflow ?? 'clip';
-		m.el.toggleClass('is-overflowing', applyOverflow(m.el, m.body, policy));
+		const note = m.module as NoteModule;
+		m.el.toggleClass('is-overflowing', applyOverflow(m.el, m.body, note.overflow ?? 'clip', note.scrollY));
 	}
 
 	/**

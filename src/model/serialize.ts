@@ -17,7 +17,7 @@ const STYLE: Shape = {
 
 const MODULE_KEYS: Record<string, readonly string[]> = {
 	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'invert', 'sourceId', 'renderDpi', 'render'],
-	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow', 'scale', 'frozen'],
+	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow', 'scrollY', 'scale', 'frozen'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
 	toc: ['heading'],

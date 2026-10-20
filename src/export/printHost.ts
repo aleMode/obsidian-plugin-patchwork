@@ -218,7 +218,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 		});
 		const settled = await settle(host, renderers);
 		// Same overflow policy as on screen, applied to the final layout (no indicator in print).
-		for (const n of notes) applyOverflow(n.el, n.body, n.m.overflow ?? 'clip');
+		for (const n of notes) applyOverflow(n.el, n.body, n.m.overflow ?? 'clip', n.m.scrollY);
 		const problems = findProblems(host);
 		if (!settled) problems.push('Some content was still changing after 10 s and may be incomplete.');
 		const links = findLinks(host);

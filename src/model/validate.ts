@@ -128,6 +128,7 @@ function checkModule(m: Json, path: string, is: Issues) {
 			is.optional(m, 'lines', path, (v) => Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 1) && v[0] <= v[1], '[first, last] line numbers ≥ 1');
 			is.optional(m, 'includeHeading', path, isBool, 'true/false');
 			is.optional(m, 'overflow', path, oneOf('clip', 'fit', 'grow'), '"clip", "fit" or "grow"');
+			is.optional(m, 'scrollY', path, nonNegative, 'a number ≥ 0');
 			is.optional(m, 'scale', path, positive, 'a positive number');
 			is.optional(m, 'frozen', path, (v) => isObj(v) && isStr(v.markdown) && isStr(v.at), '{at, markdown}');
 			break;

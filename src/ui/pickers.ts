@@ -1,4 +1,4 @@
-import { App, FuzzySuggestModal, SuggestModal, TFile } from 'obsidian';
+import { App, FuzzySuggestModal, SuggestModal, TFile, setIcon } from 'obsidian';
 
 export class FilePickerModal extends FuzzySuggestModal<TFile> {
 	constructor(app: App, private files: TFile[], placeholder: string, private onPick: (file: TFile) => void) {
@@ -37,9 +37,20 @@ export function sectionsOf(app: App, file: TFile): SectionChoice[] {
 }
 
 export class SectionPickerModal extends SuggestModal<SectionChoice> {
-	constructor(app: App, private choices: SectionChoice[], private onPick: (choice: SectionChoice) => void) {
+	/** `onBack` adds an arrow left of the text box that returns to the previous step (picking the note). */
+	constructor(app: App, private choices: SectionChoice[], private onPick: (choice: SectionChoice) => void, onBack?: () => void) {
 		super(app);
 		this.setPlaceholder('Pick a section, or the whole note');
+		const row = this.inputEl.parentElement;
+		if (!onBack || !row) return;
+		row.addClass('pw-has-back');
+		const back = row.createEl('button', { cls: 'pw-picker-back clickable-icon', attr: { 'aria-label': 'Pick another note' } });
+		setIcon(back, 'arrow-left');
+		row.insertBefore(back, this.inputEl);
+		back.addEventListener('click', () => {
+			this.close();
+			onBack();
+		});
 	}
 
 	getSuggestions(query: string): SectionChoice[] {
@@ -57,4 +68,16 @@ export class SectionPickerModal extends SuggestModal<SectionChoice> {
 	onChooseSuggestion(choice: SectionChoice): void {
 		this.onPick(choice);
 	}
+}
+
+/**
+ * Two steps: the note, then a section of it. The section step has a back arrow, so a wrong note
+ * can be swapped without starting over.
+ */
+export function pickNoteSection(app: App, placeholder: string, onPick: (file: TFile, choice: SectionChoice) => void): void {
+	const pickNote = () =>
+		new FilePickerModal(app, app.vault.getMarkdownFiles(), placeholder, (file) =>
+			new SectionPickerModal(app, sectionsOf(app, file), (choice) => onPick(file, choice), pickNote).open(),
+		).open();
+	pickNote();
 }

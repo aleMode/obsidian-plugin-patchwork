@@ -306,6 +306,11 @@
 	height: var(--pw-grow-h, var(--pw-h));
 }
 
+/* Scrolled content (note.scrollY): the box shows a later part of the note. */
+.pw-markdown {
+	margin-top: calc(-1 * var(--pw-scroll, 0mm));
+}
+
 .pw-markdown.is-fit {
 	width: calc(100% / var(--pw-fit, 1));
 	transform: scale(var(--pw-fit, 1));
@@ -442,6 +447,23 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 
 .pw-suggest-section {
 	padding-left: calc(var(--pw-indent, 0) * 1.2em);
+}
+
+/* Back arrow left of the picker's text box. */
+.prompt-input-container.pw-has-back {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+}
+
+.prompt-input-container.pw-has-back .prompt-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.pw-picker-back {
+	flex: none;
+	margin-left: var(--size-4-2);
 }
 
 .pw-placeholder-action {

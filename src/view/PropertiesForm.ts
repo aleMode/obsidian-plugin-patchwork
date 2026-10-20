@@ -363,7 +363,7 @@ export class PropertiesForm {
 		const info = flowChains(board.boardStore.file).get(m.id);
 		const text = !info ? 'Not linked.' : !info.ok ? info.reason : `Frame ${info.index + 1} of ${info.chain.length}, continuing “${moduleTitle(info.chain[0]!.module)}”. Text that doesn't fit in one frame flows into the next, a block at a time.`;
 		this.el.createDiv({ cls: 'pw-panel-hint', text });
-		form.button('Continue', 'Add another frame', () => board.continueInFrame(page.id, m.id), 'Placed on the next page, at the same spot.');
+		form.button('Continue', 'Add another frame', () => board.continueInFrame(page.id, m.id), 'Placed on this page, in free space next to this frame. Move it wherever the text should go.');
 	}
 
 	private fileRow(m: { file: string }, accept: (f: TFile) => boolean, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
@@ -396,6 +396,10 @@ export class PropertiesForm {
 		this.el.createDiv({ cls: 'pw-panel-hint', text: 'Lines count from the start of the section (or of the note), 1-based.' });
 		this.in('content');
 		form.dropdown('Overflow', { clip: 'Clip', fit: 'Shrink to fit', grow: 'Grow' }, m.overflow ?? 'clip', (v) => set('overflow', (x) => withField(x, 'overflow', v === 'clip' ? undefined : v)));
+		if ((m.overflow ?? 'clip') === 'clip') {
+			form.length('Scroll', m.scrollY ?? 0, (mm) => set('scrollY', (x) => withField(x, 'scrollY', mm > 0 ? mm : undefined)), { min: 0 });
+			this.el.createDiv({ cls: 'pw-panel-hint', text: 'Shows a later part of a note that is too long for its box. Scroll the mouse wheel over the selected note to do it by hand.' });
+		}
 		this.in('advanced');
 		form.number('Scale', m.scale, (v) => set('scale', (x) => withField(x, 'scale', v === 1 ? undefined : v)), { min: 0.1, max: 5, placeholder: '1' });
 		this.in('content');

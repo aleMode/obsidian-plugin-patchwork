@@ -10,13 +10,14 @@ import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule, TrackerModule } from '../model/schema';
-import { flowChains } from '../model/flow';
+import { flowChains, placeNextFrame } from '../model/flow';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
 import { masterPreview, pageFurniture } from '../model/numbering';
 import { outputPages, resolvePage } from '../model/masters';
 import { gridDrawStep, snapPoint, snapValue } from '../model/snapping';
 import { stepByKey } from '../model/tracker';
+import { clampScroll } from '../model/style';
 import { PX_PER_MM } from '../model/units';
 import { ModuleHost } from '../modules/ModuleHost';
 import { ContextBar } from './ContextBar';
@@ -36,7 +37,7 @@ import { PatchworkSettingsModal, type SettingsDraft } from '../ui/PatchworkSetti
 import { NamedPickerModal, TextPromptModal } from '../ui/prompts';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
-import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
+import { FilePickerModal, pickNoteSection } from '../ui/pickers';
 import { isImage, isPdf } from '../sources/fileKinds';
 import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
 import { Minimap, Rulers, ThemeColors } from './boardChrome';
@@ -549,18 +550,15 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	pickNote() {
-		const app = this.view.app;
-		new FilePickerModal(app, app.vault.getMarkdownFiles(), 'Note to add', (file) =>
-			new SectionPickerModal(app, sectionsOf(app, file), (choice) =>
-				this.placeModule((page, id): NoteModule => ({
-					id,
-					type: 'note',
-					...defaultModuleRect(page),
-					file: file.path,
-					...(choice.subpath ? { subpath: choice.subpath } : {}),
-				})),
-			).open(),
-		).open();
+		pickNoteSection(this.view.app, 'Note to add', (file, choice) =>
+			this.placeModule((page, id): NoteModule => ({
+				id,
+				type: 'note',
+				...defaultModuleRect(page),
+				file: file.path,
+				...(choice.subpath ? { subpath: choice.subpath } : {}),
+			})),
+		);
 	}
 
 	/** Point a module at another file, e.g. after its note, PDF or image was deleted (SPEC 5.3). */
@@ -570,17 +568,15 @@ export class BoardViewport implements BoardSurface {
 		const app = this.view.app;
 		const set = (patch: (x: AnyModule) => AnyModule) => this.store.update((f) => mapModule(f, pageId, moduleId, patch));
 		if (m.type === 'note') {
-			new FilePickerModal(app, app.vault.getMarkdownFiles(), 'Note to show', (file) =>
-				new SectionPickerModal(app, sectionsOf(app, file), (choice) =>
-					set((x) => {
-						const next = { ...x, file: file.path } as NoteModule;
-						if (choice.subpath) next.subpath = choice.subpath;
-						else delete next.subpath;
-						delete next.lines;
-						return next;
-					}),
-				).open(),
-			).open();
+			pickNoteSection(app, 'Note to show', (file, choice) =>
+				set((x) => {
+					const next = { ...x, file: file.path } as NoteModule;
+					if (choice.subpath) next.subpath = choice.subpath;
+					else delete next.subpath;
+					delete next.lines;
+					return next;
+				}),
+			);
 		} else if (m.type === 'image') {
 			new FilePickerModal(app, app.vault.getFiles().filter(isImage), 'Image to show', (file) => set((x) => ({ ...x, file: file.path }))).open();
 		} else if (m.type === 'pdf') {
@@ -674,8 +670,9 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/**
-	 * Linked frames (M5): continue the chain this module is in with a new frame of the same size, at
-	 * the same spot on the next page (a new page if this is the last one). One undo step.
+	 * Linked frames (M5): continue the chain this module is in with a new frame on the same page as
+	 * the chain's last frame, in free space beside or under it. Never adds or uses another page; the
+	 * user moves the frame wherever the text should go. One undo step.
 	 */
 	continueInFrame(pageId: string, moduleId: string) {
 		if (this.store.readOnly) return;
@@ -685,25 +682,13 @@ export class BoardViewport implements BoardSurface {
 		if (!start || !['note', 'text', 'frame'].includes(start.type)) return;
 		if (info && !info.ok) return void new Notice(info.reason);
 		const last = info?.ok ? info.chain[info.chain.length - 1]! : { pageId, module: start };
-		const pages = outputPages(file);
-		const at = pages.findIndex((p) => p.id === last.pageId);
+		const page = file.pages.find((p) => p.id === last.pageId);
+		if (!page) return;
 		const id = newId(allIds(file));
-		let target = pages[at + 1];
-		this.store.update((f) => {
-			let next = f;
-			if (!target) {
-				const lastPage = f.pages.find((p) => p.id === last.pageId)!;
-				const r = addPage(f, { w: lastPage.w, h: lastPage.h }, `Page ${f.pages.length + 1}`);
-				next = r.file;
-				target = r.page;
-			}
-			const m = last.module;
-			const w = Math.min(m.w, target.w);
-			const h = Math.min(m.h, target.h);
-			const frame: FrameModule = { id, type: 'frame', from: m.id, x: Math.min(m.x, target.w - w), y: Math.min(m.y, target.h - h), w, h, ...(m.style ? { style: m.style } : {}) };
-			return addModule(next, target.id, frame);
-		});
-		if (target) this.select({ pageId: target.id, moduleId: id });
+		const r = placeNextFrame(last.module, page.modules, page);
+		const frame: FrameModule = { id, type: 'frame', from: last.module.id, ...r, ...(last.module.style ? { style: last.module.style } : {}) };
+		this.store.update((f) => addModule(f, page.id, frame));
+		this.select({ pageId: page.id, moduleId: id });
 	}
 
 	continueSelectionInFrame() {
@@ -1133,8 +1118,29 @@ export class BoardViewport implements BoardSurface {
 		const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.root.clientHeight : 1;
 		// Trackpad pinch arrives as ctrl+wheel in Chromium.
 		if (e.ctrlKey || e.metaKey) this.setCamera(zoomAt(this.camera, Math.exp(-e.deltaY * unit * 0.002), this.local(e)));
+		else if (e.deltaY !== 0 && !e.shiftKey && this.scrollSelectedNote(e, e.deltaY * unit)) return;
 		else if (e.shiftKey && e.deltaX === 0) this.setCamera(panBy(this.camera, -e.deltaY * unit, 0));
 		else this.setCamera(panBy(this.camera, -e.deltaX * unit, -e.deltaY * unit));
+	}
+
+	/**
+	 * Wheel over the selected note whose text is cut off scrolls its content (note.scrollY) instead of
+	 * panning the board, so a box can show just the part wanted. Only the selected module, so the
+	 * wheel still pans everywhere else. Returns whether the event was used.
+	 */
+	private scrollSelectedNote(e: WheelEvent, deltaPx: number): boolean {
+		const sel = this.selection;
+		const el = (e.target as HTMLElement).closest<HTMLElement>('.pw-module');
+		if (!sel?.moduleId || this.store.readOnly || this.useMode || el?.dataset.moduleId !== sel.moduleId || !el.hasClass('is-overflowing')) return false;
+		const m = findModule(this.store.file, sel.pageId, sel.moduleId);
+		const content = el.querySelector<HTMLElement>('.pw-module-body > .pw-markdown');
+		const body = content?.parentElement;
+		if (m?.type !== 'note' || (m.overflow ?? 'clip') !== 'clip' || !content || !body) return false;
+		const next = clampScroll(((m as NoteModule).scrollY ?? 0) + deltaPx / (PX_PER_MM * this.camera.zoom), content.offsetHeight / PX_PER_MM, body.clientHeight / PX_PER_MM);
+		const rounded = Math.round(next * 10) / 10;
+		// One undo step per burst of wheel ticks.
+		this.store.update((f) => mapModule(f, sel.pageId, sel.moduleId!, (x) => withField(x, 'scrollY', rounded > 0 ? rounded : undefined)), { coalesce: `scroll:${sel.moduleId}` });
+		return true;
 	}
 
 	/** What's under the pointer: a module (with its page), a page, or empty board. */

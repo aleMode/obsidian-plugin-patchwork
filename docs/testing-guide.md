@@ -99,7 +99,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - Inspector: kind, value, min/max/step, number of boxes, checklist items (one per line; ticks stay with their line), **Print blank**. Export: the state prints without the −/+ buttons; with Print blank, empty boxes and an empty value to fill in by pencil.
 
 ### Linked text frames
-- Right-click a note or text module → **Continue in a new frame** (or command *Continue selected text in a new frame*). A frame of the same size appears at the same spot on the next page (a new page if needed). Text that doesn't fit the first box continues there, a paragraph/list/table at a time; the last frame gets the red overflow marker if text is still left.
+- Right-click a note or text module → **Continue in a new frame** (or command *Continue selected text in a new frame*). A frame of the same size appears on the same page, in free space under or beside the last frame (smaller if only a strip is left; never a new page). Drag it wherever the text should go. Text that doesn't fit the first box continues there, a paragraph/list/table at a time; the last frame gets the red overflow marker if text is still left.
 - Resize either box, edit the text or the note: the split updates. A heading is never stranded at the bottom of a frame.
 - Add more frames from a frame's right-click menu or the inspector (*Add another frame*). Delete a middle frame: the chain closes up. Export: each page prints its share.
 - Worth checking with your real notes: callouts, tables, embeds and images, and how the split looks.
@@ -219,6 +219,8 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - **Shrink to fit**: text shrinks (down to 50%) and re-wraps across the full width until it fits; still too long → clipped with the marker.
 - **Grow**: the module grows to the note's height on screen and in the export; the saved size doesn't change.
 - Edit the source note while watching: the fit/grow updates as the text changes.
+- **Scroll inside a small box** (clip only): select a note that is too long for its box and use the mouse wheel over it. The content moves up instead of the board panning, stopping at the end of the note, and exports the same. The Properties panel has a *Scroll* field (mm) for exact values. Use this to show only a later part of a section, e.g. the last image of a chapter. Wheel over a note that isn't selected still pans the board.
+- **Adding a note**: after choosing a note, the section list has a back arrow left of the text box to pick a different note.
 
 ### 3d. Drag from the file explorer (new)
 - Drag a note, PDF or image from the file explorer onto a page. The board gets an accent outline while you hover.

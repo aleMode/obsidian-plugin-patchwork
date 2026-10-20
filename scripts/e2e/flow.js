@@ -30,8 +30,10 @@ try {
 	view.surface.continueInFrame(page1, 'head');
 	await sleep(200);
 	const pages = view.store.file.pages;
-	const frame = pages[1]?.modules[0];
-	check('continuing adds a page and a frame linked to the text', pages.length === 2 && frame?.type === 'frame' && frame.from === 'head' && frame.w === 100 && frame.h === 60, frame);
+	const frame = pages[0].modules[1];
+	check('continuing adds a frame linked to the text, on the same page', pages.length === 1 && frame?.type === 'frame' && frame.from === 'head' && frame.w === 100 && frame.h === 60, [pages.length, frame]);
+	const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+	check('the new frame sits in free space, inside the page', !overlaps(frame, pages[0].modules[0]) && frame.y + frame.h <= pages[0].h && frame.x + frame.w <= pages[0].w, frame);
 	view.surface.zoomToFit();
 
 	const mod = (id) => view.contentEl.querySelector(`.pw-module[data-module-id="${id}"]`);
@@ -56,14 +58,14 @@ try {
 	check('resizing re-flows the chain', await until(() => paras('head').length > a.length && paras(frame.id)[0] === paras('head').slice(-1)[0] + 1), [paras('head'), paras(frame.id)]);
 
 	// A third frame, then delete the middle one: the chain closes up.
-	view.surface.continueInFrame(pages[1].id, frame.id);
+	view.surface.continueInFrame(page1, frame.id);
 	await sleep(200);
-	const third = view.store.file.pages[2].modules[0];
-	check('a frame can be continued again', third.type === 'frame' && third.from === frame.id, third);
-	view.surface.select({ pageId: pages[1].id, moduleId: frame.id });
+	const third = view.store.file.pages[0].modules[2];
+	check('a frame can be continued again, still on the one page', view.store.file.pages.length === 1 && third.type === 'frame' && third.from === frame.id, third);
+	view.surface.select({ pageId: page1, moduleId: frame.id });
 	view.surface.deleteSelection();
 	await sleep(200);
-	check('deleting a middle frame links its neighbours', view.store.file.pages[2].modules[0].from === 'head');
+	check('deleting a middle frame links its neighbours', view.store.file.pages[0].modules.find((m) => m.id === third.id).from === 'head');
 	view.store.undo();
 	await sleep(200);
 
@@ -85,7 +87,7 @@ try {
 	for (let i = 1; i <= doc.numPages; i++) printed.push(((await (await doc.getPage(i)).getTextContent()).items.map((t) => t.str).join(' ').match(/PARA-\d\d/g) ?? []).map((s) => Number(s.slice(5))));
 	plugin.pdfDocs.release(out.path);
 	plugin.pdfDocs.invalidate(out.path);
-	check('export prints each frame’s share, as on screen', JSON.stringify(printed) === JSON.stringify([paras('head'), paras(frame.id), paras(third.id)]), [printed, paras('head'), paras(frame.id), paras(third.id)]);
+	check('export prints each frame’s share, as on screen', JSON.stringify(printed.flat().sort()) === JSON.stringify([...paras('head'), ...paras(frame.id), ...paras(third.id)].sort()) && printed.length === 1, [printed, paras('head'), paras(frame.id), paras(third.id)]);
 
 	await vault.modify(note, text(3));
 	check('editing the note re-flows the chain', await until(() => [...paras('head'), ...paras(frame.id)].length === 3), [paras('head'), paras(frame.id)]);
