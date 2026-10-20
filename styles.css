@@ -1493,3 +1493,105 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 .pw-surface-host:has(.pw-module.is-editing) .pw-context-pill {
 	display: none;
 }
+
+/* ---------- mode switch and Use mode (docs/use-mode-plan.md) ---------- */
+
+.pw-mode-switch {
+	display: inline-flex;
+	padding: 2px;
+	gap: 2px;
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+}
+
+.pw-mode-switch .pw-tb-btn {
+	height: calc(var(--clickable-icon-size, 28px) - 4px);
+	border-radius: var(--radius-s);
+}
+
+.pw-mode-switch .pw-tb-btn.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+/* Use mode: a dashboard. The editing chrome goes; the toolbar moves into the corner the rulers used. */
+.pw-use .pw-arrange-only,
+.pw-use .pw-ruler,
+.pw-use .pw-ruler-corner,
+.pw-use .pw-page-labels,
+.pw-use .pw-safe-area,
+.pw-use .pw-selection,
+.pw-use .pw-guides,
+.pw-use .pw-marquee,
+.pw-use .pw-context-bar,
+.pw-use .pw-context-pill,
+.pw-use .pw-popover,
+.pw-use .pw-page.is-master {
+	display: none;
+}
+
+.pw-use .pw-toolbar {
+	top: var(--size-4-2);
+	left: var(--size-4-2);
+}
+
+.pw-use .pw-board.has-grid {
+	background-image: none;
+}
+
+.pw-use .pw-board .pw-module.is-overflowing::before {
+	display: none;
+}
+
+/* Pages are faint panels in the app theme, so their grouping stays visible without white paper. */
+.pw-use .pw-page,
+.pw-use .pw-module {
+	cursor: default;
+}
+
+.pw-use .pw-page-paper,
+.pw-use .pw-page-paper.has-background {
+	background: var(--background-primary);
+	box-shadow: none;
+	border: calc(1px / var(--pw-zoom)) solid var(--background-modifier-border);
+	border-radius: 2mm;
+}
+
+.pw-use .pw-module.is-pending {
+	background: var(--background-modifier-hover);
+}
+
+.pw-use .pw-module-skeleton {
+	background: var(--background-modifier-hover);
+	border-color: var(--background-primary);
+}
+
+/* Content is live: links, checkboxes, plugin buttons and text selection. */
+.pw-use .pw-module-body,
+.pw-use .pw-module.is-inherited {
+	pointer-events: auto;
+	user-select: text;
+}
+
+/* Module colour (style.tint): a Canvas-like card, tinted fill and coloured edge. Drawn as an inset ring,
+   so it never changes the content box (screen and export lay out the same). Paper resolves the theme
+   colours to their light values. */
+.pw-module.has-tint {
+	background: color-mix(in srgb, var(--pw-tint) 14%, transparent);
+	box-shadow: inset 0 0 0 0.5mm var(--pw-tint);
+	border-radius: max(var(--pw-radius, 0mm), 1.5mm);
+}
+
+.pw-module.has-tint.has-background {
+	background: var(--pw-bg);
+}
+
+.pw-swatch {
+	display: inline-block;
+	width: 0.8em;
+	height: 0.8em;
+	margin-right: var(--size-2-3);
+	border-radius: 50%;
+	background: var(--pw-swatch);
+	vertical-align: -0.05em;
+}

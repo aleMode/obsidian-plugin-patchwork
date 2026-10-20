@@ -1,13 +1,26 @@
-# Testing guide (state as of 2026-10-20, morning)
+# Testing guide (state as of 2026-10-20, evening)
 
-What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 257 checks across 26 suites, all passing; `npm test`: 202 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
+What to try by hand, in the order that gives the most signal. Everything here is also covered by automated checks (`npm run e2e`: 32 suites, all passing; `npm test`: 266 unit tests), so you're mostly looking for **feel, visuals, and anything the scripts can't judge**. Note results in `docs/qa.md` (or just tell me).
 
 ## Setup
 
 1. `npm run build` (or `npm run dev`), then open the dev Obsidian: `scripts/launchObsidian.sh` (test vault, isolated profile). Your own Obsidian works too: copy `main.js`, `manifest.json`, `styles.css` into a vault's `.obsidian/plugins/patchwork/`.
 2. The dev Obsidian now launches with flags that keep it rendering when covered by other windows (needed for automated runs). If you launched it before tonight, restart it with the script.
 
-## New in the interface pass (latest)
+## New: Use mode (a patchwork as a dashboard)
+
+Plan and decisions: `docs/use-mode-plan.md`. Open `Dashboard/Dashboard.patchwork` in the test vault: it opens in Use mode.
+
+- **Switch:** the **Arrange | Use** switch at the left of the toolbar, or the command *Switch between arrange and use*. Close and reopen the file: it comes back in the mode you left it in. Ctrl+Z after switching doesn't switch back.
+- **Look:** no rulers, grid, page labels or handles; pages are faint panels in your theme (try light and dark); the toolbar is just the switch, zoom to fit and View (minimap still toggles there). Master pages are hidden.
+- **Nothing moves:** drag on a module's text (selects text), on the page's background or empty board (pans). Right-click, double-click, Delete and arrow keys do nothing.
+- **Links:** click [[Goblin]] in *Prep*: it opens in a pane to the side. Click Fireball in *Party*: the same side pane switches to it. Ctrl/Cmd-click opens a new tab; Ctrl/Cmd-hover shows the page preview.
+- **Checkboxes:** tick "Prepare the ambush map": open `Dashboard/Session.md`, the line is ticked. Untick it. Tick a task in *Table notes* (a text box): Ctrl+Z unticks it. Tick twice very fast: the second may say the note changed (the module re-renders first); that is the safety check.
+- **Colours:** in Arrange, select a module → the palette button on the context bar: Red … Purple, or "Custom colour…" (Style tab). The cards look right in both themes and in a PDF export (light values).
+- **Plugins:** if you install Dataview, Tasks, Buttons, Meta Bind or use Bases, put their blocks in a note module and try their buttons and checkboxes in Use mode. Tell me what doesn't respond.
+- **Fixed:** opening a patchwork sometimes showed it at 2 % zoom (a speck in the corner); it should now always fit.
+
+## Interface pass
 
 Everything here is also described in `docs/ui-reorganisation.md`.
 

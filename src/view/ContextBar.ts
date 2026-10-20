@@ -8,6 +8,7 @@ import { FIT_LABELS, withField, withStyle } from '../ui/formHelpers';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import { shieldFromBoard } from './shield';
 import type { AlignMode } from '../model/align';
+import { tintColor, TINT_PRESETS } from '../model/tint';
 import type { BoardViewport } from './BoardViewport';
 
 type Rect = { x: number; y: number; w: number; h: number };
@@ -225,7 +226,21 @@ export class ContextBar {
 		if (!page) return [];
 		if (!it.moduleId) return this.page(page);
 		const m = page.modules.find((x) => x.id === it.moduleId);
-		return m ? [...this.module(page, m), this.more()] : [];
+		return m ? [...this.module(page, m), this.tint(page, m), this.more()] : [];
+	}
+
+	/** Canvas's colour palette: a tinted card. Custom colours are picked in the Style tab. */
+	private tint(page: Page, m: AnyModule): Ctl {
+		const current = m.style?.tint;
+		return {
+			icon: 'palette',
+			tip: 'Colour',
+			menu: (menu) => {
+				menu.addItem((i) => i.setTitle('No colour').setChecked(!current).onClick(() => this.setStyle(page, m, 'tint', undefined)));
+				for (const t of TINT_PRESETS) menu.addItem((i) => i.setTitle(swatch(t.name, tintColor(t.id)!)).setChecked(current === t.id).onClick(() => this.setStyle(page, m, 'tint', t.id)));
+				menu.addItem((i) => i.setTitle('Custom colour…').setChecked(!!current && !TINT_PRESETS.some((t) => t.id === current)).onClick(() => this.board.showProperties('style')));
+			},
+		};
 	}
 
 	private more(): Ctl {
@@ -488,4 +503,12 @@ export class ContextBar {
 		out.push({ icon: 'trash-2', tip: `Delete ${items.length} items`, onClick: () => this.board.deleteSelection() });
 		return out;
 	}
+}
+
+/** A menu title with a colour dot in front of it. */
+function swatch(name: string, color: string): DocumentFragment {
+	const frag = createFragment();
+	frag.createSpan({ cls: 'pw-swatch' }).setCssProps({ '--pw-swatch': color });
+	frag.appendText(name);
+	return frag;
 }

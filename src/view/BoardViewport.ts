@@ -40,6 +40,7 @@ import { FilePickerModal, SectionPickerModal, sectionsOf } from '../ui/pickers';
 import { isImage, isPdf } from '../sources/fileKinds';
 import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
 import { Minimap, Rulers, ThemeColors } from './boardChrome';
+import { LiveContent } from './liveContent';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
 
@@ -105,6 +106,8 @@ const CULL_MARGIN = 0.5;
  * outlines instead of content (SPEC 8.3). Keeps "zoom to fit" on a 100-page board instant.
  */
 const DETAIL_ZOOM = 0.25;
+/** Smallest board size (px) worth fitting the pages to when it first opens. */
+const MIN_FIT_PX = 120;
 /** Wait this long after the last zoom step before re-rendering for the new zoom (SPEC 8.3). */
 const ZOOM_SETTLE_MS = 150;
 
@@ -147,6 +150,10 @@ export class BoardViewport implements BoardSurface {
 	private popover!: PropertiesPopover;
 	private outlinePanel!: OutlinePanel;
 	private host: HTMLElement;
+	/** Use mode (a dashboard): content is live, nothing can be selected or moved. See docs/use-mode-plan.md. */
+	private useMode = false;
+	private modeButtons: { arrange: HTMLElement; use: HTMLElement } | null = null;
+	private live: LiveContent;
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
 		this.host = container;
@@ -167,6 +174,7 @@ export class BoardViewport implements BoardSurface {
 			replaceSource: (pageId, moduleId) => this.replaceSource(pageId, moduleId),
 		});
 		this.cleanups.push(() => this.modules.destroy());
+		this.live = new LiveContent({ app: view.app, store, modules: this.modules, boardPath: () => view.file?.path ?? '', hoverParent: view.leaf });
 		this.colors = new ThemeColors(this.root);
 		this.rulers = new Rulers(container, this.root, this.colors);
 		this.minimap = new Minimap(container, this.root, this.colors, services.ui?.minimap() ?? true, (p) => this.setCamera(cameraCentredOn(p, this.camera.zoom, this.viewportSize())));
@@ -191,6 +199,7 @@ export class BoardViewport implements BoardSurface {
 		const ro = new ResizeObserver(() => this.onResize());
 		ro.observe(this.root);
 		this.cleanups.push(() => ro.disconnect());
+		if (store.readOnly) this.applyMode(store.file.board.mode === 'use');
 		this.render();
 	}
 
@@ -216,6 +225,8 @@ export class BoardViewport implements BoardSurface {
 
 	private render() {
 		const file = this.store.file;
+		// The file holds the mode; a read-only patchwork can't store it, so its mode only lives here.
+		if (!this.store.readOnly) this.applyMode(file.board.mode === 'use');
 		// Items deleted meanwhile (e.g. by undo) drop out of the selection.
 		const kept = this.items.filter((it) => this.exists(it));
 		if (kept.length !== this.items.length) {
@@ -234,7 +245,8 @@ export class BoardViewport implements BoardSurface {
 			const selected = this.items.some((it) => it.pageId === page.id && !it.moduleId);
 			const shown = resolvePage(file, page);
 			const pageFurniture = page.isMaster ? masterPreview(file, page) : furniture.get(page.id);
-			el.update(shown, { appTheme: file.board.useAppTheme, unit: file.board.displayUnit, selected, furniture: pageFurniture, position: file.board.numbering.position, safeArea: file.board.defaultSafeArea });
+			// Use mode shows content in the app theme, like Canvas; exports stay on paper.
+			el.update(shown, { appTheme: file.board.useAppTheme || this.useMode, unit: file.board.displayUnit, selected, furniture: pageFurniture, position: file.board.numbering.position, safeArea: file.board.defaultSafeArea });
 		}
 		for (const [id, el] of this.pages) {
 			if (!seen.has(id)) {
@@ -290,12 +302,14 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	select(sel: Selection) {
+		if (this.useMode) return;
 		if (this.items.length === (sel ? 1 : 0) && (!sel || sameItem(sel, this.items[0]!))) return;
 		this.setItems(sel ? [sel] : []);
 	}
 
 	/** Shift-click: add or remove an item. Pages and modules aren't mixed; a different kind starts over. */
 	toggle(it: Item) {
+		if (this.useMode) return;
 		const kindMatches = this.items.every((x) => !!x.moduleId === !!it.moduleId);
 		if (!kindMatches) return this.setItems([it]);
 		const rest = this.items.filter((x) => !sameItem(x, it));
@@ -323,6 +337,39 @@ export class BoardViewport implements BoardSurface {
 
 	focusBoard() {
 		this.root.focus();
+	}
+
+	get inUseMode(): boolean {
+		return this.useMode;
+	}
+
+	/** Switch between Arrange and Use; remembered in the patchwork, outside the undo history. */
+	setUseMode(on: boolean) {
+		if (this.store.readOnly) return this.applyMode(on);
+		this.store.updateOutsideHistory((f) => (on === (f.board.mode === 'use') ? f : { ...f, board: withField(f.board, 'mode', on ? 'use' : undefined) }));
+	}
+
+	toggleUseMode() {
+		this.setUseMode(!this.useMode);
+	}
+
+	/**
+	 * Apply the mode: from the file (each render), or directly for a read-only patchwork, which can't
+	 * store it. Use mode drops the selection; the rest of the switch is CSS on the host (`pw-use`).
+	 */
+	private applyMode(on: boolean) {
+		if (on === this.useMode) return;
+		this.useMode = on;
+		this.host.toggleClass('pw-use', on);
+		this.modeButtons?.arrange.toggleClass('is-active', !on);
+		this.modeButtons?.use.toggleClass('is-active', on);
+		this.popover.hide();
+		if (this.items.length) {
+			this.items = [];
+			this.emitSelection();
+		}
+		if (this.store.readOnly) this.render();
+		this.fitToolbar();
 	}
 
 	/** The selection's bounding box in pixels relative to the board host (what the bar and popover position against). */
@@ -437,11 +484,10 @@ export class BoardViewport implements BoardSurface {
 	 * region keeps clear of the floating toolbar and of the outline panel, so an item at an edge or
 	 * under the panel is brought out, without re-centring every time.
 	 */
-	revealSelection() {
-		const sel = this.selectedRect();
+	revealSelection(item: Item | null = this.selection) {
+		const r = item && this.itemRect(item);
 		const vp = this.viewportSize();
-		if (!sel || vp.w === 0) return;
-		const r = sel.rect;
+		if (!r || vp.w === 0) return;
 		const region = this.comfortRegion(vp);
 		const fit = fitCamera(r, vp, 60);
 		if (fit.zoom < this.camera.zoom) {
@@ -878,7 +924,9 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	private onResize() {
-		if (!this.fitted && this.root.clientWidth > 0) {
+		// The first fit waits for a real size: while a pane is being laid out it can briefly be a few
+		// pixels wide, and fitting to that opened boards at 2 % zoom.
+		if (!this.fitted && this.root.clientWidth >= MIN_FIT_PX && this.root.clientHeight >= MIN_FIT_PX) {
 			this.fitted = true;
 			this.zoomToFit();
 		}
@@ -974,7 +1022,9 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	private renderMinimap() {
-		this.minimap.draw(this.store.file.pages, this.camera, this.viewportSize());
+		// Masters are hidden in Use mode, so the map leaves them out too.
+		const pages = this.useMode ? this.store.file.pages.filter((p) => !p.isMaster) : this.store.file.pages;
+		this.minimap.draw(pages, this.camera, this.viewportSize(), this.useMode);
 	}
 
 	/** Create, update or remove label elements to match the pages. */
@@ -1049,6 +1099,9 @@ export class BoardViewport implements BoardSurface {
 		on('keyup', (e) => this.onKey(e, false));
 		on('contextmenu', (e) => this.onContextMenu(e));
 		on('dblclick', (e) => this.onDoubleClick(e));
+		// Use mode: links and checkboxes in the content (in Arrange the content doesn't take the pointer).
+		on('click', (e) => this.useMode && this.live.click(e));
+		on('mouseover', (e) => this.useMode && this.live.hover(e));
 		on('dragover', (e) => this.onDragOver(e));
 		on('dragleave', () => this.root.removeClass('is-drop-target'));
 		on('drop', (e) => this.onDrop(e));
@@ -1077,6 +1130,7 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	private onPointerDown(e: PointerEvent) {
+		if (this.useMode) return this.onUsePointerDown(e);
 		this.root.focus();
 		// Tracker controls take plain clicks; Shift and the other buttons still select and drag.
 		if (e.button === 0 && !e.shiftKey && !this.spaceHeld && (e.target as HTMLElement).closest('.pw-interactive')) return;
@@ -1118,6 +1172,21 @@ export class BoardViewport implements BoardSurface {
 			this.drag = this.store.readOnly ? null : this.startDrag(hit, start);
 			if (!this.drag) return;
 		} else return;
+		this.root.setPointerCapture(e.pointerId);
+		this.root.addClass('is-dragging');
+	}
+
+	/**
+	 * Use mode: a press inside a module belongs to its content (links, checkboxes, plugin buttons, text
+	 * selection), and focus stays where the content puts it. Anywhere else a drag pans, as do the
+	 * middle button and Space + drag over content.
+	 */
+	private onUsePointerDown(e: PointerEvent) {
+		const onContent = !!(e.target as HTMLElement).closest('.pw-module');
+		if (e.button === 0 && onContent && !this.spaceHeld) return;
+		if (e.button !== 0 && e.button !== 1) return;
+		this.root.focus();
+		this.drag = { kind: 'pan', last: { x: e.clientX, y: e.clientY } };
 		this.root.setPointerCapture(e.pointerId);
 		this.root.addClass('is-dragging');
 	}
@@ -1305,6 +1374,9 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	private onKey(e: KeyboardEvent, down: boolean) {
+		// Typing in a field inside the content (a plugin's input, in Use mode) is not a board shortcut.
+		const t = e.target as HTMLElement;
+		if (t !== this.root && (t.isContentEditable || t.closest('input, textarea, select'))) return;
 		if (e.code === 'Space') {
 			this.spaceHeld = down;
 			this.root.toggleClass('is-panning', down);
@@ -1313,6 +1385,8 @@ export class BoardViewport implements BoardSurface {
 		}
 		if (!down) return;
 		const mod = e.ctrlKey || e.metaKey;
+		// Use mode keeps undo and redo (a ticked checkbox in a text box is an edit); nothing else edits.
+		if (this.useMode && !(mod && ['z', 'y'].includes(e.key.toLowerCase()))) return;
 		if (mod && e.key.toLowerCase() === 'z') {
 			if (e.shiftKey) this.store.redo();
 			else this.store.undo();
@@ -1391,7 +1465,7 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	private onDragOver(e: DragEvent) {
-		if (this.store.readOnly || !e.dataTransfer?.types.some((t) => t === 'text/uri-list' || t === 'text/plain')) return;
+		if (this.store.readOnly || this.useMode || !e.dataTransfer?.types.some((t) => t === 'text/uri-list' || t === 'text/plain')) return;
 		e.preventDefault();
 		e.dataTransfer.dropEffect = 'copy';
 		this.root.addClass('is-drop-target');
@@ -1404,7 +1478,7 @@ export class BoardViewport implements BoardSurface {
 	private onDrop(e: DragEvent) {
 		this.root.removeClass('is-drop-target');
 		const dt = e.dataTransfer;
-		if (!dt || this.store.readOnly) return;
+		if (!dt || this.store.readOnly || this.useMode) return;
 		const app = this.view.app;
 		const files = linkpathsFromDrop(dt.getData('text/uri-list'), dt.getData('text/plain'))
 			.map((l) => app.metadataCache.getFirstLinkpathDest(l, this.view.file?.path ?? ''))
@@ -1445,6 +1519,7 @@ export class BoardViewport implements BoardSurface {
 
 	/** Double-click: a note module opens its source at that section; a PDF module opens the crop editor (SPEC 5.6). */
 	private onDoubleClick(e: MouseEvent) {
+		if (this.useMode) return;
 		// The pointer is captured by the board on press, which retargets the click events to the board itself.
 		const hit = this.hit(e, (this.root.doc.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement);
 		const m = hit?.moduleId ? findModule(this.store.file, hit.pageId, hit.moduleId) : undefined;
@@ -1498,7 +1573,7 @@ export class BoardViewport implements BoardSurface {
 
 	private onContextMenu(e: MouseEvent) {
 		const hit = this.hit(e);
-		if (!hit || this.store.readOnly) return;
+		if (!hit || this.store.readOnly || this.useMode) return;
 		e.preventDefault();
 		if (this.items.length > 1 && this.items.some((x) => sameItem(x, hit))) return this.showGroupMenu(e);
 		this.select(hit);
@@ -1578,18 +1653,35 @@ export class BoardViewport implements BoardSurface {
 	private buildToolbar(container: HTMLElement) {
 		const bar = container.createDiv({ cls: 'pw-toolbar' });
 		this.toolbar = bar;
-		const button = (icon: string, label: string, onClick: (e: MouseEvent) => void) => {
-			const b = bar.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': label } });
+		// Use mode keeps only the mode switch, zoom to fit and the View menu; the rest is marked to hide.
+		const ARRANGE = 'pw-arrange-only';
+		const button = (icon: string, label: string, onClick: (e: MouseEvent) => void, cls = ARRANGE) => {
+			const b = bar.createEl('button', { cls: ['clickable-icon', cls], attr: { 'aria-label': label } });
 			setIcon(b, icon);
 			b.addEventListener('click', onClick);
 		};
-		const labelled = (icon: string, text: string, tip: string, onClick: (e: MouseEvent) => void) => {
-			const b = bar.createEl('button', { cls: 'pw-tb-btn', attr: { 'aria-label': tip } });
+		const labelled = (icon: string, text: string, tip: string, onClick: (e: MouseEvent) => void, cls = ARRANGE) => {
+			const b = bar.createEl('button', { cls: ['pw-tb-btn', cls], attr: { 'aria-label': tip } });
 			setIcon(b.createSpan({ cls: 'pw-tb-icon' }), icon);
 			b.createSpan({ text });
 			b.addEventListener('click', onClick);
+			return b;
 		};
-		const sep = () => bar.createDiv({ cls: 'pw-toolbar-sep' });
+		const sep = (cls = ARRANGE) => bar.createDiv({ cls: ['pw-toolbar-sep', cls] });
+		const modes = bar.createDiv({ cls: 'pw-mode-switch' });
+		const modeButton = (icon: string, text: string, tip: string, use: boolean) => {
+			const b = modes.createEl('button', { cls: 'pw-tb-btn', attr: { 'aria-label': tip } });
+			setIcon(b.createSpan({ cls: 'pw-tb-icon' }), icon);
+			b.createSpan({ text });
+			b.addEventListener('click', () => this.setUseMode(use));
+			return b;
+		};
+		this.modeButtons = {
+			arrange: modeButton('move', 'Arrange', 'Arrange: move, resize and edit items', false),
+			use: modeButton('mouse-pointer-click', 'Use', 'Use as a dashboard: links, checkboxes and buttons work, nothing moves', true),
+		};
+		this.modeButtons.arrange.addClass('is-active');
+		sep('pw-mode-sep');
 		if (!this.store.readOnly) {
 			labelled('file-plus', 'Page', 'Add a page', (e) => this.showAddPageMenu(e));
 			labelled('file-text', 'Note', 'Add a note', () => this.pickNote());
@@ -1598,9 +1690,9 @@ export class BoardViewport implements BoardSurface {
 			sep();
 		}
 		button('zoom-out', 'Zoom out', () => this.zoomBy(1 / 1.25));
-		this.zoomLabel = bar.createDiv({ cls: 'pw-zoom-label', text: '100%' });
+		this.zoomLabel = bar.createDiv({ cls: ['pw-zoom-label', ARRANGE], text: '100%' });
 		button('zoom-in', 'Zoom in', () => this.zoomBy(1.25));
-		button('maximize', 'Zoom to fit', () => this.zoomToFit());
+		button('maximize', 'Zoom to fit', () => this.zoomToFit(), '');
 		if (!this.store.readOnly) {
 			sep();
 			button('undo-2', 'Undo', () => this.store.undo());
@@ -1609,7 +1701,7 @@ export class BoardViewport implements BoardSurface {
 		sep();
 		if (!this.store.readOnly) labelled('settings-2', 'Settings', 'Settings for the whole patchwork: units, grid, numbering, appearance. Right-click a page or an item for its own settings.', () => this.showSettings());
 		labelled('file-output', 'Export', 'Export as PDF or PNG, or to a canvas', (e) => this.showExportMenu(e));
-		labelled('layout-panel-left', 'View', 'Outline and views, minimap, sidebar inspector', (e) => this.showViewMenu(e));
+		labelled('layout-panel-left', 'View', 'Outline and views, minimap, sidebar inspector', (e) => this.showViewMenu(e), '');
 		this.cleanups.push(() => bar.remove());
 		this.fitToolbar();
 	}

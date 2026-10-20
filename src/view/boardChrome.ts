@@ -10,6 +10,8 @@ interface Colors {
 	bg: string;
 	fg: string;
 	accent: string;
+	/** Pages on the minimap in Use mode, where they are faint panels rather than paper. */
+	faint: string;
 	font: string;
 }
 
@@ -27,7 +29,7 @@ export class ThemeColors {
 		if (this.cached) return this.cached;
 		const style = this.root.win.getComputedStyle(this.root);
 		const font = style.getPropertyValue('--font-interface').trim() || 'sans-serif';
-		this.cached = { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted'), accent: style.getPropertyValue('--interactive-accent'), font: `9px ${font}` };
+		this.cached = { bg: style.getPropertyValue('--background-secondary'), fg: style.getPropertyValue('--text-muted'), accent: style.getPropertyValue('--interactive-accent'), faint: style.getPropertyValue('--background-modifier-border'), font: `9px ${font}` };
 		return this.cached;
 	}
 
@@ -149,8 +151,8 @@ export class Minimap {
 		this.el.toggleClass('is-hidden', !show);
 	}
 
-	/** Cheap enough to redraw every camera frame. */
-	draw(pages: readonly Rect[], camera: Camera, vp: { w: number; h: number }) {
+	/** Cheap enough to redraw every camera frame. `faint`: pages as Use mode shows them. */
+	draw(pages: readonly Rect[], camera: Camera, vp: { w: number; h: number }, faint = false) {
 		if (!this.shown) return;
 		const area = visibleRect(camera, vp);
 		const all = bounds([...pages, area]);
@@ -169,7 +171,7 @@ export class Minimap {
 		const ox = MAP_PAD + (MAP_W - 2 * MAP_PAD - all.w * k) / 2 - all.x * k;
 		const oy = MAP_PAD + (MAP_H - 2 * MAP_PAD - all.h * k) / 2 - all.y * k;
 		this.frame = { x: ox, y: oy, k };
-		c.fillStyle = '#ffffff';
+		c.fillStyle = faint ? colors.faint : '#ffffff';
 		for (const p of pages) c.fillRect(ox + p.x * k, oy + p.y * k, Math.max(1, p.w * k), Math.max(1, p.h * k));
 		c.strokeStyle = colors.accent;
 		c.lineWidth = 1.5;

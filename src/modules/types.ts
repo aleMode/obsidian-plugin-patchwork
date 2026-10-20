@@ -27,6 +27,11 @@ export interface ModuleContext {
 export interface ModuleRenderer {
 	/** Called when content-relevant fields change (see `contentKey`). */
 	render(m: AnyModule): void;
+	/**
+	 * The markdown on screen, for renderers whose task checkboxes can be ticked (Use mode): the n-th
+	 * checkbox is the n-th task of this text. Undefined when ticking isn't supported (linked frames).
+	 */
+	shownMarkdown?(): string | undefined;
 	/** Paths whose modification should trigger a re-render. */
 	dependencies(): ReadonlySet<string>;
 	/** Resolves when the latest render has finished (content or placeholder). Export waits on it. */

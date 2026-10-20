@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "unit": "mm",
+  "meta": {
+    "title": "Session dashboard"
+  },
+  "board": {
+    "mode": "use"
+  },
+  "pages": [
+    {
+      "id": "dash",
+      "name": "Tonight",
+      "x": 0,
+      "y": 0,
+      "w": 297,
+      "h": 210,
+      "modules": [
+        {
+          "id": "prep",
+          "type": "note",
+          "x": 8,
+          "y": 8,
+          "w": 90,
+          "h": 60,
+          "file": "Dashboard/Session.md",
+          "subpath": "#Prep",
+          "style": {
+            "padding": 3,
+            "tint": "4"
+          }
+        },
+        {
+          "id": "party",
+          "type": "note",
+          "x": 104,
+          "y": 8,
+          "w": 100,
+          "h": 92,
+          "file": "Dashboard/Session.md",
+          "subpath": "#Party",
+          "style": {
+            "padding": 3,
+            "tint": "5"
+          }
+        },
+        {
+          "id": "loot",
+          "type": "note",
+          "x": 8,
+          "y": 74,
+          "w": 90,
+          "h": 66,
+          "file": "Dashboard/Session.md",
+          "subpath": "#Loot",
+          "style": {
+            "padding": 3,
+            "tint": "3"
+          }
+        },
+        {
+          "id": "hp",
+          "type": "tracker",
+          "x": 210,
+          "y": 8,
+          "w": 79,
+          "h": 25,
+          "kind": "counter",
+          "label": "Hit points",
+          "value": 31,
+          "min": 0
+        },
+        {
+          "id": "notes",
+          "type": "text",
+          "x": 104,
+          "y": 106,
+          "w": 100,
+          "h": 34,
+          "markdown": "**Table notes**\n\n- [ ] Ask about the crown\n- [ ] Check [[Combat]] rules for prone",
+          "style": {
+            "padding": 3,
+            "tint": "6"
+          }
+        },
+        {
+          "id": "map",
+          "type": "image",
+          "x": 210,
+          "y": 40,
+          "w": 79,
+          "h": 94,
+          "file": "Images/Map.png"
+        },
+        {
+          "id": "rules",
+          "type": "pdf",
+          "x": 8,
+          "y": 146,
+          "w": 196,
+          "h": 56,
+          "file": "PDFs/Sample rulebook.pdf",
+          "page": 1,
+          "crop": [
+            0.05,
+            0.05,
+            0.95,
+            0.4
+          ]
+        }
+      ]
+    }
+  ]
+}

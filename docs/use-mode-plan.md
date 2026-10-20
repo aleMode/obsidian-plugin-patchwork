@@ -1,5 +1,7 @@
 # Use mode: a patchwork as a dashboard (plan, 2026-10-20)
 
+**Status:** steps 1–6 built and tested; plugin checks (Dataview, Tasks, Buttons, Meta Bind, Bases) wait for the plugins to be installed in the test vault. One change from the plan: in Use, a press inside a module belongs to its content (links, buttons, text selection) and only a drag elsewhere pans, so plugin controls that aren't links or buttons still get their clicks.
+
 Replaces the Live Preview editing idea (Q18): instead of editing notes in Obsidian's editor, a patchwork gets a second mode for **using** what it shows. Notes render cleanly in the app theme; links, checkboxes and plugin buttons work; nothing can be moved by accident. In-place text editing (the text area, in Arrange) stays as it is.
 
 ## Decisions (taken with the user, 2026-10-20)

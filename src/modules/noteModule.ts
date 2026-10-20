@@ -10,6 +10,8 @@ abstract class MarkdownModule implements ModuleRenderer {
 	private generation = 0;
 	protected deps = new Set<string>();
 	protected done: Promise<void> = Promise.resolve();
+	/** What `show` last rendered (see ModuleRenderer.shownMarkdown). */
+	private shown: string | undefined;
 
 	constructor(protected el: HTMLElement, protected ctx: ModuleContext) {}
 
@@ -23,10 +25,16 @@ abstract class MarkdownModule implements ModuleRenderer {
 		return this.done;
 	}
 
+	shownMarkdown(): string | undefined {
+		return this.shown;
+	}
+
 	/** Render markdown unless a newer render started meanwhile (renders are async). */
 	protected async show(markdown: string, sourcePath: string, generation: number, classes: readonly string[] = []) {
 		const target = this.begin(generation, classes);
-		if (target) await MarkdownRenderer.render(this.ctx.app, markdown, target, sourcePath, this.child!);
+		if (!target) return;
+		this.shown = markdown;
+		await MarkdownRenderer.render(this.ctx.app, markdown, target, sourcePath, this.child!);
 	}
 
 	/** Render blocks one wrapper each, the same structure FlowLayout measured. */
@@ -38,6 +46,7 @@ abstract class MarkdownModule implements ModuleRenderer {
 
 	private begin(generation: number, classes: readonly string[]): HTMLElement | null {
 		if (generation !== this.generation) return null;
+		this.shown = undefined;
 		this.clearChild();
 		const child = new Component();
 		this.ctx.component.addChild(child);

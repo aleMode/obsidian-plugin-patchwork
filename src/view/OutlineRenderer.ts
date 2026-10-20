@@ -106,7 +106,8 @@ export class OutlineRenderer {
 		if (!board) return;
 		const item = moduleId ? { pageId, moduleId } : { pageId };
 		if (e.shiftKey) return board.toggle(item);
+		// In Use mode nothing is selected; the item is only brought into view.
 		board.select(item);
-		board.revealSelection();
+		board.revealSelection(item);
 	}
 }

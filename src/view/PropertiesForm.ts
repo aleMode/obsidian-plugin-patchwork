@@ -11,8 +11,12 @@ import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import { ALIGN_ACTIONS, type BoardViewport } from './BoardViewport';
 import { moduleTitle } from './OutlineRenderer';
+import { TINT_PRESETS } from '../model/tint';
 import { FIT_LABELS, insets, PLAIN_NUMBER, uniformInset, withField, withStyle } from '../ui/formHelpers';
 import { isImage, isPdf } from '../sources/fileKinds';
+
+/** Where a custom card colour starts: a neutral blue that reads on light and dark themes. */
+const DEFAULT_CUSTOM_TINT = '#4a90d9';
 
 export type PropertiesSection = 'content' | 'layout' | 'style' | 'furniture' | 'advanced';
 
@@ -429,6 +433,20 @@ export class PropertiesForm {
 		);
 	}
 
+	/** Card colour (Use mode look): Canvas's palette, or a custom colour with its own picker. */
+	private tintRows(form: Form, tint: string | undefined, set: (v: string | undefined) => void) {
+		const preset = TINT_PRESETS.some((t) => t.id === tint);
+		const options: Record<string, string> = { '': 'None' };
+		for (const t of TINT_PRESETS) options[t.id] = t.name;
+		options.custom = 'Custom';
+		form.dropdown('Colour', options, !tint ? '' : preset ? tint : 'custom', (v) => {
+			if (v === 'custom') set(tint && !preset ? tint : DEFAULT_CUSTOM_TINT);
+			else set(v === '' ? undefined : v);
+			this.rerender();
+		});
+		if (tint && !preset) form.color('Custom colour', tint, set);
+	}
+
 	private renderStyle(form: Form, m: AnyModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
 		const s = m.style ?? {};
 		const setStyle = (field: string, key: keyof ModuleStyle & string, value: unknown) => set(`style.${field}`, (x) => withStyle(x, key, value));
@@ -442,6 +460,7 @@ export class PropertiesForm {
 			form.length('Corner radius', s.border.radius ?? 0, (mm) => setStyle('radius', 'border', withField(s.border!, 'radius', mm > 0 ? mm : undefined)), { min: 0 });
 		}
 		form.color('Background', s.background, (v) => setStyle('background', 'background', v));
+		this.tintRows(form, s.tint, (v) => setStyle('tint', 'tint', v));
 		form.number('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v), { min: 0, max: 1, placeholder: '1' });
 		form.number('Text scale', s.fontScale, (v) => setStyle('fontScale', 'fontScale', v === 1 ? undefined : v), { min: 0.1, max: 5, placeholder: '1' });
 		form.color('Text colour', s.color, (v) => setStyle('color', 'color', v));

@@ -24,3 +24,13 @@ Manual:
 - [x] Edit a source note while its board is open: the module updates.
 - [x] Edit the board file in a text editor while the board has unsaved changes: a conflict copy appears and the dialog offers "Use my version". (2026-10-20: not reproducible by hand, since unsaved changes only exist for ~2 s before autosave; an outside edit after that reloads cleanly, which is what was observed. The conflict path is covered by `scripts/e2e/fileView.js`.)
 - [ ] Printed scale: print an exported A4 page at 100%; a 90 mm wide module measures 90 mm. (Deprioritized: no printer; on-screen checks matched.)
+
+## Use mode (2026-10-20)
+
+Automated: `scripts/e2e/usemode.mjs` (19 checks: switch, remembered mode, no undo step, hidden chrome, app theme, pan instead of move, no selection, links to a reused side pane, note and text-box checkboxes, frozen refuses, tints). Stress board in Use mode pans like Arrange (whole board p50 16.6 ms).
+
+Manual:
+- [ ] Light and dark themes, and a community theme: faint panels and tinted cards readable in each.
+- [ ] Ctrl/Cmd-hover on a link shows the page preview.
+- [ ] Dataview, Tasks, Buttons, Meta Bind, Bases blocks in a note module respond in Use mode (needs the plugins installed).
+- [ ] A PDF export of a patchwork with tinted modules: light tints, coloured edges.

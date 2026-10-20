@@ -1,5 +1,6 @@
 import type { AnyModule } from '../model/schema';
 import { textScale } from '../model/style';
+import { tintColor } from '../model/tint';
 
 /**
  * Apply a module's `style` (SPEC 5.3) to its element. Used on the board and in the print host, so
@@ -12,6 +13,8 @@ export function applyModuleStyle(el: HTMLElement, m: AnyModule) {
 	el.toggleClass('has-text-color', !!s.color);
 	el.toggleClass('has-align', !!s.align);
 	el.toggleClass('has-font-family', !!s.fontFamily);
+	const tint = tintColor(s.tint);
+	el.toggleClass('has-tint', !!tint);
 	el.setCssProps({
 		'--pw-pad': `${Math.max(0, s.padding ?? 0)}mm`,
 		'--pw-border-w': `${Math.max(0, s.border?.width ?? 0)}mm`,
@@ -23,6 +26,7 @@ export function applyModuleStyle(el: HTMLElement, m: AnyModule) {
 		'--pw-color': s.color ?? '',
 		'--pw-align': s.align ?? '',
 		'--pw-font-family': s.fontFamily ?? '',
+		'--pw-tint': tint ?? '',
 	});
 	// A user CSS class (for snippets). Remember it so a change removes the old one.
 	const prev = el.dataset.pwClass;

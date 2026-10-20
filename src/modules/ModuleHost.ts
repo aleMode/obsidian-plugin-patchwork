@@ -348,6 +348,11 @@ export class ModuleHost {
 		this.mounted.delete(id);
 	}
 
+	/** The markdown a mounted module shows (see ModuleRenderer.shownMarkdown). */
+	shownMarkdown(id: string): string | undefined {
+		return this.mounted.get(id)?.renderer?.shownMarkdown?.();
+	}
+
 	/**
 	 * Start editing a module in place: its rendered content stops updating and its body is handed to the
 	 * editor. Returns null when the module is not on screen (not mounted).

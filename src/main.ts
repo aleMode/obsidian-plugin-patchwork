@@ -13,6 +13,7 @@ import { PdfDocCache } from './sources/pdfSource';
 import { isPdf } from './sources/fileKinds';
 import { ActiveBoard } from './view/activeBoard';
 import { BoardViewport } from './view/BoardViewport';
+import { HOVER_SOURCE } from './view/liveContent';
 import { InspectorView, VIEW_TYPE_INSPECTOR } from './view/InspectorView';
 import { OutlineView, VIEW_TYPE_OUTLINE } from './view/OutlineView';
 import { refreshPaperScope, removePaperScope } from './view/paperScope';
@@ -47,6 +48,7 @@ export default class PatchworkPlugin extends Plugin {
 			}),
 		);
 		this.addSettingTab(new PatchworkSettingTab(this.app, this));
+		this.registerHoverLinkSource(HOVER_SOURCE, { display: 'Patchwork', defaultMod: true });
 		this.registerEvent(this.app.vault.on('rename', (file, oldPath) => void onVaultRename(this.app, oldPath, file.path)));
 		const services = {
 			pdfDocs: this.pdfDocs,
@@ -110,6 +112,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('continue-frame', 'Continue selected text in a new frame', (v) => v.continueSelectionInFrame(), true);
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());
 		this.addBoardCommand('zoom-to-selection', 'Zoom to selection', (v) => v.zoomToSelection());
+		this.addBoardCommand('toggle-use-mode', 'Switch between arrange and use (dashboard)', (v) => v.toggleUseMode());
 		this.addBoardCommand('export', 'Export…', (v) => v.showExport());
 		this.addBoardCommand('board-settings', 'Settings…', (v) => v.showSettings(), true);
 		this.addBoardCommand('arrange-row', 'Arrange pages in a row', (v) => v.autoArrange('row'), true);
@@ -196,7 +199,7 @@ export default class PatchworkPlugin extends Plugin {
 		await this.saveSettings();
 	}
 
-	/** A command that only shows up while a board is the active view. */
+	/** A command that only shows up while a board is the active view; editing ones only in Arrange mode. */
 	private addBoardCommand(id: string, name: string, run: (v: BoardViewport) => void, needsWrite = false) {
 		this.addCommand({
 			id,
@@ -204,7 +207,7 @@ export default class PatchworkPlugin extends Plugin {
 			checkCallback: (checking) => {
 				const view = this.app.workspace.getActiveViewOfType(PatchworkView);
 				const surface = view?.surface;
-				if (!(surface instanceof BoardViewport) || (needsWrite && view?.store?.readOnly)) return false;
+				if (!(surface instanceof BoardViewport) || (needsWrite && (view?.store?.readOnly || surface.inUseMode))) return false;
 				if (!checking) run(surface);
 				return true;
 			},

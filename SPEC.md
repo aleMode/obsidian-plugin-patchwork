@@ -120,6 +120,15 @@ PDF module rules:
 - Inspector panel (right side) edits the selection. Outline panel lists pages and modules.
 - Multi-select, align, distribute, duplicate, lock, z-order, smart guides, arrow-key nudge, undo/redo.
 
+### 5.7 Arrange and Use modes
+- A patchwork has two modes, switched on the toolbar (or the command *Switch between arrange and use*). **Arrange** is everything above and the default. **Use** turns it into a dashboard: nothing can be selected, moved, resized or deleted, and the content is live.
+- The mode is stored in the file (`board.mode: "use"`), outside the undo history, so a dashboard reopens in Use. A read-only patchwork switches for the session only.
+- In Use: links open in a pane to the side, reused by later clicks (Ctrl/Cmd and the other modifiers as anywhere in Obsidian; Ctrl/Cmd-hover shows the page preview). Task checkboxes write back to the line they come from: the note file for note modules (only if the note still matches what is shown), the patchwork for text boxes (an undo step). Frozen notes, linked frames and master content keep their checkboxes read-only for now. Plugin content (Dataview, Tasks, Buttons, Meta Bind, Bases) gets its own clicks. Trackers work as in Arrange.
+- A press inside a module belongs to its content; a drag anywhere else pans (also middle button, or Space + drag).
+- Look: rulers, grid, page labels, safe-area guides, the overflow marker, handles, the context bar and master pages are hidden; the toolbar keeps the mode switch, zoom to fit and the View menu (minimap, outline). Content uses the app theme instead of light paper, and pages are faint panels. Each module keeps its overflow policy.
+- Module colours (`style.tint`): Canvas's six theme colours or a custom colour give a tinted card with a coloured edge, in both modes and in exports (light values on paper). Set from the context bar's palette or the Style tab.
+- Exports are unchanged by the mode.
+
 ## 6. Data model
 
 Stored as pretty-printed JSON (2 spaces, stable key order) so it diffs well in git.
@@ -153,6 +162,7 @@ export interface BoardSettings {
   useAppTheme: boolean;                  // default false
   pdfDarkMode?: boolean;                 // M4, viewing only: invert PDF regions in a dark theme
   fontFamily?: string;
+  mode?: string;                         // "use": opens as a dashboard (5.7); anything else: arrange
   export: ExportDefaults;
 }
 
@@ -214,6 +224,8 @@ export interface TrackerModule extends BaseModule {   // M5: interactive; state 
 export interface ModuleStyle {
   padding?: number; border?: { width: number; color: string; radius?: number };
   background?: string; opacity?: number; fontScale?: number; cssClass?: string;
+  color?: string; align?: string; fontFamily?: string;
+  tint?: string;                         // card colour: Canvas preset "1"–"6" or "#rrggbb" (5.7)
 }
 
 export interface SavedView {                      // M3
@@ -480,3 +492,6 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
 - **v0.10 · 2026-10-20 (memory review)**
   - Cached PDF renders are freed a minute after the last open patchwork closes (they used to stay, up to the cache budget, until Obsidian quit).
   - Export holds less at once: each printed batch is merged and dropped as soon as Chromium returns it, PNG files are written one at a time, and the finished bytes are no longer copied on write. Image previews decode straight to preview size.
+- **v0.11 · 2026-10-20 (Use mode; docs/use-mode-plan.md)**
+  - Live Preview editing (Q18) is dropped in favour of **Arrange / Use modes** (section 5.7): Use is a dashboard with live links, checkboxes and plugin content, app-theme pages as faint panels, and no editing chrome. New fields `board.mode` and `style.tint` (Canvas colour palette).
+  - Opening a patchwork no longer fits the pages to a pane that is still being laid out (it could open at 2 % zoom).

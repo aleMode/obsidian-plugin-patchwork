@@ -1,8 +1,9 @@
-import { type App, Notice, resolveSubpath, setIcon, TFile } from 'obsidian';
+import { type App, Notice, setIcon, TFile } from 'obsidian';
 import { insertLink, type LineStyle, type Replace, toggleLines, toggleWrap } from '../model/mdFormat';
 import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import type { ModuleHost } from '../modules/ModuleHost';
-import { type SectionRange, sliceBounds } from '../sources/noteSlice';
+import { noteSection } from '../sources/markdownSource';
+import { sliceBounds } from '../sources/noteSlice';
 import type { BoardStore } from '../store/BoardStore';
 import { findModule, mapModule } from '../store/pageOps';
 import { BOARD_EVENTS, shieldFromBoard } from './shield';
@@ -52,15 +53,10 @@ async function editNote(d: InlineEditDeps, pageId: string, note: NoteModule): Pr
 		return false;
 	}
 	const text = await d.app.vault.read(file);
-	let range: SectionRange | null = null;
-	if (note.subpath) {
-		const cache = d.app.metadataCache.getFileCache(file);
-		const hit = cache ? resolveSubpath(cache, note.subpath) : null;
-		if (!hit || hit.type === 'footnote') {
-			new Notice(`Section not found: ${note.file}${note.subpath}`);
-			return false;
-		}
-		range = { kind: hit.type, start: hit.start.offset, end: hit.end?.offset ?? null };
+	const range = noteSection(d.app, file, note.subpath);
+	if (range === undefined) {
+		new Notice(`Section not found: ${note.file}${note.subpath}`);
+		return false;
 	}
 	const { start, end } = sliceBounds(text, range, { ...(note.includeHeading === undefined ? {} : { includeHeading: note.includeHeading }), ...(note.lines ? { lines: note.lines } : {}) });
 	const initial = text.slice(start, end);
