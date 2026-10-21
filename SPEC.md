@@ -68,7 +68,7 @@ The author plays D&D and keeps rules as `.md` notes (previously exported to PDF 
 ## 5. Concepts and UX
 
 ### 5.1 Board
-- Opens as a custom view for `.patchwork` files. Pan (wheel/trackpad, space+drag), zoom (ctrl+wheel, pinch, buttons, zoom-to-fit-all, zoom-to-fit-page), minimap in M3.
+- Opens as a custom view for `.patchwork` files. Pan (wheel/trackpad, space+drag), zoom (ctrl+wheel at 10 % per notch, pinch, +/- buttons through fixed stops, a click on the zoom label for 100 %, zoom-to-fit-all, zoom-to-fit-page), minimap in M3.
 - Rulers in the user's display unit (mm / cm / in). Display unit is a setting; storage is always mm.
 - Grid default 5 mm, toggleable snap, hold Alt to bypass snap.
 
@@ -507,3 +507,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - The inline editor keeps 2 px of room inside the module's border.
 - **v0.14 · 2026-10-21 (QA round)**
   - Small text is easier to read on screen. From 100 % down to 50 % zoom, note text eases toward full contrast (away from its background, so it works on dark and light paper and tinted cards) and gets a hairline stroke (0.15 px on screen at full strength). Below 100 % body-text strokes are thinner than a pixel and draw dim, a limit of the pixel grid; a render at the real size, a transform of exactly 1, hinting and font weights were tried and made no difference (they only reflowed the text). Pure CSS in `styles.css`, driven by the settled `--pw-zoom`, scoped to the board layer: wrapping is untouched and exports never see it.
+  - Zoom controls: a mouse-wheel notch with Ctrl zooms by 10 % at most (it was about 22 %; a trackpad pinch is unchanged, one event is capped, not scaled). The +/- buttons step through fixed stops (5, 10, 15, 25, 50, 75, 100, 125, 150, 200, 300, 400, 600, 800 %) instead of x1.25, from wherever the zoom is. Clicking the zoom label sets exactly 100 %, about the centre of the view.

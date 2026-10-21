@@ -39,7 +39,7 @@ import { CropModal, type CropResult } from '../ui/CropModal';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, pickNoteSection } from '../ui/pickers';
 import { isImage, isPdf } from '../sources/fileKinds';
-import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, panBy, screenToBoard, visibleRect, zoomAt } from './camera';
+import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, nextZoomStop, panBy, screenToBoard, visibleRect, wheelZoomFactor, zoomAt, zoomTo } from './camera';
 import { Minimap, Rulers, ThemeColors } from './boardChrome';
 import { LiveContent } from './liveContent';
 import { PageElement } from './pageElement';
@@ -919,9 +919,10 @@ export class BoardViewport implements BoardSurface {
 		return bar.height ? bar.bottom - root.top : 0;
 	}
 
-	private zoomBy(factor: number) {
+	/** Zoom to `zoom` about the centre of the view. */
+	private zoomToLevel(zoom: number) {
 		const vp = this.viewportSize();
-		this.setCamera(zoomAt(this.camera, factor, { x: vp.w / 2, y: vp.h / 2 }));
+		this.setCamera(zoomTo(this.camera, zoom, { x: vp.w / 2, y: vp.h / 2 }));
 	}
 
 	private onResize() {
@@ -1118,7 +1119,7 @@ export class BoardViewport implements BoardSurface {
 		e.preventDefault();
 		const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.root.clientHeight : 1;
 		// Trackpad pinch arrives as ctrl+wheel in Chromium.
-		if (e.ctrlKey || e.metaKey) this.setCamera(zoomAt(this.camera, Math.exp(-e.deltaY * unit * 0.002), this.local(e)));
+		if (e.ctrlKey || e.metaKey) this.setCamera(zoomAt(this.camera, wheelZoomFactor(e.deltaY * unit), this.local(e)));
 		else if (e.deltaY !== 0 && !e.shiftKey && this.scrollSelectedNote(e, e.deltaY * unit)) return;
 		else if (e.shiftKey && e.deltaX === 0) this.setCamera(panBy(this.camera, -e.deltaY * unit, 0));
 		else this.setCamera(panBy(this.camera, -e.deltaX * unit, -e.deltaY * unit));
@@ -1707,9 +1708,10 @@ export class BoardViewport implements BoardSurface {
 			labelled('plus', 'More', 'Add text, an image, a tracker or a table of contents', (e) => this.showAddMenu(e));
 			sep();
 		}
-		button('zoom-out', 'Zoom out', () => this.zoomBy(1 / 1.25));
-		this.zoomLabel = bar.createDiv({ cls: ['pw-zoom-label', ARRANGE], text: '100%' });
-		button('zoom-in', 'Zoom in', () => this.zoomBy(1.25));
+		button('zoom-out', 'Zoom out', () => this.zoomToLevel(nextZoomStop(this.camera.zoom, -1)));
+		this.zoomLabel = bar.createEl('button', { cls: ['clickable-icon', 'pw-zoom-label', ARRANGE], text: '100%', attr: { 'aria-label': 'Reset to 100%' } });
+		this.zoomLabel.addEventListener('click', () => this.zoomToLevel(1));
+		button('zoom-in', 'Zoom in', () => this.zoomToLevel(nextZoomStop(this.camera.zoom, 1)));
 		button('maximize', 'Zoom to fit', () => this.zoomToFit(), '');
 		if (!this.store.readOnly) {
 			sep();

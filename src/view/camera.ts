@@ -14,6 +14,24 @@ export interface Camera {
 const MIN_ZOOM = 0.02;
 export const MAX_ZOOM = 8;
 
+/** What the zoom buttons step through: 25-point steps through the useful range, coarser above, finer below. */
+export const ZOOM_STOPS = [0.05, 0.1, 0.15, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
+
+/** The next stop above (`dir` 1) or below (-1) `zoom`; the zoom limits when there is none. */
+export function nextZoomStop(zoom: number, dir: 1 | -1): number {
+	// A zoom that only looks like a stop (99.96 % after a wheel zoom) still steps away from it.
+	if (dir === 1) return ZOOM_STOPS.find((s) => s > zoom * 1.005) ?? MAX_ZOOM;
+	return [...ZOOM_STOPS].reverse().find((s) => s < zoom / 1.005) ?? MIN_ZOOM;
+}
+
+/** One wheel event stays within +-10 %: a mouse notch (deltas of 100 and up) is that big, a trackpad pinch sends small deltas and is not capped. */
+const MAX_WHEEL_STEP = Math.log(1.1);
+
+/** Zoom factor of a wheel event with the given vertical delta (px): proportional, capped per event. */
+export function wheelZoomFactor(delta: number): number {
+	return Math.exp(clamp(-delta * 0.002, -MAX_WHEEL_STEP, MAX_WHEEL_STEP));
+}
+
 export function boardToScreen(c: Camera, p: Point): Point {
 	return { x: p.x * PX_PER_MM * c.zoom + c.tx, y: p.y * PX_PER_MM * c.zoom + c.ty };
 }
@@ -22,11 +40,16 @@ export function screenToBoard(c: Camera, p: Point): Point {
 	return { x: (p.x - c.tx) / (PX_PER_MM * c.zoom), y: (p.y - c.ty) / (PX_PER_MM * c.zoom) };
 }
 
+/** Zoom to the level `zoom` (exactly, within the limits), keeping the board point under `anchor` (screen px) fixed. */
+export function zoomTo(c: Camera, zoom: number, anchor: Point): Camera {
+	const z = clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+	const k = z / c.zoom;
+	return { zoom: z, tx: anchor.x - (anchor.x - c.tx) * k, ty: anchor.y - (anchor.y - c.ty) * k };
+}
+
 /** Zoom by `factor`, keeping the board point under `anchor` (screen px) fixed. */
 export function zoomAt(c: Camera, factor: number, anchor: Point): Camera {
-	const zoom = clamp(c.zoom * factor, MIN_ZOOM, MAX_ZOOM);
-	const k = zoom / c.zoom;
-	return { zoom, tx: anchor.x - (anchor.x - c.tx) * k, ty: anchor.y - (anchor.y - c.ty) * k };
+	return zoomTo(c, c.zoom * factor, anchor);
 }
 
 export function panBy(c: Camera, dx: number, dy: number): Camera {

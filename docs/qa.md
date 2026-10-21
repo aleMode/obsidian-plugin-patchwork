@@ -70,3 +70,13 @@ Manual:
 - [ ] Zoom 100 % → 60 % → 100 %: text changes smoothly once the zoom settles, and is identical to before at 100 %.
 - [ ] Export to PDF and PNG: text looks exactly as before (no stroke, no brightening).
 - [ ] 2× display scaling (not available on the dev machine): the effect is subtler, text is not too heavy.
+
+## Zoom controls (2026-10-21)
+
+Automated: `scripts/e2e/zoomSteps.js` (stops from and between stops, limits, label resets to 100 % about the centre, a notch is 10 %, a fast notch is still 10 %, a small delta is proportional); `board.mjs` (Ctrl+wheel around the cursor).
+
+Manual:
+- [ ] Ctrl + mouse wheel: one notch changes the zoom by about 10 %, in both directions, around the cursor. A trackpad pinch still feels smooth and not slower than before.
+- [ ] + and -: from 100 % you get 125, 150, 200...; from a zoom the wheel left you on (say 67 %) the next stop (75 %, or 50 % with -). Nothing happens past 800 % or below 2 %.
+- [ ] Click the zoom label: exactly 100 % (A4 page about 794 px wide), centred on what was in the middle of the view. It has a hover state and the tooltip "Reset to 100%"; the toolbar does not shift as the number changes.
+- [ ] Use mode: the toolbar hides +/- and the label as before; Ctrl+wheel still zooms by 10 %.

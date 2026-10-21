@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { snapPoint, snapValue } from '../../src/model/snapping';
 import { PX_PER_MM } from '../../src/model/units';
-import { boardToScreen, fitCamera, MAX_ZOOM, panBy, screenToBoard, visibleRect, zoomAt } from '../../src/view/camera';
+import { boardToScreen, fitCamera, MAX_ZOOM, nextZoomStop, panBy, screenToBoard, visibleRect, wheelZoomFactor, ZOOM_STOPS, zoomAt, zoomTo } from '../../src/view/camera';
 
 const close = (a: { x: number; y: number }, b: { x: number; y: number }) => {
 	expect(a.x).toBeCloseTo(b.x, 6);
@@ -73,5 +73,55 @@ describe('saved view helpers', () => {
 		expect(back.x).toBeCloseTo(345);
 		expect(back.y).toBeCloseTo(678);
 		expect(c.zoom).toBe(0.75);
+	});
+});
+
+describe('zoom steps', () => {
+	it('the buttons step through the stops, from a stop or from between two', () => {
+		expect(nextZoomStop(1, 1)).toBe(1.25);
+		expect(nextZoomStop(1, -1)).toBe(0.75);
+		expect(nextZoomStop(0.67, 1)).toBe(0.75);
+		expect(nextZoomStop(0.67, -1)).toBe(0.5);
+		expect(nextZoomStop(1.6, 1)).toBe(2);
+	});
+
+	it('a zoom that only looks like a stop steps away from it', () => {
+		expect(nextZoomStop(0.9996, 1)).toBe(1.25);
+		expect(nextZoomStop(1.0004, -1)).toBe(0.75);
+	});
+
+	it('past the ends it goes to the zoom limits, and stays there', () => {
+		expect(nextZoomStop(MAX_ZOOM, 1)).toBe(MAX_ZOOM);
+		expect(nextZoomStop(0.03, -1)).toBe(0.02);
+		expect(nextZoomStop(0.03, 1)).toBe(0.05);
+	});
+
+	it('stops are ascending, 25 points apart through the useful range, within the limits', () => {
+		expect([...ZOOM_STOPS].sort((a, b) => a - b)).toEqual(ZOOM_STOPS);
+		const range = ZOOM_STOPS.filter((s) => s >= 0.25 && s <= 2);
+		expect(range.slice(1).map((s, i) => s - range[i]!)).toEqual([0.25, 0.25, 0.25, 0.25, 0.25, 0.5]);
+		expect(ZOOM_STOPS[ZOOM_STOPS.length - 1]).toBe(MAX_ZOOM);
+	});
+
+	it('zoomTo lands exactly on the level and keeps the anchor fixed', () => {
+		const cam = { tx: 100, ty: 50, zoom: 0.7287177328843994 };
+		const anchor = { x: 400, y: 300 };
+		const after = zoomTo(cam, 1, anchor);
+		expect(after.zoom).toBe(1);
+		close(screenToBoard(after, anchor), screenToBoard(cam, anchor));
+		expect(zoomTo(cam, 1000, anchor).zoom).toBe(MAX_ZOOM);
+	});
+
+	it('a mouse notch zooms by 10 % at most, in either direction', () => {
+		expect(wheelZoomFactor(-100)).toBeCloseTo(1.1, 10);
+		expect(wheelZoomFactor(100)).toBeCloseTo(1 / 1.1, 10);
+		expect(wheelZoomFactor(-120)).toBeCloseTo(1.1, 10);
+		expect(wheelZoomFactor(-1000)).toBeCloseTo(1.1, 10);
+	});
+
+	it('small deltas (trackpad pinch, smooth wheels) stay proportional', () => {
+		expect(wheelZoomFactor(-10)).toBeCloseTo(Math.exp(0.02), 10);
+		expect(wheelZoomFactor(3)).toBeCloseTo(Math.exp(-0.006), 10);
+		expect(wheelZoomFactor(0)).toBe(1);
 	});
 });

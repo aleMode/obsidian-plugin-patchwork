@@ -64,7 +64,8 @@ try {
 	await cdp.wheel(anchor.x, anchor.y, -300, MOD.ctrl);
 	await sleep(100);
 	const after = await inView(`const r = s.root.getBoundingClientRect(); const c = s.camera; const k = (96 / 25.4) * c.zoom; return { x: (${anchor.x} - r.left - c.tx) / k, y: (${anchor.y} - r.top - c.ty) / k, zoom: c.zoom };`);
-	check('Ctrl+wheel zooms in around the cursor', after.zoom > before.zoom * 1.5 && Math.abs(after.x - before.x) < 0.5 && Math.abs(after.y - before.y) < 0.5, { before, after });
+	// One event is capped at 10 %, however big its delta (zoomSteps.js covers the steps).
+	check('Ctrl+wheel zooms in around the cursor', Math.abs(after.zoom / before.zoom - 1.1) < 0.001 && Math.abs(after.x - before.x) < 0.5 && Math.abs(after.y - before.y) < 0.5, { before, after });
 
 	// Plain wheel pans; page data untouched.
 	const cam0 = await inView('return { ...s.camera };');
