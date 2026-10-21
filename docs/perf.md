@@ -88,3 +88,7 @@ Below 25 % zoom, outline boxes show previews kept from earlier renders (≤ 96 p
 ## Use mode (2026-10-20)
 
 Stress board with Use mode on: pan along a row at working zoom p50 16.6 ms, p95 25.1 ms, 3 frames > 50 ms per 240 (Arrange in the same session: same p50/p95, 6 frames); whole board p50 16.6 ms, p95 17.5 ms. Live content (pointer events on module bodies) costs nothing measurable.
+
+## Small-text legibility ramp (2026-10-21)
+
+Colour and stroke on every module body below 100 % zoom (`styles.css`). Stress board, 100 pages × 3 modules, the working zoom of the probe (about 77 %, boost about 0.46), one run without and two with the rule: pan along a row p50 16.3 / 11.3 / 16.8 ms, p95 27.7 / 33.1 / 19.7 ms, frames > 50 ms 4 / 5 / 1 per 240; whole board p50 17.3 / 17.1 / 16.8 ms, p95 19.5 / 19.4 / 19.8 ms; open zoomed to fit ~485 ms in all runs. Within the run-to-run variation seen before (the pan p95 has ranged 19–33 ms); no regression found. The rule restyles once per settled zoom, not per frame.

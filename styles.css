@@ -78,6 +78,30 @@
 	will-change: auto;
 }
 
+/* Small text on screen: below 100 % the strokes of body text are thinner than a pixel and draw dim and soft,
+   a limit of the pixel grid, not of the render. From 100 % down to 50 % the text eases toward full contrast
+   (away from the background, so it works on dark and light paper and on tinted cards) and gets a hairline
+   stroke. Nothing here touches layout, so wrapping still matches the export, which renders outside this
+   layer and never sees the rule. `--pw-zoom` is the settled zoom: one restyle per zoom, not per frame. */
+@supports (color: oklch(from red l c h)) {
+	.pw-board-layer {
+		--pw-boost: clamp(0, calc((1 - var(--pw-zoom)) * 2), 1);
+	}
+
+	/* The theme's colours are captured one level above where they are redefined: a variable cannot refer to itself. */
+	.pw-board-layer .pw-module {
+		--pw-ink: var(--text-normal);
+		--pw-ink-muted: var(--text-muted);
+	}
+
+	.pw-board-layer .pw-module-body {
+		--text-normal: oklch(from var(--pw-ink) calc(l + (clamp(0, (l - 0.5) * 100, 1) - l) * var(--pw-boost)) c h);
+		--text-muted: oklch(from var(--pw-ink-muted) calc(l + (clamp(0, (l - 0.5) * 100, 1) - l) * var(--pw-boost)) c h);
+		color: var(--text-normal);
+		-webkit-text-stroke: calc(var(--pw-boost) * 0.15px / var(--pw-zoom)) currentColor;
+	}
+}
+
 .pw-page {
 	position: absolute;
 	left: var(--pw-x);

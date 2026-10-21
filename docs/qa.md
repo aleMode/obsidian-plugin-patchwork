@@ -58,3 +58,15 @@ Manual:
 - [ ] A frame left empty (text all fits in the first) opens an empty editor; typing adds a paragraph at the end of the note.
 - [ ] The text area has a hairline of room from the module border, also on a module with a thick border.
 - [ ] Select a module by clicking it, press Delete (Canc) and Backspace: it goes, Ctrl+Z brings it back. Typing in the editor does not delete modules.
+
+## Small text on screen (2026-10-21)
+
+Automated: `scripts/e2e/legibility.js` (no change at 100 %, hairline stroke and a lighter colour on dark paper and a darker one on light paper at 60 %, full strength at 40 %, wrapping unchanged, a module's own text colour kept, nothing outside the board layer touched).
+
+Manual:
+- [ ] A dark-paper board (app theme) at 60 %: body text looks about as solid as at 115 %; headings and bullets too; no halo, nothing looks bold.
+- [ ] Same on the white paper: text is dark and solid, not grey.
+- [ ] A module with a text colour or a light tint keeps its colour (darker or lighter in the direction it already leans, never washed out).
+- [ ] Zoom 100 % → 60 % → 100 %: text changes smoothly once the zoom settles, and is identical to before at 100 %.
+- [ ] Export to PDF and PNG: text looks exactly as before (no stroke, no brightening).
+- [ ] 2× display scaling (not available on the dev machine): the effect is subtler, text is not too heavy.
