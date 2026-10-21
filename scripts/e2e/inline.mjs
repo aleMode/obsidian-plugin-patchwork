@@ -54,6 +54,7 @@ try {
 	// ---- text box
 	check('text box: a text area opens over it', await open('t'));
 	check('the rendered text is hidden and the area holds the markdown', await ev(`return document.querySelector('.pw-module[data-module-id="t"]').classList.contains('is-editing') && document.querySelector('.pw-inline-editor').value === 'hello'`));
+	check('the text area keeps a little room from the module border', await ev(`const c = getComputedStyle(document.querySelector('.pw-inline-editor')); return [c.paddingTop, c.paddingRight, c.paddingBottom, c.paddingLeft].every((p) => parseFloat(p) >= 1 && parseFloat(p) <= 3)`));
 	check('the context bar steps aside while editing', await ev(`const b = document.querySelector('.pw-context-bar'); return getComputedStyle(b).display === 'none' || b.classList.contains('is-hidden')`));
 	const before = await ev(`return JSON.stringify([v.store.file.pages[0].modules.length, mod('t').x, mod('t').y])`);
 	await ev(`const ta = document.querySelector('.pw-inline-editor'); for (const k of ['Delete', 'Backspace', 'ArrowRight']) ta.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true })); ${wait(200)}`);
@@ -112,6 +113,50 @@ try {
 	await key('Escape');
 	await editorGone();
 	check('a file changed under the editor is not overwritten', (await readNote()) === external, await readNote());
+
+	// ---- linked frames: a frame edits only the part of the chain's text it shows
+	const SRC = 'Alpha one\n\nBeta two\n\nGamma three\n\nDelta four';
+	await cdp.evaluate(`await app.vault.create('_e2e/chain.md', ${JSON.stringify('Para one\n\nPara two\n\nPara three\n\nPara four\n')});`);
+	await ev(`v.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: [...f.pages[0].modules,
+		{ id: 'ch', type: 'text', markdown: ${JSON.stringify(SRC)}, x: 110, y: 110, w: 80, h: 10 },
+		{ id: 'f1', type: 'frame', from: 'ch', x: 110, y: 125, w: 80, h: 40 },
+		{ id: 'cn', type: 'note', file: '_e2e/chain.md', x: 110, y: 170, w: 80, h: 10 },
+		{ id: 'f2', type: 'frame', from: 'cn', x: 110, y: 185, w: 80, h: 40 }] }] })); s.zoomToFit(); ${wait(1500)}`);
+	const part = (id) => ev(`return JSON.stringify(await s.modules.flowPart('${id}'))`).then((p) => JSON.parse(p));
+	check('a frame knows which stretch of the text it shows', await until(async () => !!(await part('f1')) && !!(await part('f2'))));
+	const p1 = await part('f1');
+	check('the head keeps the first blocks, the frame the rest', p1.from > 0 && p1.to > p1.from && p1.source === SRC, p1);
+
+	check('frame: a text area opens', await open('f1'));
+	check('it holds exactly the part the frame shows', (await ev(`return document.querySelector('.pw-inline-editor').value`)) === SRC.slice(p1.from, p1.to));
+	await type(SRC.slice(p1.from, p1.to).toUpperCase());
+	await key('Escape');
+	await editorGone();
+	check('only that part of the head text changed', await until(async () => (await ev(`return mod('ch').markdown`)) === SRC.slice(0, p1.from) + SRC.slice(p1.from, p1.to).toUpperCase() + SRC.slice(p1.to)), await ev(`return mod('ch').markdown`));
+	check('and the frame shows the new text', await until(async () => (await text('f1')).includes(SRC.slice(p1.from, p1.to).toUpperCase().split('\n')[0])));
+	await ev(`v.store.undo();`);
+	check('the frame edit is one undo step', await until(async () => (await ev(`return mod('ch').markdown`)) === SRC));
+
+	const p2 = await part('f2');
+	const CHAIN = 'Para one\n\nPara two\n\nPara three\n\nPara four';
+	check('note chain: the frame holds part of the note', p2.from > 0 && p2.source === CHAIN, p2);
+	check('note chain: a text area opens in the frame', await open('f2'));
+	const edited = CHAIN.slice(p2.from, p2.to).replace('Para', 'PARA');
+	await type(edited);
+	await key('Escape');
+	await editorGone();
+	const chainFile = () => cdp.evaluate(`return await app.vault.read(app.vault.getAbstractFileByPath('_e2e/chain.md'))`);
+	check('only that part of the note file was rewritten', await until(async () => (await chainFile()) === CHAIN.slice(0, p2.from) + edited + CHAIN.slice(p2.to) + '\n'), await chainFile());
+
+	await ev(`s.select({ pageId: 'a', moduleId: 'f1' }); s.focusBoard(); ${wait(300)} document.querySelector('.pw-board').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));`);
+	check('Enter on a selected frame edits it', await until(editing, 15000));
+	await key('Escape');
+	await editorGone();
+	await dbl('f1');
+	check('double-click on a frame edits it', await until(editing, 15000));
+	await key('Escape');
+	await editorGone();
+	await ev(`v.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: f.pages[0].modules.filter((m) => !['ch', 'f1', 'cn', 'f2'].includes(m.id)) }] }));`);
 
 	// ---- frozen and unmounting
 	await ev(`s.editInline('a', 'z'); ${wait(800)}`);

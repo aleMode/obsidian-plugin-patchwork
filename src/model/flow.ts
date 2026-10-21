@@ -8,10 +8,29 @@ import { contentBox, textScale } from './style';
 export interface Block {
 	text: string;
 	heading: boolean;
+	/** Where the block sits in the markdown it was cut from: `markdown.slice(from, to)`. */
+	from: number;
+	to: number;
 }
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const HEADING = /^ {0,3}#{1,6}(\s|$)/;
+
+interface Line {
+	text: string;
+	from: number;
+}
+
+/** Lines without their line ends, each with the offset it starts at. */
+function splitLines(markdown: string): Line[] {
+	const lines: Line[] = [];
+	for (let at = 0; ; ) {
+		const nl = markdown.indexOf('\n', at);
+		lines.push({ text: markdown.slice(at, nl < 0 ? markdown.length : nl).replace(/\r$/, ''), from: at });
+		if (nl < 0) return lines;
+		at = nl + 1;
+	}
+}
 
 /**
  * Top-level markdown blocks: runs of lines separated by blank lines, with headings on their own and
@@ -19,29 +38,32 @@ const HEADING = /^ {0,3}#{1,6}(\s|$)/;
  */
 export function splitBlocks(markdown: string): Block[] {
 	const blocks: Block[] = [];
-	let cur: string[] = [];
+	let cur: Line[] = [];
 	const flush = () => {
-		if (cur.length) blocks.push({ text: cur.join('\n'), heading: cur.length === 1 && HEADING.test(cur[0]!) });
+		if (cur.length) {
+			const last = cur[cur.length - 1]!;
+			blocks.push({ text: cur.map((l) => l.text).join('\n'), heading: cur.length === 1 && HEADING.test(cur[0]!.text), from: cur[0]!.from, to: last.from + last.text.length });
+		}
 		cur = [];
 	};
-	const lines = markdown.split(/\r?\n/);
+	const lines = splitLines(markdown);
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i]!;
-		const fence = FENCE.exec(line)?.[1];
-		const math = line.trim() === '$$';
+		const fence = FENCE.exec(line.text)?.[1];
+		const math = line.text.trim() === '$$';
 		if (fence || math) {
 			// Everything up to the closing fence is one block.
 			const close = (l: string) => (fence ? l.trim().startsWith(fence[0]!.repeat(fence.length)) : l.trim() === '$$');
 			const body = [line];
 			while (++i < lines.length) {
 				body.push(lines[i]!);
-				if (close(lines[i]!)) break;
+				if (close(lines[i]!.text)) break;
 			}
 			flush();
 			cur = body;
 			flush();
-		} else if (line.trim() === '') flush();
-		else if (HEADING.test(line)) {
+		} else if (line.text.trim() === '') flush();
+		else if (HEADING.test(line.text)) {
 			flush();
 			cur = [line];
 			flush();
@@ -49,6 +71,27 @@ export function splitBlocks(markdown: string): Block[] {
 	}
 	flush();
 	return blocks;
+}
+
+/** The stretch of the markdown a frame shows, given the blocks [start, end) it was assigned; empty (at the end) for a frame with no text. */
+export function partOf(blocks: readonly Pick<Block, 'from' | 'to'>[], range: readonly [number, number], length: number): { from: number; to: number } {
+	const [start, end] = range;
+	if (start >= end) {
+		const at = blocks[start]?.from ?? length;
+		return { from: at, to: at };
+	}
+	return { from: blocks[start]!.from, to: blocks[end - 1]!.to };
+}
+
+/**
+ * Put an edited part back into the markdown it was cut from. Text typed into a frame that showed
+ * nothing becomes a block of its own after the existing text, so it never runs into the last paragraph.
+ */
+export function splicePart(source: string, part: { from: number; to: number }, value: string): string {
+	if (part.from < part.to) return source.slice(0, part.from) + value + source.slice(part.to);
+	if (!value.trim()) return source;
+	const before = source.slice(0, part.from).trimEnd();
+	return (before ? `${before}\n\n` : '') + value + source.slice(part.to);
 }
 
 /**

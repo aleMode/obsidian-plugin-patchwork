@@ -410,9 +410,10 @@ export class BoardViewport implements BoardSurface {
 		this.popover.show(tab);
 	}
 
-	/** Open the source of a note module in a pane, at its section. */
+	/** Open the source of a note module in a pane, at its section; a frame opens the note its chain starts from. */
 	openNote(pageId: string, moduleId: string) {
-		const m = findModule(this.store.file, pageId, moduleId);
+		const found = findModule(this.store.file, pageId, moduleId);
+		const m = found?.type === 'frame' ? this.chainHead(found.id) : found;
 		if (m?.type !== 'note') return;
 		const note = m as NoteModule;
 		void this.view.app.workspace.openLinkText(`${note.file}${note.subpath ?? ''}`, this.view.file?.path ?? '', 'split');
@@ -1539,19 +1540,14 @@ export class BoardViewport implements BoardSurface {
 		new Notice(`Patchwork can't place .${ext} files yet.`);
 	}
 
-	/** Double-click: a note module opens its source at that section; a PDF module opens the crop editor (SPEC 5.6). */
+	/** Double-click: a text, note or frame module edits its text in place; a PDF module opens the crop editor (SPEC 5.6). */
 	private onDoubleClick(e: MouseEvent) {
 		if (this.useMode) return;
 		// The pointer is captured by the board on press, which retargets the click events to the board itself.
 		const hit = this.hit(e, (this.root.doc.elementFromPoint(e.clientX, e.clientY) ?? e.target) as HTMLElement);
 		const m = hit?.moduleId ? findModule(this.store.file, hit.pageId, hit.moduleId) : undefined;
 		if (hit?.moduleId && m?.type === 'pdf') return this.editCrop(hit.pageId, hit.moduleId);
-		if (hit?.moduleId && canEditInline(m)) return this.editInline(hit.pageId, hit.moduleId);
-		// A frame opens the note its chain starts from.
-		const note = (m?.type === 'frame' ? this.chainHead(m.id) : m) as NoteModule | undefined;
-		if (note?.type !== 'note') return;
-		const page = this.store.file.pages.find((p) => p.modules.some((x) => x.id === note.id));
-		if (page) this.openNote(page.id, note.id);
+		if (hit?.moduleId && canEditInline(m)) this.editInline(hit.pageId, hit.moduleId);
 	}
 
 	/** Edit a text box or note in place (double-click, Enter, or Edit on the context bar). */

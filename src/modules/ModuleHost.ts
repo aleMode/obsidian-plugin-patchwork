@@ -76,6 +76,7 @@ export class ModuleHost {
 	private frame = 0;
 	private component = new Component();
 	private ctx: ModuleContext;
+	private flowLayout: FlowLayout;
 	/** Linked-frame chains of the current file, recomputed when the file changes. */
 	private chains: { file: unknown; map: Map<string, FlowInfo> } = { file: null, map: new Map() };
 	selectedModules: ReadonlySet<string> = new Set();
@@ -86,6 +87,7 @@ export class ModuleHost {
 	constructor(private o: ModuleHostOptions) {
 		const layout = new FlowLayout(o.ctx.app, o.boardPath, () => o.store.file.board.fontFamily, o.ctx.pdfDocs);
 		const replace = o.replaceSource;
+		this.flowLayout = layout;
 		this.ctx = {
 			...o.ctx,
 			component: this.component,
@@ -348,6 +350,12 @@ export class ModuleHost {
 		m.renderer?.destroy();
 		m.el.remove();
 		this.mounted.delete(id);
+	}
+
+	/** Which stretch of its chain's text a linked module shows (see FlowLayout.part); null when it isn't in a working chain. */
+	flowPart(id: string): ReturnType<FlowLayout['part']> {
+		const info = this.flowInfo().get(id);
+		return info?.ok ? this.flowLayout.part(info.chain, info.index) : Promise.resolve(null);
 	}
 
 	/** The markdown a mounted module shows (see ModuleRenderer.shownMarkdown). */

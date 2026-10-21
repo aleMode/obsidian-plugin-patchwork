@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chainSignature, fitCount, flowChains, placeNextFrame, splitBlocks } from '../../src/model/flow';
+import { chainSignature, fitCount, flowChains, partOf, placeNextFrame, splicePart, splitBlocks } from '../../src/model/flow';
 import type { AnyModule } from '../../src/model/schema';
 
 describe('splitBlocks', () => {
@@ -16,6 +16,42 @@ describe('splitBlocks', () => {
 
 	it('ignores extra blank lines', () => {
 		expect(splitBlocks('\n\nA\n\n\n\nB\n\n').map((x) => x.text)).toEqual(['A', 'B']);
+	});
+
+	it('records where each block sits in the source, line ends included or not', () => {
+		for (const eol of ['\n', '\r\n']) {
+			const src = ['# T', 'one', 'two', '', '```', 'a', '', 'b', '```', 'end'].join(eol);
+			for (const b of splitBlocks(src)) expect(src.slice(b.from, b.to).replace(/\r\n/g, '\n')).toBe(b.text);
+		}
+	});
+});
+
+describe('partOf and splicePart', () => {
+	const src = 'one\n\ntwo\nlines\n\nthree';
+	const blocks = splitBlocks(src);
+
+	it('cuts out the blocks a frame shows', () => {
+		const part = partOf(blocks, [1, 3], src.length);
+		expect(src.slice(part.from, part.to)).toBe('two\nlines\n\nthree');
+		expect(src.slice(partOf(blocks, [0, 1], src.length).from, partOf(blocks, [0, 1], src.length).to)).toBe('one');
+	});
+
+	it('puts an edited part back without touching the rest', () => {
+		const part = partOf(blocks, [1, 2], src.length);
+		expect(splicePart(src, part, 'TWO')).toBe('one\n\nTWO\n\nthree');
+	});
+
+	it('leaves the text alone when an empty frame stays empty', () => {
+		const part = partOf(blocks, [3, 3], src.length);
+		expect(part).toEqual({ from: src.length, to: src.length });
+		expect(splicePart(src, part, '  ')).toBe(src);
+	});
+
+	it('adds text typed into an empty frame as a block of its own', () => {
+		const part = partOf(blocks, [3, 3], src.length);
+		expect(splicePart(`${src}\n`, { from: src.length + 1, to: src.length + 1 }, 'more')).toBe(`${src}\n\nmore`);
+		expect(splicePart(src, part, 'more')).toBe(`${src}\n\nmore`);
+		expect(splicePart('', { from: 0, to: 0 }, 'first')).toBe('first');
 	});
 });
 

@@ -1501,7 +1501,8 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	height: 100%;
 	box-sizing: border-box;
 	margin: 0;
-	padding: 0;
+	/* A hair of room so the typed text doesn't touch the module's border. */
+	padding: 2px;
 	resize: none;
 	overflow: auto;
 	border: none;

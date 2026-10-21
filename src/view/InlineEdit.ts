@@ -1,4 +1,5 @@
 import { type App, Notice, setIcon, TFile } from 'obsidian';
+import { flowChains, splicePart } from '../model/flow';
 import { insertLink, type LineStyle, type Replace, toggleLines, toggleWrap } from '../model/mdFormat';
 import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import type { ModuleHost } from '../modules/ModuleHost';
@@ -21,28 +22,71 @@ export interface InlineEditDeps {
 	onCameraMove: (fn: () => void) => () => void;
 }
 
-/** Modules whose text can be edited where they sit: a text box (its markdown lives in the patchwork) or a note. */
+/** Modules whose text can be edited where they sit: a text box (its markdown lives in the patchwork), a note, or a frame continuing one. */
 export function canEditInline(m: AnyModule | undefined): boolean {
-	return m?.type === 'text' || m?.type === 'note';
+	return m?.type === 'text' || m?.type === 'note' || m?.type === 'frame';
+}
+
+/** The box the editor opens in, and the stretch of the source text it shows (all of it when unset). */
+interface Target {
+	id: string;
+	part?: { from: number; to: number; source: string };
 }
 
 /**
- * Edit a text or note module in place, as raw markdown in a text area over the module (it scales
+ * Edit a text, note or frame module in place, as raw markdown in a text area over the module (it scales
  * with the page). A text box saves into the patchwork as one undo step; a note is written back to its
- * file, only the part the module shows. Escape or clicking away finishes.
+ * file, only the part the module shows. A module in a chain of linked frames edits just the part of the
+ * text it shows, and the rest of the chain's text is left as it was. Escape or clicking away finishes.
  */
 export async function editInline(d: InlineEditDeps, pageId: string, moduleId: string): Promise<boolean> {
 	const m = findModule(d.store.file, pageId, moduleId);
 	if (!m || d.store.readOnly) return false;
-	if (m.type === 'text') {
-		const save = (value: string) => d.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, markdown: value })));
-		return open(d, moduleId, (m as TextModule).markdown, save);
+	const info = flowChains(d.store.file).get(moduleId);
+	if (info && !info.ok) {
+		new Notice(info.reason);
+		return false;
 	}
-	if (m.type === 'note') return editNote(d, pageId, m as NoteModule);
+	if (!info) return m.type === 'frame' ? false : editSource(d, pageId, m, { id: moduleId });
+	const part = await d.modules.flowPart(moduleId);
+	if (!part) {
+		new Notice('Zoom in on the item to edit it.');
+		return false;
+	}
+	const head = info.chain[0]!;
+	return editSource(d, head.pageId, head.module, { id: moduleId, part });
+}
+
+/** Edit the text that `source` (a text box or a note) holds, in the box of `target`. */
+function editSource(d: InlineEditDeps, pageId: string, source: AnyModule, target: Target): Promise<boolean> | boolean {
+	if (source.type === 'note') return editNote(d, pageId, source as NoteModule, target);
+	if (source.type !== 'text') return false;
+	const markdown = (source as TextModule).markdown;
+	if (target.part && target.part.source !== markdown) return changedNotice();
+	const save = (value: string) => {
+		let stale = false;
+		d.store.update((f) =>
+			mapModule(f, pageId, source.id, (x) => {
+				const current = (x as TextModule).markdown;
+				// The part's offsets only fit the text they were measured on.
+				if (target.part && current !== markdown) {
+					stale = true;
+					return x;
+				}
+				return { ...x, markdown: target.part ? splicePart(current, target.part, value) : value };
+			}),
+		);
+		if (stale) new Notice('The text changed while you were editing, so nothing was saved.');
+	};
+	return open(d, target.id, target.part ? markdown.slice(target.part.from, target.part.to) : markdown, save);
+}
+
+function changedNotice(): false {
+	new Notice('The text changed while it was being laid out. Try again.');
 	return false;
 }
 
-async function editNote(d: InlineEditDeps, pageId: string, note: NoteModule): Promise<boolean> {
+async function editNote(d: InlineEditDeps, pageId: string, note: NoteModule, target: Target): Promise<boolean> {
 	if (note.frozen) {
 		new Notice('This note is frozen. Unfreeze it to edit the note itself.');
 		return false;
@@ -60,8 +104,12 @@ async function editNote(d: InlineEditDeps, pageId: string, note: NoteModule): Pr
 	}
 	const { start, end } = sliceBounds(text, range, { ...(note.includeHeading === undefined ? {} : { includeHeading: note.includeHeading }), ...(note.lines ? { lines: note.lines } : {}) });
 	const initial = text.slice(start, end);
+	const { part } = target;
+	if (part && part.source !== initial) return changedNotice();
 
-	const save = async (value: string) => {
+	const save = async (edited: string) => {
+		// A frame edited only its part of the section; the rest of the section stays as it was.
+		const value = part ? splicePart(initial, part, edited) : edited;
 		let changedUnderneath = false;
 		await d.app.vault.process(file, (current) => {
 			// Never overwrite something that changed while the text area was open.
@@ -79,7 +127,7 @@ async function editNote(d: InlineEditDeps, pageId: string, note: NoteModule): Pr
 		followRenamedHeading(d, pageId, note, initial, value);
 		await metadataUpdated(d.app, file.path);
 	};
-	return open(d, note.id, initial, save);
+	return open(d, target.id, part ? initial.slice(part.from, part.to) : initial, save);
 }
 
 /** The module points at its section by heading; if that heading was retyped, point at the new one. */

@@ -502,3 +502,6 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Note field `scrollY` (mm, clip policy only): the box shows a later part of a note too long for it. Set with the mouse wheel over the selected note (one undo step per burst) or in Properties; applied on screen and in export.
   - *Continue in a new frame* puts the frame on the same page, in free space beside or under the chain's last frame (shrunk to the strip left, or offset on top if none), instead of adding or using the next page.
   - The section step of the note picker has a back arrow to choose another note.
+- **v0.13 · 2026-10-21 (QA round)**
+  - A frame's text is editable in place, like a text box or note: double-click, Enter or *Edit* on its context bar. A module in a chain of linked frames edits only the part of the text it shows (the head note's file or the head text box is rewritten there only; the rest of the chain's text is untouched, one undo step for text). A frame that shows nothing yet adds what is typed as a new block at the end. Double-click on a frame no longer opens the source note; the frame's context bar has *Open* for that.
+  - The inline editor keeps 2 px of room inside the module's border.

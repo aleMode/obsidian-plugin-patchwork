@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownRenderer } from 'obsidian';
-import { type Block, chainSignature, fitCount, type FlowInfo, type FlowMember, splitBlocks } from '../model/flow';
+import { type Block, chainSignature, fitCount, type FlowInfo, type FlowMember, partOf, splitBlocks } from '../model/flow';
 import type { NoteModule, TextModule } from '../model/schema';
 import { contentBox, textScale } from '../model/style';
 import { loadNoteContent } from '../sources/markdownSource';
@@ -11,6 +11,8 @@ import { renderPdfEmbeds } from './pdfEmbed';
 // rendered offscreen at the frame's width, exactly as the frame will show it, until one overflows.
 
 export interface FlowResult {
+	/** The head's markdown that `blocks` were cut from. */
+	markdown: string;
 	blocks: Block[];
 	/** Per chain member: the blocks [start, end) it shows. */
 	ranges: [number, number][];
@@ -59,11 +61,18 @@ export class FlowLayout {
 		this.latest.set(head, key);
 		let result = this.cache.get(key);
 		if (!result) {
-			result = this.afterQuiet(key, head, () => this.measure(splitBlocks(content.markdown), chain, content.sourcePath, font));
+			result = this.afterQuiet(key, head, () => this.measure(content.markdown, chain, content.sourcePath, font));
 			this.cache.set(key, result);
 			if (this.cache.size > CACHE_SIZE) this.cache.delete(this.cache.keys().next().value!);
 		}
 		return result;
+	}
+
+	/** The stretch of the head's markdown that chain member `index` shows, for editing just that frame's text; null when the chain can't be laid out. */
+	async part(chain: readonly FlowMember[], index: number): Promise<{ from: number; to: number; source: string } | null> {
+		const r = await this.layout(chain);
+		if ('error' in r) return null;
+		return { ...partOf(r.blocks, r.ranges[index]!, r.markdown.length), source: r.markdown };
 	}
 
 	/** Measure unless a newer layout of the same chain was asked for meanwhile; then that one answers. */
@@ -84,7 +93,8 @@ export class FlowLayout {
 		return c.ok ? { markdown: c.markdown, sourcePath: c.file.path } : { error: c.reason };
 	}
 
-	private async measure(blocks: Block[], chain: readonly FlowMember[], sourcePath: string, font: string | undefined): Promise<FlowResult> {
+	private async measure(markdown: string, chain: readonly FlowMember[], sourcePath: string, font: string | undefined): Promise<FlowResult> {
+		const blocks = splitBlocks(markdown);
 		const root = activeDocument.body.createDiv({ cls: 'pw-flow-measure pw-paper theme-light' });
 		if (font) {
 			root.addClass('has-board-font');
@@ -122,7 +132,7 @@ export class FlowLayout {
 				start += n;
 				body.remove();
 			}
-			return { blocks, ranges, leftover: start < blocks.length, sourcePath };
+			return { markdown, blocks, ranges, leftover: start < blocks.length, sourcePath };
 		} finally {
 			component.unload();
 			root.remove();

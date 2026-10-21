@@ -48,3 +48,13 @@ Automated: `scripts/e2e/pdfembed.js` (8 checks: no Obsidian viewer, page drawn a
 Manual:
 - [ ] A note with `![[some.pdf#page=N]]` in a note module: the note's text shows, the page appears where the embed is, crisp a moment after zooming in (redrawn when the zoom settles, like PDF modules).
 - [ ] Export at best quality: the embedded page is sharp and its text selectable in a PDF viewer; at small quality it is a picture.
+
+## Editing frames in place, editor padding, Delete key (2026-10-21)
+
+Automated: `scripts/e2e/inline.mjs` (frame editors open on exactly the part the frame shows, splice back into the head text box and the head note file, Enter and double-click trigger it, one undo step, editor padding); Delete on a selection is in `select.mjs` and `board.mjs`.
+
+Manual:
+- [ ] Second frame of a long note: double-click it, change a word, Escape. Only that word changes in the note file; the first frame is unchanged.
+- [ ] A frame left empty (text all fits in the first) opens an empty editor; typing adds a paragraph at the end of the note.
+- [ ] The text area has a hairline of room from the module border, also on a module with a thick border.
+- [ ] Select a module by clicking it, press Delete (Canc) and Backspace: it goes, Ctrl+Z brings it back. Typing in the editor does not delete modules.
