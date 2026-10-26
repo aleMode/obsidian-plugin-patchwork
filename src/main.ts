@@ -108,6 +108,7 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('add-text', 'Add text box to page', (v) => v.addText(), true);
 		this.addBoardCommand('add-image', 'Add image to page', (v) => v.pickImage(), true);
 		this.addBoardCommand('add-toc', 'Add table of contents to page', (v) => v.addToc(), true);
+		this.addBoardCommand('add-shape', 'Draw shape on page', (v) => v.showShapeMenu(), true);
 		this.addBoardCommand('add-tracker', 'Add tracker to page', (v) => v.showTrackerMenu(), true);
 		this.addBoardCommand('continue-frame', 'Continue selected text in a new frame', (v) => v.continueSelectionInFrame(), true);
 		this.addBoardCommand('zoom-to-fit', 'Zoom to fit', (v) => v.zoomToFit());

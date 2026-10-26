@@ -1671,3 +1671,81 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	width: 100%;
 	height: 100%;
 }
+
+/* ---------- shapes ---------- */
+
+/* Strokes can sit on the box edge (and lines run to its corners), so they may overflow it a little. */
+.pw-module:has(> .pw-module-shape) {
+	overflow: visible;
+	/* Only the painted parts of a shape take clicks (below), so an unfilled box or a diagonal line
+	   does not block whatever is underneath it. */
+	pointer-events: none;
+}
+
+.pw-module-shape {
+	overflow: visible;
+}
+
+.pw-shape-svg {
+	display: block;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.pw-shape-svg .pw-shape-paint {
+	pointer-events: visiblePainted;
+}
+
+/* Invisible, wider than the outline so a hairline is easy to grab (about 8 screen px at the settled zoom). */
+.pw-shape-svg .pw-shape-hit {
+	fill: none;
+	stroke: transparent;
+	stroke-width: max(var(--pw-sw), calc(8 / 3.78 / var(--pw-zoom, 1)));
+	pointer-events: stroke;
+}
+
+.pw-use .pw-shape-svg *,
+.pw-print-host .pw-shape-svg * {
+	pointer-events: none;
+}
+
+.pw-skeleton-shape {
+	background: none;
+	border: none;
+}
+
+.pw-skeleton-shape .pw-shape-svg {
+	pointer-events: none;
+}
+
+/* Line endpoints take the place of the eight box handles. */
+.pw-selection .pw-endpoint {
+	display: none;
+	position: absolute;
+	width: calc(11px / var(--pw-zoom));
+	height: calc(11px / var(--pw-zoom));
+	margin: calc(-5.5px / var(--pw-zoom));
+	box-sizing: border-box;
+	background: var(--background-primary);
+	border: calc(1.5px / var(--pw-zoom)) solid var(--interactive-accent);
+	border-radius: 50%;
+	cursor: crosshair;
+	pointer-events: auto;
+}
+
+.pw-selection.is-line .pw-handle {
+	display: none;
+}
+
+.pw-selection.is-line .pw-endpoint {
+	display: block;
+}
+
+/* Drawing a shape: the next drag on a page makes one. */
+.pw-board.is-drawing,
+.pw-board.is-drawing .pw-page,
+.pw-board.is-drawing .pw-module {
+	cursor: crosshair;
+}

@@ -3,6 +3,7 @@ import { isInheritedId, resolvePage } from '../model/masters';
 import { type AnyModule, isKnownModule, type NoteModule, type Page, type TrackerModule } from '../model/schema';
 import type { BoardStore } from '../store/BoardStore';
 import { ImageModuleRenderer } from './imageModule';
+import { drawShape, ShapeRenderer } from './shapeModule';
 import { FlowRenderer, NoteModuleRenderer, TextModuleRenderer } from './noteModule';
 import { FlowLayout } from './flowLayout';
 import { chainSignature, type FlowInfo, flowChains } from '../model/flow';
@@ -24,6 +25,7 @@ const CONTENT_KEYS: Record<string, readonly string[]> = {
 	image: ['file', 'fit'],
 	toc: ['heading'],
 	tracker: ['kind', 'label', 'value', 'min', 'max', 'step', 'items'],
+	shape: ['shape', 'fill', 'stroke', 'radius', 'p1', 'p2', 'startHead', 'endHead', 'w', 'h'],
 };
 
 /**
@@ -185,7 +187,7 @@ export class ModuleHost {
 		const { app } = this.o.ctx;
 		const thumbs = this.o.ctx.thumbs;
 		const thumbKeys = page.modules.map((m) => (thumbs ? ThumbnailCache.key(app, m) : undefined));
-		const key = JSON.stringify(page.modules.map((m, i) => [m.type, m.x, m.y, m.w, m.h, m.fit, m.invert, thumbKeys[i] && thumbs?.has(thumbKeys[i])]));
+		const key = JSON.stringify(page.modules.map((m, i) => (m.type === 'shape' ? m : [m.type, m.x, m.y, m.w, m.h, m.fit, m.invert, thumbKeys[i] && thumbs?.has(thumbKeys[i])])));
 		const existing = this.skeletons.get(page.id);
 		if (existing?.key === key && existing.el.parentElement === paper) return;
 		existing?.el.remove();
@@ -193,6 +195,8 @@ export class ModuleHost {
 		page.modules.forEach((m, i) => {
 			const box = el.createDiv({ cls: `pw-module-skeleton pw-skeleton-${m.type}` });
 			box.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm` });
+			// Shapes are cheap and a bare box would misrepresent a line, so they are drawn as they are.
+			if (isKnownModule(m) && m.type === 'shape') return drawShape(box, m);
 			const url = thumbKeys[i] ? thumbs?.url(thumbKeys[i]) : undefined;
 			if (!url) return;
 			const img = box.createEl('img', { cls: ['pw-skeleton-thumb', `pw-fit-${typeof m.fit === 'string' ? m.fit : 'contain'}`], attr: { src: url, alt: '', draggable: 'false' } });
@@ -279,6 +283,8 @@ export class ModuleHost {
 				return new TocModuleRenderer(body, () => tocEntries(this.o.store.file, pageId));
 			case 'frame':
 				return new FlowRenderer(body, this.ctx);
+			case 'shape':
+				return new ShapeRenderer(body);
 			case 'tracker': {
 				const store = this.o.store;
 				// Clicks are ordinary edits: undoable and saved with the board.

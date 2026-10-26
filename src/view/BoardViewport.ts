@@ -9,7 +9,8 @@ import { bounds, containsPoint, type Handle, inset, intersects, keepGrabbable, t
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule, TrackerModule } from '../model/schema';
+import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule, ShapeModule, TrackerModule } from '../model/schema';
+import { constrainAngle, isLine, lineFromEnds, linePoints, SHAPE_PRESETS, type ShapePreset, shapeAtClick, shapeFromDrag } from '../model/shapes';
 import { flowChains, placeNextFrame } from '../model/flow';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
@@ -79,6 +80,10 @@ type Drag =
 	| { kind: 'page'; id: string; startPointer: Point; startPos: Point; group: Group }
 	| { kind: 'module'; pageId: string; id: string; startPointer: Point; startPos: Point; group: Group }
 	| { kind: 'resize'; target: Item; handle: Handle; startPointer: Point; start: Rect }
+	/** Dragging one end of a line; `fixed` is the other end (page mm). */
+	| { kind: 'endpoint'; pageId: string; id: string; end: 1 | 2; fixed: Point }
+	/** Drawing a new shape from `origin` (page mm); `id` is set once the drag has made it. */
+	| { kind: 'draw'; pageId: string; preset: ShapePreset; origin: Point; id: string | null }
 	| { kind: 'marquee'; start: Point; onPage: Item | null };
 
 const sameItem = (a: Item, b: Item) => a.pageId === b.pageId && a.moduleId === b.moduleId;
@@ -154,6 +159,9 @@ export class BoardViewport implements BoardSurface {
 	/** Use mode (a dashboard): content is live, nothing can be selected or moved. See docs/use-mode-plan.md. */
 	private useMode = false;
 	private modeButtons: { arrange: HTMLElement; use: HTMLElement } | null = null;
+	/** The shape the next drag on a page draws (set from the Shape menu), or null. */
+	private tool: ShapePreset | null = null;
+	private shapeButton: HTMLElement | null = null;
 	private live: LiveContent;
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
@@ -166,6 +174,7 @@ export class BoardViewport implements BoardSurface {
 		this.guideLayer = this.layer.createDiv({ cls: 'pw-guides' });
 		this.marqueeEl = this.layer.createDiv({ cls: 'pw-marquee is-hidden' });
 		for (const h of HANDLES) this.selectionBox.createDiv({ cls: `pw-handle pw-handle-${h}`, attr: { 'data-handle': h } });
+		for (const end of [1, 2]) this.selectionBox.createDiv({ cls: 'pw-endpoint', attr: { 'data-end': String(end) } });
 		this.modules = new ModuleHost({
 			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, ...(services.thumbs ? { thumbs: services.thumbs } : {}), resolution: () => this.resolution() },
 			store,
@@ -286,6 +295,21 @@ export class BoardViewport implements BoardSurface {
 		if (!show) return;
 		const { x, y, w, h } = sel.rect;
 		this.selectionBox.setCssProps({ '--pw-x': `${x}mm`, '--pw-y': `${y}mm`, '--pw-w': `${w}mm`, '--pw-h': `${h}mm` });
+		this.placeEndpoints();
+	}
+
+	/** A selected line shows a handle on each end instead of the eight box handles. */
+	private placeEndpoints() {
+		const sel = this.selection;
+		const m = sel?.moduleId ? findModule(this.store.file, sel.pageId, sel.moduleId) : undefined;
+		const line = !!m && isLine(m);
+		this.selectionBox.toggleClass('is-line', line);
+		if (!line) return;
+		const shape = m as ShapeModule;
+		linePoints(shape).forEach((p, i) => {
+			const el = this.selectionBox.querySelector<HTMLElement>(`.pw-endpoint[data-end="${i + 1}"]`);
+			el?.setCssProps({ left: `${(p.x / shape.w) * 100}%`, top: `${(p.y / shape.h) * 100}%` });
+		});
 	}
 
 	private exists(it: Item): boolean {
@@ -361,6 +385,7 @@ export class BoardViewport implements BoardSurface {
 	private applyMode(on: boolean) {
 		if (on === this.useMode) return;
 		this.useMode = on;
+		if (on) this.setTool(null);
 		this.host.toggleClass('pw-use', on);
 		this.modeButtons?.arrange.toggleClass('is-active', !on);
 		this.modeButtons?.use.toggleClass('is-active', on);
@@ -1156,8 +1181,10 @@ export class BoardViewport implements BoardSurface {
 	private onPointerDown(e: PointerEvent) {
 		if (this.useMode) return this.onUsePointerDown(e);
 		this.root.focus();
+		if (this.tool && e.button === 0 && !this.spaceHeld && this.startDraw(e)) return;
 		// Tracker controls take plain clicks; Shift and the other buttons still select and drag.
 		if (e.button === 0 && !e.shiftKey && !this.spaceHeld && (e.target as HTMLElement).closest('.pw-interactive')) return;
+		if (e.button === 0 && this.startEndpointDrag(e)) return;
 		const handle = (e.target as HTMLElement).closest<HTMLElement>('.pw-handle')?.dataset.handle as Handle | undefined;
 		// A handle sitting on a tracker control (content that fills the module) must not swallow the click.
 		const control = handle && e.button === 0 && !e.shiftKey ? this.root.doc.elementsFromPoint(e.clientX, e.clientY).find((el): el is HTMLElement => el.instanceOf(HTMLElement) && el.classList.contains('pw-interactive')) : undefined;
@@ -1252,6 +1279,8 @@ export class BoardViewport implements BoardSurface {
 		const p = screenToBoard(this.camera, this.local(e));
 		const grid = this.store.file.board.grid;
 		if (d.kind === 'resize') return this.resizeTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
+		if (d.kind === 'endpoint') return this.moveEndpoint(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
+		if (d.kind === 'draw') return this.drawTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
 		if (d.kind === 'marquee') return this.drawMarquee(d.start, p);
 		const raw = { x: d.startPos.x + p.x - d.startPointer.x, y: d.startPos.y + p.y - d.startPointer.y };
 		const pos = this.snapMove(d, raw, grid, e.altKey);
@@ -1388,6 +1417,7 @@ export class BoardViewport implements BoardSurface {
 		if (!this.drag) return;
 		if (this.drag.kind === 'module' && this.drag.group.length === 0) this.reparent(this.drag);
 		if (this.drag.kind === 'marquee') this.finishMarquee(this.drag, screenToBoard(this.camera, this.local(e)));
+		if (this.drag.kind === 'draw') this.finishDraw(this.drag);
 		this.drag = null;
 		this.guideLayer.empty();
 		this.store.endCoalesce();
@@ -1408,6 +1438,11 @@ export class BoardViewport implements BoardSurface {
 			return;
 		}
 		if (!down) return;
+		if (e.key === 'Escape' && this.tool && !this.drag) {
+			this.setTool(null);
+			e.preventDefault();
+			return;
+		}
 		const mod = e.ctrlKey || e.metaKey;
 		// Use mode keeps undo and redo (a ticked checkbox in a text box is an edit); nothing else edits.
 		if (this.useMode && !(mod && ['z', 'y'].includes(e.key.toLowerCase()))) return;
@@ -1705,6 +1740,7 @@ export class BoardViewport implements BoardSurface {
 			labelled('file-plus', 'Page', 'Add a page', (e) => this.showAddPageMenu(e));
 			labelled('file-text', 'Note', 'Add a note', () => this.pickNote());
 			labelled('book-open', 'PDF', 'Add a region of a PDF', () => this.pickPdf());
+			this.shapeButton = labelled('shapes', 'Shape', 'Draw a rectangle, ellipse, line or arrow: pick one, then drag on a page', (e) => this.showShapeMenu(e));
 			labelled('plus', 'More', 'Add text, an image, a tracker or a table of contents', (e) => this.showAddMenu(e));
 			sep();
 		}
@@ -1734,6 +1770,91 @@ export class BoardViewport implements BoardSurface {
 		}
 		const r = this.root.getBoundingClientRect();
 		menu.showAtPosition({ x: r.left + 40, y: r.top + 40 });
+	}
+
+	showShapeMenu(e?: MouseEvent) {
+		const menu = new Menu();
+		for (const preset of SHAPE_PRESETS) menu.addItem((i) => i.setTitle(preset.label).setIcon(preset.icon).setChecked(this.tool?.id === preset.id).onClick(() => this.setTool(preset)));
+		this.showMenuAt(menu, e);
+	}
+
+	/** Arms (or, with null, disarms) the drawing tool: the next drag on a page makes that shape. */
+	private setTool(tool: ShapePreset | null) {
+		if (tool && (this.store.readOnly || this.useMode)) return;
+		this.tool = tool;
+		this.root.toggleClass('is-drawing', !!tool);
+		this.shapeButton?.toggleClass('is-active', !!tool);
+		if (tool) new Notice(`Drag on a page to draw. Shift keeps it ${tool.fields.shape === 'line' ? 'at 45° steps' : 'square'}; Esc cancels.`);
+	}
+
+	private startDraw(e: PointerEvent): boolean {
+		const tool = this.tool;
+		const pageId = this.hit(e)?.pageId;
+		const page = pageId ? this.store.file.pages.find((p) => p.id === pageId) : undefined;
+		if (!tool || !page) return false;
+		const grid = this.store.file.board.grid;
+		const origin = this.pagePoint(page, screenToBoard(this.camera, this.local(e)), grid.snap && !e.altKey ? grid.size : 0);
+		this.drag = { kind: 'draw', pageId: page.id, preset: tool, origin, id: null };
+		this.root.setPointerCapture(e.pointerId);
+		this.root.addClass('is-dragging');
+		return true;
+	}
+
+	/** A board point as page millimetres, snapped to the grid if asked and kept on the page. */
+	private pagePoint(page: Page, p: Point, grid: number): Point {
+		const local = snapPoint({ x: p.x - page.x, y: p.y - page.y }, grid);
+		return { x: Math.min(Math.max(local.x, 0), page.w), y: Math.min(Math.max(local.y, 0), page.h) };
+	}
+
+	private drawTo(d: Extract<Drag, { kind: 'draw' }>, board: Point, grid: number, constrain: boolean) {
+		const page = this.store.file.pages.find((p) => p.id === d.pageId);
+		if (!page) return;
+		const end = this.pagePoint(page, board, grid);
+		// A press that barely moves is a click (see finishDraw), not a tiny shape.
+		if (!d.id && Math.hypot(end.x - d.origin.x, end.y - d.origin.y) * PX_PER_MM * this.camera.zoom < 4) return;
+		const geometry = shapeFromDrag(d.preset.fields.shape, d.origin, end, constrain);
+		const id = d.id ?? newId(allIds(this.store.file));
+		const created = !!d.id;
+		d.id = id;
+		this.store.update(
+			(f) => (created ? mapModule(f, page.id, id, (x) => ({ ...x, ...geometry })) : addModule(f, page.id, { id, type: 'shape', ...d.preset.fields, ...geometry })),
+			{ coalesce: `draw:${id}` },
+		);
+	}
+
+	/** A click without a drag places the shape at its default size. */
+	private finishDraw(d: Extract<Drag, { kind: 'draw' }>) {
+		const page = this.store.file.pages.find((p) => p.id === d.pageId);
+		let id = d.id;
+		if (!id && page) {
+			id = newId(allIds(this.store.file));
+			const geometry = shapeAtClick(d.preset.fields.shape, d.origin, page);
+			this.store.update((f) => addModule(f, page.id, { id: id!, type: 'shape', ...d.preset.fields, ...geometry }), { coalesce: `draw:${id}` });
+		}
+		this.setTool(null);
+		if (id) this.select({ pageId: d.pageId, moduleId: id });
+	}
+
+	private startEndpointDrag(e: PointerEvent): boolean {
+		const end = Number((e.target as HTMLElement).closest<HTMLElement>('.pw-endpoint')?.dataset.end);
+		const sel = this.selection;
+		const m = sel?.moduleId ? findModule(this.store.file, sel.pageId, sel.moduleId) : undefined;
+		if (!end || !sel?.moduleId || !m || !isLine(m) || m.locked || this.store.readOnly) return false;
+		const points = linePoints(m as ShapeModule);
+		const fixed = points[end === 1 ? 1 : 0];
+		this.drag = { kind: 'endpoint', pageId: sel.pageId, id: sel.moduleId, end: end === 1 ? 1 : 2, fixed: { x: m.x + fixed.x, y: m.y + fixed.y } };
+		this.root.setPointerCapture(e.pointerId);
+		this.root.addClass('is-dragging');
+		return true;
+	}
+
+	private moveEndpoint(d: Extract<Drag, { kind: 'endpoint' }>, board: Point, grid: number, constrain: boolean) {
+		const page = this.store.file.pages.find((p) => p.id === d.pageId);
+		if (!page) return;
+		const at = this.pagePoint(page, board, grid);
+		const moved = constrain ? constrainAngle(d.fixed, at) : at;
+		const geometry = d.end === 1 ? lineFromEnds(moved, d.fixed) : lineFromEnds(d.fixed, moved);
+		this.store.update((f) => mapModule(f, d.pageId, d.id, (x) => ({ ...x, ...geometry })), { coalesce: `endpoint:${d.id}` });
 	}
 
 	/** Everything that is not a page, a note or a PDF, so the toolbar keeps three add buttons. */

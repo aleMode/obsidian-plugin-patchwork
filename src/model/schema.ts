@@ -184,7 +184,30 @@ export interface TrackerItem {
 	[extra: string]: unknown;
 }
 
-export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule | TrackerModule;
+export type ShapeKind = 'rect' | 'ellipse' | 'line';
+export type HeadKind = 'none' | 'arrow' | 'open' | 'dot';
+
+/**
+ * A simple shape drawn on the page. An arrow is a line with a head. Geometry and drawing live in
+ * model/shapes.ts.
+ */
+export interface ShapeModule extends BaseModule {
+	type: 'shape';
+	shape: ShapeKind;
+	/** CSS colour inside the shape; absent means none. Ignored by lines. */
+	fill?: string;
+	/** Outline; absent fields are the defaults (dark, 0.5 mm, solid). A width of 0 means no outline. */
+	stroke?: { color?: string; width?: number; dash?: 'solid' | 'dashed' | 'dotted'; [extra: string]: unknown };
+	/** Corner radius of a rectangle (mm). */
+	radius?: number;
+	/** Line endpoints as fractions of the box ([0,0] is its top-left); absent means the diagonal. */
+	p1?: [number, number];
+	p2?: [number, number];
+	startHead?: HeadKind;
+	endHead?: HeadKind;
+}
+
+export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule | TrackerModule | ShapeModule;
 
 /**
  * A module whose `type` this version doesn't know (written by a newer plugin, or hand-edited).
@@ -196,7 +219,7 @@ export interface ForeignModule extends BaseModule {
 
 export type AnyModule = Module | ForeignModule;
 
-const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame', 'tracker'] as const;
+const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame', 'tracker', 'shape'] as const;
 
 export function isKnownModule(m: AnyModule): m is Module {
 	return (MODULE_TYPES as readonly string[]).includes(m.type);

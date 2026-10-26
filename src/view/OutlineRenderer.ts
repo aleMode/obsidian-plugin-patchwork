@@ -1,10 +1,11 @@
 import { type App, setIcon } from 'obsidian';
 import { orderedPages } from '../model/ordering';
-import type { AnyModule } from '../model/schema';
+import type { AnyModule, ShapeModule } from '../model/schema';
+import { isArrow } from '../model/shapes';
 import { TextPromptModal } from '../ui/prompts';
 import type { BoardViewport } from './BoardViewport';
 
-const ICONS: Record<string, string> = { note: 'file-text', pdf: 'book-open', text: 'type', image: 'image', toc: 'list-ordered', frame: 'link', tracker: 'list-checks' };
+const ICONS: Record<string, string> = { note: 'file-text', pdf: 'book-open', text: 'type', image: 'image', toc: 'list-ordered', frame: 'link', tracker: 'list-checks', shape: 'shapes' };
 
 /** A short name for a module: its label, else what it shows. */
 export function moduleTitle(m: AnyModule): string {
@@ -23,6 +24,8 @@ export function moduleTitle(m: AnyModule): string {
 			return 'Table of contents';
 		case 'frame':
 			return 'Text frame';
+		case 'shape':
+			return m.shape === 'ellipse' ? 'Ellipse' : m.shape === 'line' ? (isArrow(m as ShapeModule) ? 'Arrow' : 'Line') : 'Rectangle';
 		case 'tracker':
 			return typeof m.label === 'string' && m.label ? m.label : `${String(m.kind)} tracker`;
 		default:

@@ -129,6 +129,14 @@ PDF module rules:
 - Module colours (`style.tint`): Canvas's six theme colours or a custom colour give a tinted card with a coloured edge, in both modes and in exports (light values on paper). Set from the context bar's palette or the Style tab.
 - Exports are unchanged by the mode.
 
+### 5.8 Shapes
+- A `shape` module is a rectangle (optionally with rounded corners), an ellipse, or a line. An arrow is a line with an arrowhead at either end (`arrow` filled, `open`, or `dot`). Colours are plain CSS colours; outline width is in mm, so shapes scale with the page like everything else (hard rule 4).
+- Drawn as inline SVG whose user unit is the millimetre (`src/model/shapes.ts` computes the primitives, purely), so screen, PDF and PNG agree; exports are vector. Shapes keep their colours on dark app themes (paper content), take the module's opacity, and have no text: put a text box on top for a label.
+- **Drawing:** the toolbar's *Shape* menu (or the command *Draw shape on page*) arms a shape; the next drag on a page draws it, from the first corner to wherever the pointer is. Shift makes boxes square (circles) and lines a multiple of 45°. A plain click places a 40 × 30 mm shape centred there. The tool disarms after one shape (Esc cancels it); the whole gesture is one undo step. The grid snaps drawing unless Alt is held.
+- **Lines** store their box and two endpoints as fractions of it (`p1`, `p2`), so a line can run at any angle, and a horizontal or vertical one sits in a box 1 mm thick. A selected line shows a handle on each end instead of the eight box handles; dragging one moves that end only (Shift: 45° steps). Move, align, snap, lock, duplicate and stacking work as for any module.
+- **Clicking:** only painted pixels take clicks: the outline (with a wider invisible target, about 8 screen px), and the inside of a filled shape. An unfilled rectangle or a diagonal line does not block what is under its box. Shapes are inert in Use mode.
+- The context bar has fill, outline colour, thickness, solid/dashed/dotted, corners (rectangles) and arrowheads (lines); the properties popover has the rest (kind, exact widths, both ends' heads, opacity). Canvas export drops shapes (Canvas has no equivalent); the dialog lists them as dropped.
+
 ## 6. Data model
 
 Stored as pretty-printed JSON (2 spaces, stable key order) so it diffs well in git.
@@ -181,7 +189,7 @@ export interface Page {
   modules: Module[];                             // draw order = array order unless z set
 }
 
-export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule | TrackerModule;
+export type Module = PdfModule | NoteModule | TextModule | ImageModule | TocModule | FrameModule | TrackerModule | ShapeModule;
 
 export interface BaseModule {
   id: string; x: number; y: number; w: number; h: number;   // mm, relative to page
@@ -219,6 +227,15 @@ export interface TrackerModule extends BaseModule {   // M5: interactive; state 
   min?: number; max?: number; step?: number;     // boxes: max = how many
   items?: { text: string; done?: boolean }[];    // checklist
   printBlank?: boolean;                          // exports show it empty
+}
+
+export interface ShapeModule extends BaseModule {   // v0.15: rectangle, ellipse, line (an arrow is a line with a head)
+  type: "shape"; shape: "rect" | "ellipse" | "line";
+  fill?: string;                                 // CSS colour; absent = none (not for lines)
+  stroke?: { color?: string; width?: number; dash?: "solid" | "dashed" | "dotted" };   // defaults #222222, 0.5 mm, solid; width 0 = no outline
+  radius?: number;                               // rect corner radius, mm
+  p1?: [number, number]; p2?: [number, number];  // line endpoints as fractions of the box; absent = the diagonal
+  startHead?: "none" | "arrow" | "open" | "dot"; endHead?: "none" | "arrow" | "open" | "dot";
 }
 
 export interface ModuleStyle {
@@ -508,3 +525,5 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
 - **v0.14 · 2026-10-21 (QA round)**
   - Small text is easier to read on screen. From 100 % down to 50 % zoom, note text eases toward full contrast (away from its background, so it works on dark and light paper and tinted cards) and gets a hairline stroke (0.15 px on screen at full strength). Below 100 % body-text strokes are thinner than a pixel and draw dim, a limit of the pixel grid; a render at the real size, a transform of exactly 1, hinting and font weights were tried and made no difference (they only reflowed the text). Pure CSS in `styles.css`, driven by the settled `--pw-zoom`, scoped to the board layer: wrapping is untouched and exports never see it.
   - Zoom controls: a mouse-wheel notch with Ctrl zooms by 10 % at most (it was about 22 %; a trackpad pinch is unchanged, one event is capped, not scaled). The +/- buttons step through fixed stops (5, 10, 15, 25, 50, 75, 100, 125, 150, 200, 300, 400, 600, 800 %) instead of x1.25, from wherever the zoom is. Clicking the zoom label sets exactly 100 %, about the centre of the view.
+- **v0.15 · 2026-10-26 (shapes)**
+  - New module type `shape` (rectangle, ellipse, line/arrow), drawn by dragging from the toolbar's *Shape* menu; see section 5.8. Lines keep two endpoints as fractions of their box (`p1`, `p2`) rather than a flip flag, so any angle (and an exactly horizontal line) works with the box-based tools; a line's selection shows endpoint handles instead of box handles. Shapes are SVG in millimetres and print as vector. Not built: text inside a shape (use a text box on top), glued connectors, freehand drawing.

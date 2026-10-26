@@ -153,6 +153,14 @@ function checkModule(m: Json, path: string, is: Issues) {
 			is.optional(m, 'items', path, (v) => Array.isArray(v) && v.every((it) => isObj(it) && isStr(it.text) && (it.done === undefined || isBool(it.done))), 'a list of {text, done}');
 			is.optional(m, 'printBlank', path, isBool, 'true/false');
 			break;
+		case 'shape':
+			is.required(m, 'shape', path, oneOf('rect', 'ellipse', 'line'), '"rect", "ellipse" or "line"');
+			is.optional(m, 'fill', path, isStr, 'a CSS colour');
+			is.optional(m, 'stroke', path, (v) => isObj(v) && (v.color === undefined || isStr(v.color)) && (v.width === undefined || nonNegative(v.width)) && (v.dash === undefined || oneOf('solid', 'dashed', 'dotted')(v.dash)), '{color, width, dash}');
+			is.optional(m, 'radius', path, nonNegative, 'a number ≥ 0');
+			for (const k of ['p1', 'p2']) is.optional(m, k, path, (v) => Array.isArray(v) && v.length === 2 && v.every(isNum), '[x, y] as fractions of the box');
+			for (const k of ['startHead', 'endHead']) is.optional(m, k, path, oneOf('none', 'arrow', 'open', 'dot'), '"none", "arrow", "open" or "dot"');
+			break;
 		default:
 			if (isStr(m.type)) is.warnings.push(`${path}: unknown module type "${m.type}" kept as is`);
 	}

@@ -80,3 +80,23 @@ Manual:
 - [ ] + and -: from 100 % you get 125, 150, 200...; from a zoom the wheel left you on (say 67 %) the next stop (75 %, or 50 % with -). Nothing happens past 800 % or below 2 %.
 - [ ] Click the zoom label: exactly 100 % (A4 page about 794 px wide), centred on what was in the middle of the view. It has a hover state and the tooltip "Reset to 100%"; the toolbar does not shift as the number changes.
 - [ ] Use mode: the toolbar hides +/- and the label as before; Ctrl+wheel still zooms by 10 %.
+
+## Shapes (2026-10-26)
+
+Automated: `tests/model/shapes.test.ts` (geometry, heads, dashes, drag helpers, file format), `scripts/e2e/shapes.mjs` (real mouse: draw by dragging, Shift circle, Shift-horizontal arrow, click to place, one undo step per drawing, hit-testing of unfilled/filled/diagonal shapes, endpoint handles, Escape, context bar).
+
+Manual:
+- [ ] Shape menu → each of the five items arms the tool; drawing works on any page, also over an existing note or PDF; nothing happens if you press on empty board (the tool stays armed).
+- [ ] Drawing from bottom-right to top-left gives the same shape; the shape stays inside the page.
+- [ ] Zoomed out to 25 %: shapes are still there (drawn small, not boxes); zoomed in to 400 %: lines and outlines stay sharp, and a hairline stays easy to grab.
+- [ ] A rectangle over a PDF crop with no fill: you can still click, drag and crop the PDF through it; with a fill, the shape takes the clicks.
+- [ ] A long diagonal arrow across text: only the line itself is grabbable.
+- [ ] Dashed and dotted outlines look right on an ellipse, a rounded rectangle and a line; dots are round.
+- [ ] Arrow heads: end, start, both; open arrow; dot. A very short arrow still shows its head. A thick arrow (Heavy) has a proportionally larger head.
+- [ ] Change the kind in ⋯: rectangle → line gives a diagonal; line → ellipse keeps colour and size.
+- [ ] Duplicate (Ctrl+D), nudge with arrows, align and distribute shapes with other modules; lock one and try to drag it.
+- [ ] Use mode: shapes are drawn but inert; a drag over them still pans.
+- [ ] Export PDF: shapes are vector (zoom in a viewer), colours match, opacity respected. PNG likewise. Dark app theme: shapes keep their paper colours.
+- [ ] A shape on a master page shows on every page that uses it and cannot be selected there.
+- [ ] Open a patchwork written by this version in an older one (if you have one): the shapes show as "Unknown module type" and are kept when saved.
+

@@ -58,7 +58,7 @@ Plan and decisions: `docs/use-mode-plan.md`. Open `Dashboard/Dashboard.patchwork
 Everything here is also described in `docs/ui-reorganisation.md`.
 
 ### Context bar and properties popover
-- Select a page or an item: a small **⋯** pill appears above it; hover it (or click it) and it opens into the bar, which stays open while you are near it, while a menu or the popover is open or a field has focus, and closes shortly after you move away. Page: name, size, orientation, background, master. Note: section ▾, overflow ▾, Freeze text, Edit, Open. PDF: Crop, page ‹ n ›, fit ▾, invert. Text: Edit. Image: Change, fit ▾. Tracker: kind ▾, Edit, print blank. Text frame: "Frame 2 of 3", Next frame. Table of contents: Heading. Several items: Align ▾, Distribute ▾, Lock, Delete.
+- Select a page or an item: a small **⋯** pill appears above it; hover it (or click it) and it opens into the bar, which stays open while you are near it, while a menu or the popover is open or a field has focus, and closes shortly after you move away. Page: name, size, orientation, background, master. Note: section ▾, overflow ▾, Freeze text, Edit, Open. PDF: Crop, page ‹ n ›, fit ▾, invert. Text: Edit. Image: Change, fit ▾. Tracker: kind ▾, Edit, print blank. Shape: fill, outline colour, thickness, dash, corners or arrowheads. Text frame: "Frame 2 of 3", Next frame. Table of contents: Heading. Several items: Align ▾, Distribute ▾, Lock, Delete.
 - The `⋯` button opens the **properties popover** next to the item: tabs *Content / Layout / Style / Advanced* (a page: *Page / Layout / Numbers*). Typing in it edits live; Escape or a click on the board closes it. It should never sit on top of the item you are editing.
 - Check: the bar follows the item while you pan and zoom, hides while you drag, comes back where the item lands, and stays reachable for a page bigger than the screen. Typing Delete or the arrow keys in a popover field must not delete or move the item.
 - Adding text, a tracker or a table of contents opens the popover on it. The sidebar inspector no longer opens by itself: **View → Inspector and outline** if you want the dock.
@@ -92,6 +92,17 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - A module whose note, PDF or image was deleted shows **Pick another…** right on the board. For a PDF, the crop editor opens after picking, to check the crop.
 - Right-click a page → **Zoom to page**; command *Zoom to selection* fits whatever is selected.
 - A page wider or taller than 5080 mm gets a warning in the inspector: export it on a sheet size (tiles).
+
+### Shapes
+
+- Toolbar **Shape** (or the command *Patchwork: Draw shape on page*) opens a menu: Rectangle, Rounded rectangle, Ellipse, Line, Arrow. Pick one, then **drag on a page**. The cursor is a crosshair until you have drawn one (Esc cancels).
+- **Shift** while dragging: rectangle → square, ellipse → circle, line/arrow → 0°, 45°, 90°… A plain **click** (no drag) places a 40 × 30 mm shape centred where you clicked. The grid snaps drawing, as for moving; hold Alt to skip it.
+- Select a shape and the bar above it has: fill colour (rectangles and ellipses), outline colour, thickness (Hairline … Heavy, and "No outline" for boxes), solid/dashed/dotted, corners (rectangles) and, for a line, arrowheads (none, end, start, both). **⋯** has the rest: change the kind, exact widths in your unit, both ends' heads (arrow, open arrow, dot), corner radius, opacity.
+- A selected **line** shows a round handle on each end instead of the eight square ones. Drag an end to move just that end (Shift: 45° steps); the other end stays put.
+- **Clicking** only counts on what is painted: the outline, or the inside of a filled shape. An unfilled rectangle (or the empty corner of a diagonal line) does not block a note or PDF beneath it. Thin lines have a generous grab area.
+- Everything else works as for any item: move, resize (boxes), align, snap, lock, duplicate, Delete, undo (a whole drawing gesture is one undo step), put on a master page for decoration that appears on many pages.
+- Export to PDF/PNG: shapes are drawn as vector, in the colours you chose (also on a dark theme), with the module opacity. Export to canvas leaves shapes out (and says so).
+- Shapes have no text. Put a text box over one for a label.
 
 ### Trackers
 - Toolbar → **More** → Counter, Boxes or Checklist. Click − / + on a counter, click boxes (clicking the last filled one empties it), tick checklist items. Every click is one undo step and is saved.

@@ -1,7 +1,8 @@
 import { Menu, setIcon, TFile } from 'obsidian';
 import { flowChains } from '../model/flow';
 import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
-import type { AnyModule, ImageModule, NoteModule, Page, PdfModule, TrackerModule } from '../model/schema';
+import type { AnyModule, ImageModule, NoteModule, Page, PdfModule, ShapeModule, TrackerModule } from '../model/schema';
+import { DASH_LABELS, isLine, SHAPE_COLORS, STROKE_WIDTHS, strokeOf } from '../model/shapes';
 import { findModule, mapModule, mapPage } from '../store/pageOps';
 import { isImage } from '../sources/fileKinds';
 import { FIT_LABELS, withField, withStyle } from '../ui/formHelpers';
@@ -226,7 +227,8 @@ export class ContextBar {
 		if (!page) return [];
 		if (!it.moduleId) return this.page(page);
 		const m = page.modules.find((x) => x.id === it.moduleId);
-		return m ? [...this.module(page, m), this.tint(page, m), this.more()] : [];
+		// A shape has its own colours; the card colour of other modules means nothing to it.
+		return m ? [...this.module(page, m), ...(m.type === 'shape' ? [] : [this.tint(page, m)]), this.more()] : [];
 	}
 
 	/** Canvas's colour palette: a tinted card. Custom colours are picked in the Style tab. */
@@ -266,6 +268,8 @@ export class ContextBar {
 				return this.frame(page, m);
 			case 'tracker':
 				return this.tracker(page, m as TrackerModule);
+			case 'shape':
+				return this.shape(page, m as ShapeModule);
 			case 'toc':
 				return [{ icon: 'heading', text: 'Heading', tip: 'Change the heading of the table of contents', onClick: () => this.board.showProperties('content') }];
 			default:
@@ -399,6 +403,68 @@ export class ContextBar {
 			...(fromNote ? [{ icon: 'external-link', text: 'Open', tip: 'Open the note in a pane', onClick: () => this.board.openNote(page.id, m.id) }] : []),
 			{ icon: 'plus', text: 'Next frame', tip: 'Continue the text in another frame on this page', onClick: () => this.board.continueInFrame(page.id, m.id) },
 		];
+	}
+
+	private shape(page: Page, m: ShapeModule): Ctl[] {
+		const stroke = strokeOf(m);
+		const line = isLine(m);
+		const patch = (fn: (x: ShapeModule) => ShapeModule) => this.set(page, m, (x) => fn(x as ShapeModule));
+		const colors = (current: string | undefined, none: string | null, pick: (hex: string | undefined) => void) => (menu: Menu) => {
+			if (none) menu.addItem((i) => i.setTitle(none).setChecked(!current).onClick(() => pick(undefined)));
+			for (const [name, hex] of SHAPE_COLORS) menu.addItem((i) => i.setTitle(swatch(name, hex)).setChecked(current?.toLowerCase() === hex).onClick(() => pick(hex)));
+			menu.addItem((i) => i.setTitle('Other colour…').onClick(() => this.board.showProperties('content')));
+		};
+		const setStroke = (key: string, value: unknown) => patch((x) => withField(x, 'stroke', { ...(x.stroke ?? {}), [key]: value }));
+		const heads = [
+			['Line', undefined, undefined],
+			['Arrow at the end', undefined, 'arrow'],
+			['Arrow at the start', 'arrow', undefined],
+			['Arrow at both ends', 'arrow', 'arrow'],
+		] as const;
+		const current = heads.find(([, a, b]) => (m.startHead === 'none' ? undefined : m.startHead) === a && (m.endHead === 'none' ? undefined : m.endHead) === b);
+		const out: Ctl[] = [];
+		if (line) {
+			out.push({
+				icon: 'arrow-up-right',
+				text: current?.[0] ?? 'Custom ends',
+				tip: 'Arrowheads (more kinds in the settings)',
+				menu: (menu) => {
+					for (const [label, start, end] of heads) menu.addItem((i) => i.setTitle(label).setChecked(current?.[0] === label).onClick(() => patch((x) => withField(withField(x, 'startHead', start), 'endHead', end))));
+				},
+			});
+		} else {
+			out.push({ icon: 'paint-bucket', tip: 'Fill colour', menu: colors(m.fill, 'No fill', (hex) => patch((x) => withField(x, 'fill', hex))) });
+		}
+		out.push(
+			{ icon: 'pen-line', tip: line ? 'Line colour' : 'Outline colour', menu: colors(stroke.color, null, (hex) => setStroke('color', hex)) },
+			{
+				icon: 'minus',
+				text: STROKE_WIDTHS.find(([, mm]) => mm === stroke.width)?.[0] ?? `${stroke.width} mm`,
+				tip: 'Line thickness',
+				menu: (menu) => {
+					if (!line) menu.addItem((i) => i.setTitle('No outline').setChecked(stroke.width === 0).onClick(() => setStroke('width', 0)));
+					for (const [name, mm] of STROKE_WIDTHS) menu.addItem((i) => i.setTitle(name).setChecked(stroke.width === mm).onClick(() => setStroke('width', mm)));
+				},
+			},
+			{
+				icon: 'ellipsis',
+				tip: 'Solid, dashed or dotted',
+				menu: (menu) => {
+					for (const [id, label] of Object.entries(DASH_LABELS)) menu.addItem((i) => i.setTitle(label).setChecked(stroke.dash === id).onClick(() => setStroke('dash', id === 'solid' ? undefined : id)));
+				},
+			},
+		);
+		if (m.shape === 'rect') {
+			const corners = [['Square corners', 0], ['Rounded', 4], ['Very rounded', 10]] as const;
+			out.push({
+				icon: 'square-dashed',
+				tip: 'Corners',
+				menu: (menu) => {
+					for (const [label, mm] of corners) menu.addItem((i) => i.setTitle(label).setChecked((m.radius ?? 0) === mm).onClick(() => patch((x) => withField(x, 'radius', mm > 0 ? mm : undefined))));
+				},
+			});
+		}
+		return out;
 	}
 
 	private tracker(page: Page, m: TrackerModule): Ctl[] {

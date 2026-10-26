@@ -4,7 +4,8 @@ import { flowChains } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
 import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
-import type { AnyModule, DisplayUnit, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, TextModule, TocModule, TrackerModule } from '../model/schema';
+import type { AnyModule, DisplayUnit, HeadKind, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, ShapeKind, ShapeModule, TextModule, TocModule, TrackerModule } from '../model/schema';
+import { convertShape, DASH_LABELS, DEFAULT_STROKE_COLOR, HEAD_LABELS, strokeOf } from '../model/shapes';
 import { formatLength, formatLengthValue, parseLength } from '../model/units';
 import { MAX_PAGE_SIDE_MM } from '../model/schema';
 import { mapModule, mapPage, restack } from '../store/pageOps';
@@ -323,13 +324,51 @@ export class PropertiesForm {
 			case 'tracker':
 				this.renderTracker(form, m as TrackerModule, set);
 				break;
+			case 'shape':
+				this.renderShape(form, m as ShapeModule, set);
+				break;
 			case 'toc':
 				form.heading('Table of contents');
 				this.overrideRow('Heading', (m as TocModule).heading === '' ? 'none' : (m as TocModule).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
 				this.el.createDiv({ cls: 'pw-panel-hint', text: 'Lists every named page in output order with its number. Entries are links in exported PDFs.' });
 				break;
 		}
-		this.renderStyle(form, m, set);
+		if (m.type === 'shape') this.renderShapeStyle(form, m, set);
+		else this.renderStyle(form, m, set);
+	}
+
+	/** Shape: its kind and look. Lines have two ends and no fill; rectangles have corners. */
+	private renderShape(form: Form, m: ShapeModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
+		const stroke = strokeOf(m);
+		const patch = (field: string, fn: (x: ShapeModule) => ShapeModule) => set(field, (x) => fn(x as ShapeModule));
+		const setStroke = (key: string, value: unknown) => patch(`stroke.${key}`, (x) => withField(x, 'stroke', { ...(x.stroke ?? {}), [key]: value }));
+		form.heading('Shape');
+		form.dropdown('Kind', { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line or arrow' }, m.shape, (v) => {
+			patch('shape', (x) => convertShape(x, v as ShapeKind));
+			this.rerender();
+		});
+		if (m.shape !== 'line') form.color('Fill', m.fill, (v) => patch('fill', (x) => withField(x, 'fill', v)));
+		form.color(m.shape === 'line' ? 'Colour' : 'Outline colour', stroke.color === DEFAULT_STROKE_COLOR && !m.stroke?.color ? undefined : stroke.color, (v) => setStroke('color', v));
+		form.length(m.shape === 'line' ? 'Thickness' : 'Outline width', stroke.width, (mm) => setStroke('width', mm), { min: 0 });
+		form.dropdown('Line style', DASH_LABELS, stroke.dash, (v) => setStroke('dash', v === 'solid' ? undefined : v));
+		if (m.shape === 'rect') form.length('Corner radius', m.radius ?? 0, (mm) => patch('radius', (x) => withField(x, 'radius', mm > 0 ? mm : undefined)), { min: 0 });
+		if (m.shape !== 'line') return;
+		const heads: Record<string, string> = HEAD_LABELS;
+		const head = (name: string, key: 'startHead' | 'endHead') =>
+			form.dropdown(name, heads, m[key] ?? 'none', (v) => patch(key, (x) => withField(x, key, v === 'none' ? undefined : (v as HeadKind))));
+		head('Start', 'startHead');
+		head('End', 'endHead');
+		this.el.createDiv({ cls: 'pw-panel-hint', text: 'Drag either end on the page to move it. Hold Shift to keep 45° steps.' });
+	}
+
+	private renderShapeStyle(form: Form, m: AnyModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
+		const s = m.style ?? {};
+		const setStyle = (field: string, key: keyof ModuleStyle & string, value: unknown) => set(`style.${field}`, (x) => withStyle(x, key, value));
+		this.in('style');
+		form.heading('Style');
+		form.number('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v), { min: 0, max: 1, placeholder: '1' });
+		this.in('advanced');
+		form.text('CSS class', s.cssClass, (v) => setStyle('cssClass', 'cssClass', v), 'For CSS snippets');
 	}
 
 	/** Tracker (M5): what it tracks; its state is changed by clicking it on the board. */
