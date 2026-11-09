@@ -315,6 +315,12 @@
 	--h6-color: var(--pw-color);
 	--bold-color: var(--pw-color);
 	--italic-color: var(--pw-color);
+	/* Derived variables resolve where the theme declares them, so each one that defaults to a muted
+	   grey has to be redefined too, or table headers, quotes and bullets stay grey on a white-text card. */
+	--text-muted: color-mix(in srgb, var(--pw-color) 75%, transparent);
+	--table-header-color: var(--pw-color);
+	--blockquote-color: var(--pw-color);
+	--list-marker-color: var(--pw-color);
 }
 
 .pw-module.has-align .pw-module-body {
@@ -1001,6 +1007,13 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	top: 0;
 }
 
+/* Obsidian's print CSS sets `.print .markdown-preview-view { color: initial }`, which turns every note's body text
+   black in the export whatever the theme or the module's text colour (headings and bold kept theirs, as they use
+   their own variables). Hand the colour back to the theme variable the module (or paper scope) defines. */
+.pw-print-host.print .markdown-preview-view {
+	color: var(--text-normal);
+}
+
 .pw-sheet {
 	position: relative;
 	overflow: hidden;
@@ -1066,9 +1079,37 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	padding: var(--size-2-3) 0;
 }
 
+/* The dock and the properties popover share one row layout. Obsidian lets a row's control take whatever
+   width it wants, which squeezed labels to a few pixels in the 320px popover; the label now keeps a
+   minimum width and the control only takes what it needs. */
+.pw-inspector .setting-item-info,
+.pw-popover-form .setting-item-info {
+	flex: 1 1 auto;
+	min-width: 7em;
+}
+
+.pw-inspector .setting-item-control,
+.pw-popover-form .setting-item-control {
+	flex: 0 1 auto;
+}
+
+.pw-inspector .setting-item-name,
+.pw-popover-form .setting-item-name {
+	overflow-wrap: normal;
+	word-break: normal;
+}
+
 .pw-inspector .setting-item-control input[type='text'],
-.pw-inspector .setting-item-control input[type='number'] {
+.pw-inspector .setting-item-control input[type='number'],
+.pw-popover-form .setting-item-control input[type='text'],
+.pw-popover-form .setting-item-control input[type='number'] {
 	width: 7.5em;
+}
+
+/* Long section names must not push the label out of a narrow panel. */
+.pw-inspector .setting-item-control select,
+.pw-popover-form .setting-item-control select {
+	max-width: 9.5em;
 }
 
 /* Tabbed dialogs (Patchwork settings). */
@@ -1748,4 +1789,15 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 .pw-board.is-drawing .pw-page,
 .pw-board.is-drawing .pw-module {
 	cursor: crosshair;
+}
+
+/* A colour row that has no colour set: the swatch is only the picker's starting point, not a colour in use. */
+.pw-color-unset .setting-item-control input[type='color'] {
+	opacity: 0.35;
+}
+
+.pw-color-auto {
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
 }

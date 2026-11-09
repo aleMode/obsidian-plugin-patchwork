@@ -26,6 +26,9 @@ class Form {
 	/** `settle` closes the undo group after a discrete choice, so two picks of the same field are two undo steps. */
 	constructor(private host: () => HTMLElement, private unit: DisplayUnit, private settle: () => void = () => {}) {}
 
+	/** What an unset text colour looks like: the app theme's, or the paper's dark ink (the default, also in exports). */
+	textAuto = 'Auto';
+
 	heading(text: string) {
 		new Setting(this.host()).setName(text).setHeading();
 	}
@@ -71,11 +74,15 @@ class Form {
 		new Setting(this.host()).setName(name).addDropdown((d) => d.addOptions(options).setValue(value).onChange((v) => this.choose(set, v)));
 	}
 
-	color(name: string, value: string | undefined, set: (v: string | undefined) => void) {
-		new Setting(this.host())
-			.setName(name)
-			.addColorPicker((c) => c.setValue(value ?? '#ffffff').onChange((v) => set(v)))
-			.addExtraButton((b) => b.setIcon('x').setTooltip('Clear').onClick(() => set(undefined)));
+	/** `auto` says what an unset colour does ("Auto"), so a white swatch is not mistaken for a white colour in use. */
+	color(name: string, value: string | undefined, set: (v: string | undefined) => void, auto = 'Auto') {
+		const s = new Setting(this.host()).setName(name);
+		if (value === undefined) {
+			s.settingEl.addClass('pw-color-unset');
+			s.controlEl.createSpan({ cls: 'pw-color-auto', text: auto });
+		}
+		s.addColorPicker((c) => c.setValue(value ?? '#ffffff').onChange((v) => set(v)));
+		if (value !== undefined) s.addExtraButton((b) => b.setIcon('x').setTooltip('Clear').onClick(() => set(undefined)));
 	}
 
 	private choose<T>(set: (v: T) => void, v: T) {
@@ -136,6 +143,7 @@ export class PropertiesForm {
 		this.makeSections();
 		const file = board.boardStore.file;
 		const form = new Form(() => this.el, file.board.displayUnit, () => board.boardStore.endCoalesce());
+		form.textAuto = file.board.useAppTheme ? 'Auto: theme' : 'Auto: dark';
 		if (board.boardStore.readOnly) return void this.el.createDiv({ cls: 'pw-panel-empty', text: 'This patchwork is read-only.' });
 		const page = file.pages.find((p) => p.id === board.selected?.pageId);
 		const mod = page?.modules.find((m) => m.id === board.selected?.moduleId);
@@ -506,7 +514,7 @@ export class PropertiesForm {
 		this.tintRows(form, s.tint, (v) => setStyle('tint', 'tint', v));
 		form.number('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v), { min: 0, max: 1, placeholder: '1' });
 		form.number('Text scale', s.fontScale, (v) => setStyle('fontScale', 'fontScale', v === 1 ? undefined : v), { min: 0.1, max: 5, placeholder: '1' });
-		form.color('Text colour', s.color, (v) => setStyle('color', 'color', v));
+		form.color('Text colour', s.color, (v) => setStyle('color', 'color', v), form.textAuto);
 		form.dropdown('Alignment', { '': 'Default', left: 'Left', center: 'Centre', right: 'Right', justify: 'Justify' }, s.align ?? '', (v) => setStyle('align', 'align', v === '' ? undefined : v));
 		form.text('Font', s.fontFamily, (v) => setStyle('fontFamily', 'fontFamily', v), 'Same as the page');
 		this.in('advanced');
