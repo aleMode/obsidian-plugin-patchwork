@@ -73,3 +73,15 @@ export function insertLink(text: string, start: number, end: number): Replace {
 	const urlStart = start + label.length + 3;
 	return { from: start, to: end, insert, selStart: urlStart, selEnd: urlStart + 3 };
 }
+
+/** Markdown as plain text for one-line titles: link and image targets, marks and table pipes go; lines join. */
+export function plainText(md: string): string {
+	return md
+		.replace(/!?\[\[([^\]|]*)(?:\|([^\]]*))?\]\]/g, (_m, target: string, alias?: string) => alias ?? target)
+		.replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+		.replace(/^\s*(?:[-*+]|\d+\.|>|#{1,6})\s+/gm, '')
+		.replace(/(\*\*|__|==|~~|\*|_|`)/g, '')
+		.replace(/\|/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
+}

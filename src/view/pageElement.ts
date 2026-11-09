@@ -1,6 +1,8 @@
 import type { PageFurniture } from '../model/numbering';
 import type { Insets, NumberPosition, Page } from '../model/schema';
 import { renderFurniture } from './furniture';
+import type { Ink } from '../model/contrast';
+import { applyInk } from './paperScope';
 import { formatLength } from '../model/units';
 import type { DisplayUnit } from '../model/schema';
 
@@ -18,7 +20,7 @@ export class PageElement {
 		this.paper = this.el.createDiv({ cls: 'pw-page-paper' });
 	}
 
-	update(page: Page, opts: { appTheme: boolean; unit: DisplayUnit; selected: boolean; furniture?: PageFurniture; position: NumberPosition; safeArea?: Insets }) {
+	update(page: Page, opts: { appTheme: boolean; unit: DisplayUnit; selected: boolean; furniture?: PageFurniture; position: NumberPosition; safeArea?: Insets; ink: Ink; themeInk: Ink }) {
 		renderFurniture(this.paper, opts.furniture, opts.position);
 		this.renderSafeArea(page.safeArea ?? opts.safeArea);
 		const prev = this.page;
@@ -28,7 +30,7 @@ export class PageElement {
 			this.el.setCssProps({ '--pw-x': `${page.x}mm`, '--pw-y': `${page.y}mm`, '--pw-w': `${page.w}mm`, '--pw-h': `${page.h}mm` });
 		}
 		this.paper.toggleClass('pw-paper', !opts.appTheme);
-		this.paper.toggleClass('theme-light', !opts.appTheme);
+		applyInk(this.paper, opts.ink, opts.themeInk, !opts.appTheme);
 		this.paper.toggleClass('has-background', !!page.background);
 		this.paper.setCssProps({ '--pw-page-bg': page.background ?? '' });
 		this.el.toggleClass('is-selected', opts.selected);

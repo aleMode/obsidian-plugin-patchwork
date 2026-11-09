@@ -14,7 +14,8 @@ describe('formatNumber', () => {
 
 describe('expandTokens', () => {
 	it('replaces known tokens and leaves others', () => {
-		expect(expandTokens('{title} — {page}/{pages} {date} {x}', { page: '2', pages: '9', title: 'Spells', date: '2026-10-20' })).toBe('Spells — 2/9 2026-10-20 {x}');
+		expect(expandTokens('{title} — {page}/{pages} {date} {x}', { page: '2', pages: '9', name: '', title: 'Spells', date: '2026-10-20' })).toBe('Spells — 2/9 2026-10-20 {x}');
+		expect(expandTokens('{name}: {page}', { page: 'iv', pages: '9', name: 'Spells', title: '', date: '' })).toBe('Spells: iv');
 	});
 });
 

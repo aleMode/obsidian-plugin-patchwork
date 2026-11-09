@@ -1,12 +1,15 @@
 import type { App, Component } from 'obsidian';
-import { batches, oversizedPages, vectorModules } from '../model/exportPlan';
+import { batches, coveringVectorModules, oversizedPages, vectorModules } from '../model/exportPlan';
 import { pageFurniture, pdfPageLabels } from '../model/numbering';
 import { planSheets, type SheetSetting } from '../model/sheetPlan';
 import { tocEntries } from '../model/toc';
 import { flowChains } from '../model/flow';
 import { FlowLayout } from '../modules/flowLayout';
 import { outputPages, resolvePage } from '../model/masters';
-import type { PatchworkFile, PdfModule } from '../model/schema';
+import type { Page, PatchworkFile, PdfModule } from '../model/schema';
+import { pageInk, unreadableText } from '../model/contrast';
+import { themeInk } from '../view/paperScope';
+import { moduleTitle } from '../view/OutlineRenderer';
 import { formatLength } from '../model/units';
 import { type PdfDocCache, readPdfBytes } from '../sources/pdfSource';
 import { appendPrinted, assemble, createPrinted, type PageLink } from './assemble';
@@ -66,7 +69,7 @@ export async function exportBoardPdf(
 	const title = board.meta?.title ?? boardPath.replace(/^.*\//, '').replace(/\.patchwork$/, '');
 	const furniture = pageFurniture(board, { title, date: opts.date });
 	const printed = await createPrinted();
-	const problems: string[] = [];
+	const problems: string[] = [...vectorWarnings(pages, opts), ...colourWarnings(pages, board.board.useAppTheme)];
 	const links: PageLink[] = [];
 	const indexOf = new Map(pages.map((p, i) => [p.id, i]));
 	// Chains span the whole board, also pages outside the exported range.
@@ -145,4 +148,23 @@ function selectLabels<T>(labels: T[] | null, all: readonly { id: string }[], pic
 	if (!labels) return null;
 	const index = new Map(all.map((p, i) => [p.id, i]));
 	return picked.map((p) => labels[index.get(p.id)!]!);
+}
+
+/** Forced-vector PDF regions that cover items stacked above them (see coveringVectorModules). */
+function vectorWarnings(pages: readonly Page[], opts: ExportOptions): string[] {
+	if (opts.quality === 'small' || opts.inkSaver) return [];
+	return pages.flatMap((p, i) =>
+		coveringVectorModules(p).map(
+			(m) => `"${m.label ?? m.file.replace(/^.*\//, '')} p. ${m.page}" on "${p.name ?? `page ${i + 1}`}" is set to export as vector, so it is drawn over the items stacked above it. Set "In exports" to Automatic to keep the order.`,
+		),
+	);
+}
+
+/** Text colours set by hand that almost vanish into their background (automatic ink never does). */
+function colourWarnings(pages: readonly Page[], appTheme: boolean): string[] {
+	const base = themeInk(appTheme);
+	return pages.flatMap((p, i) => {
+		const ink = pageInk(p, base);
+		return p.modules.filter((m) => unreadableText(m, ink)).map((m) => `"${moduleTitle(m)}" on "${p.name ?? `page ${i + 1}`}": its text colour is hard to read on its background. Clear Text colour to have it picked automatically.`);
+	});
 }

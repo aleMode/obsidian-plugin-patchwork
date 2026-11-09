@@ -148,7 +148,7 @@ try {
 	check('selecting another item: the popover follows', (await rows()).includes('Label') && !(await rows()).includes('Rotation'), await rows());
 	await select(null);
 	await openMore();
-	check('a page gets Page, Layout, Numbers tabs', (await tabs()) === 'Page|Layout|Numbers', await tabs());
+	check('a page gets Page, Layout, Header & footer tabs', (await tabs()) === 'Page|Layout|Header & footer', await tabs());
 	await ev(`document.querySelector('.pw-popover .pw-tab').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));`);
 
 	// Placement: never over the selected item or over the bar, always inside the board

@@ -1,3 +1,5 @@
+import { type InkContext, pageInk } from '../model/contrast';
+import { themeInk } from './paperScope';
 import { type App, Menu, Notice, setIcon, TFile } from 'obsidian';
 import { exportBoardPdf } from '../export/exportPdf';
 import { pdfToPngs } from '../export/exportPng';
@@ -127,6 +129,8 @@ export class BoardViewport implements BoardSurface {
 	private zoomLabel!: HTMLElement;
 	private toolbar!: HTMLElement;
 	private pages = new Map<string, PageElement>();
+	/** Background and ink of each drawn page (model/contrast), for module text and the properties form. */
+	private inks = new Map<string, InkContext>();
 	private modules: ModuleHost;
 	private camera: Camera = { tx: 0, ty: 0, zoom: 1 };
 	/** Selected items; the last one is the primary (inspector, resize handles, ruler origin). */
@@ -179,6 +183,7 @@ export class BoardViewport implements BoardSurface {
 			ctx: { app: view.app, pdfDocs: services.pdfDocs, bitmaps: services.bitmaps, ...(services.thumbs ? { thumbs: services.thumbs } : {}), resolution: () => this.resolution() },
 			store,
 			paperOf: (id) => this.pages.get(id)?.paper,
+			inkOf: (id) => this.inks.get(id),
 			boardPath: () => view.file?.path ?? '',
 			parent: view,
 			replaceSource: (pageId, moduleId) => this.replaceSource(pageId, moduleId),
@@ -256,12 +261,17 @@ export class BoardViewport implements BoardSurface {
 			const shown = resolvePage(file, page);
 			const pageFurniture = page.isMaster ? masterPreview(file, page) : furniture.get(page.id);
 			// Use mode shows content in the app theme, like Canvas; exports stay on paper.
-			el.update(shown, { appTheme: file.board.useAppTheme || this.useMode, unit: file.board.displayUnit, selected, furniture: pageFurniture, position: file.board.numbering.position, safeArea: file.board.defaultSafeArea });
+			const appTheme = file.board.useAppTheme || this.useMode;
+			const base = themeInk(appTheme, this.root.doc);
+			const ink = pageInk(shown, base);
+			this.inks.set(page.id, ink);
+			el.update(shown, { appTheme, unit: file.board.displayUnit, selected, furniture: pageFurniture, position: file.board.numbering.position, safeArea: file.board.defaultSafeArea, ink: ink.ink, themeInk: base });
 		}
 		for (const [id, el] of this.pages) {
 			if (!seen.has(id)) {
 				el.remove();
 				this.pages.delete(id);
+				this.inks.delete(id);
 			}
 		}
 		this.syncLabels();
@@ -986,8 +996,15 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** Theme or CSS snippets changed: re-read colours that are cached for per-frame drawing. */
+	/** Background and ink of a page as drawn (see model/contrast). */
+	inkOf(pageId: string): InkContext | undefined {
+		return this.inks.get(pageId);
+	}
+
 	themeChanged() {
 		this.colors.reset();
+		// Light or dark mode changes the ink of app-theme pages.
+		this.render();
 		this.renderRulers();
 		this.renderMinimap();
 	}
@@ -1651,11 +1668,12 @@ export class BoardViewport implements BoardSurface {
 			}
 			if (m?.type === 'note') {
 				const current = (m as NoteModule).overflow ?? 'clip';
-				const policies = [['clip', 'Overflow: clip'], ['fit', 'Overflow: shrink to fit'], ['grow', 'Overflow: grow']] as const;
-				for (const [policy, title] of policies) {
+				const policies = [['clip', 'Overflow: clip', 'scissors'], ['fit', 'Overflow: shrink to fit', 'shrink'], ['grow', 'Overflow: grow', 'unfold-vertical']] as const;
+				for (const [policy, title, icon] of policies) {
 					menu.addItem((i) =>
 						i
 							.setTitle(title)
+							.setIcon(icon)
 							.setChecked(current === policy)
 							.onClick(() =>
 								this.store.update((f) =>

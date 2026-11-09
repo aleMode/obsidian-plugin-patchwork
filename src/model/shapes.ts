@@ -11,7 +11,8 @@ import type { HeadKind, ShapeKind, ShapeModule } from './schema';
 export const SHAPE_KINDS: readonly ShapeKind[] = ['rect', 'ellipse', 'line'];
 export const HEAD_KINDS: readonly HeadKind[] = ['none', 'arrow', 'open', 'dot'];
 
-export const DEFAULT_STROKE_COLOR = '#222222';
+/** An outline with no colour of its own takes the text ink, so it shows on dark pages too (model/contrast). */
+export const DEFAULT_STROKE_COLOR = 'currentColor';
 export const DEFAULT_STROKE_WIDTH = 0.5;
 /** Thinnest box a line may have along an axis (mm), so a horizontal line still has something to select. */
 export const LINE_MIN_BOX = 1;

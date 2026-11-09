@@ -139,7 +139,7 @@ export class PatchworkSettingsModal extends Modal {
 		const b = this.draft.board;
 		new Setting(this.body).setName('Header').addText((t) => t.setPlaceholder('{title}').setValue(b.header ?? '').onChange((v) => setOpt(this.draft.board, 'header', v === '' ? undefined : v)));
 		new Setting(this.body).setName('Footer').addText((t) => t.setPlaceholder('{page} / {pages}').setValue(b.footer ?? '').onChange((v) => setOpt(this.draft.board, 'footer', v === '' ? undefined : v)));
-		this.body.createDiv({ cls: 'pw-panel-hint', text: 'Tokens: {page}, {pages}, {title}, {date}. Each page can override these.' });
+		this.body.createDiv({ cls: 'pw-panel-hint', text: 'Tokens: {page}, {pages}, {name} (the page name), {title}, {date}. Each page can override these.' });
 	}
 
 	private appearance() {

@@ -3,7 +3,8 @@ import { drawOrder } from '../model/exportPlan';
 import type { PageFurniture } from '../model/numbering';
 import type { NumberPosition } from '../model/schema';
 import { renderFurniture } from '../view/furniture';
-import { type AnyModule, isKnownModule, type NoteModule, type Page } from '../model/schema';
+import { type AnyModule, isKnownModule, type NoteModule, type Page, type TextModule } from '../model/schema';
+import { moduleTitle } from '../view/OutlineRenderer';
 import { ImageModuleRenderer } from '../modules/imageModule';
 import { FlowRenderer, NoteModuleRenderer, TextModuleRenderer } from '../modules/noteModule';
 import type { FlowContext } from '../modules/flowLayout';
@@ -17,6 +18,8 @@ import type { TocEntry } from '../model/toc';
 import { applyModuleStyle } from '../modules/style';
 import { type ModuleContext, type ModuleRenderer, placeholder } from '../modules/types';
 import { printWindowToPdf } from './printAdapter';
+import { pageInk } from '../model/contrast';
+import { applyInk, themeInk } from '../view/paperScope';
 
 // Stage 1 of export (SPEC 9.1): an offscreen host in the main window, one sheet per board page at its
 // native size, printed by Chromium. Vector PDF modules are left empty for stage 2.
@@ -191,16 +194,23 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
 	// Obsidian's print CSS hides `body > :not(.print)`; its own PDF export uses the same class.
 	const host = doc.body.createDiv({ cls: o.inkSaver ? 'pw-print-host print pw-ink-saver' : 'pw-print-host print' });
+	// Obsidian's print CSS swaps the text font for its print font (`body { --font-text: var(--font-print) !important }`).
+	// Paper sheets re-declare the variable, app-theme sheets don't, and their text wrapped differently from the
+	// screen. Pin the font the screen uses, read now while the screen media still applies.
+	host.setCssProps({ '--font-text': doc.body.getCssPropertyValue('--font-text') });
 	if (o.font) {
 		host.addClass('has-board-font');
 		host.setCssProps({ '--pw-font': o.font });
 	}
 	doc.body.addClass('pw-printing');
 	const renderers: ModuleRenderer[] = [];
-	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule }[] = [];
+	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule | TextModule; page: string }[] = [];
 	try {
 		pages.forEach((page, i) => {
-			const sheetEl = host.createDiv({ cls: o.appTheme ? 'pw-sheet' : 'pw-sheet pw-paper theme-light', attr: { 'data-sheet': String(i) } });
+			const sheetEl = host.createDiv({ cls: o.appTheme ? 'pw-sheet' : 'pw-sheet pw-paper', attr: { 'data-sheet': String(i) } });
+			const base = themeInk(o.appTheme, doc);
+			const ink = pageInk(page, base);
+			applyInk(sheetEl, ink.ink, base, !o.appTheme);
 			sheetEl.setCssProps({ '--pw-w': `${page.w + 2 * bleed}mm`, '--pw-h': `${page.h + 2 * bleed}mm`, '--pw-page-bg': page.background ?? '' });
 			sheetEl.toggleClass('has-background', !!page.background);
 			// The page sits inside the bleed; its background and modules crossing its edge extend into it.
@@ -210,19 +220,24 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 			drawOrder(page.modules).forEach((m, rank) => {
 				const mod = el.createDiv({ cls: 'pw-module' });
 				mod.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
-				applyModuleStyle(mod, m);
+				applyModuleStyle(mod, m, ink);
 				const body = mod.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
 				const r = createRenderer(m, body, ctx, o, page.id);
 				if (!r) return;
-				if (m.type === 'note' && !isFlow(m, o)) notes.push({ el: mod, body, m: m as NoteModule });
+				if ((m.type === 'note' || m.type === 'text') && !isFlow(m, o)) notes.push({ el: mod, body, m: m as NoteModule | TextModule, page: page.name ?? `page ${i + 1}` });
 				r.render(m);
 				renderers.push(r);
 			});
 		});
 		const settled = await settle(host, renderers);
 		// Same overflow policy as on screen, applied to the final layout (no indicator in print).
-		for (const n of notes) applyOverflow(n.el, n.body, n.m.overflow ?? 'clip', n.m.scrollY);
 		const problems = findProblems(host);
+		for (const n of notes) {
+			const note: Partial<NoteModule> = n.m.type === 'note' ? n.m : {};
+			const cut = applyOverflow(n.el, n.body, note.overflow ?? 'clip', note.scrollY);
+			// A scrolled note shows part of its text on purpose.
+			if (cut && !note.scrollY) problems.push(`"${moduleTitle(n.m)}" on "${n.page}": the text doesn't fit its box and is cut off.`);
+		}
 		if (!settled) problems.push('Some content was still changing after 10 s and may be incomplete.');
 		const links = findLinks(host);
 		const embeds = o.vectorEmbeds ? findEmbeds(host) : [];

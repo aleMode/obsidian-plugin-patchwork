@@ -63,7 +63,8 @@ try {
 	check('and the text is centred', await until(async () => (await css('.pw-module[data-module-id="t"] .pw-module-body', 'textAlign')) === 'center'));
 	await ev(`const i = document.querySelector('.pw-context-bar .pw-cb-color'); i.value = '#aa0000'; i.dispatchEvent(new Event('change', { bubbles: true })); ${wait(400)}`);
 	check('text colour is stored', (await ev(`return mod('t').style?.color`)) === '#aa0000');
-	check('and reaches the heading as well as the body', await until(async () => (await css('.pw-module[data-module-id="t"] h1', 'color')) === 'rgb(170, 0, 0)' && (await css('.pw-module[data-module-id="t"] p', 'color')) === 'rgb(170, 0, 0)'));
+	// The body's colour goes through the small-text contrast rule (oklch); the module's ink variable is the colour as set.
+	check('and reaches the heading as well as the body', await until(async () => (await css('.pw-module[data-module-id="t"] h1', 'color')) === 'rgb(170, 0, 0)' && (await ev(`return getComputedStyle(document.querySelector('.pw-module[data-module-id="t"]')).getPropertyValue('--text-normal').trim()`)) === '#aa0000'));
 	await clickBar('Larger text');
 	await clickBar('Larger text');
 	check('Larger text steps the scale', Math.abs((await ev(`return mod('t').style?.fontScale`)) - 1.2) < 0.001);

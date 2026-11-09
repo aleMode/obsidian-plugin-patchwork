@@ -22,7 +22,7 @@ const shape = (extra: Partial<ShapeModule> = {}): ShapeModule => ({ id: 's', typ
 
 describe('stroke', () => {
 	it('falls back to the defaults', () => {
-		expect(strokeOf(shape())).toEqual({ color: '#222222', width: 0.5, dash: 'solid' });
+		expect(strokeOf(shape())).toEqual({ color: 'currentColor', width: 0.5, dash: 'solid' });
 	});
 
 	it('keeps a stroke width of zero (no outline) and ignores junk', () => {

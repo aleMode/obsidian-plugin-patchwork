@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { insertLink, type Replace, toggleLines, toggleWrap } from '../../src/model/mdFormat';
+import { insertLink, plainText, type Replace, toggleLines, toggleWrap } from '../../src/model/mdFormat';
 
 const apply = (text: string, r: Replace) => text.slice(0, r.from) + r.insert + text.slice(r.to);
 
@@ -71,5 +71,13 @@ describe('insertLink', () => {
 	});
 	it('uses a placeholder label when nothing is selected', () => {
 		expect(apply('', insertLink('', 0, 0))).toBe('[link](url)');
+	});
+});
+
+describe('plainText', () => {
+	it('drops marks, link targets and table pipes', () => {
+		expect(plainText('Plain, **bold**, *italic*, [link](https://x.y), `code`\n\n- bullet one')).toBe('Plain, bold, italic, link, code bullet one');
+		expect(plainText('# Title\n> quote [[Note|alias]] [[Other]]')).toBe('Title quote alias Other');
+		expect(plainText('| A | B |')).toBe('A B');
 	});
 });

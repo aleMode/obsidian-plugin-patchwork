@@ -1,3 +1,4 @@
+import type { InkContext } from '../model/contrast';
 import { Component, TAbstractFile } from 'obsidian';
 import { isInheritedId, resolvePage } from '../model/masters';
 import { type AnyModule, isKnownModule, type NoteModule, type Page, type TrackerModule } from '../model/schema';
@@ -58,6 +59,8 @@ export interface ModuleHostOptions {
 	paperOf: (pageId: string) => HTMLElement | undefined;
 	boardPath: () => string;
 	parent: Component;
+	/** Background and ink of a page, so module text with no colour reads on it. */
+	inkOf: (pageId: string) => InkContext | undefined;
 	/** Pick another source file for a module (missing-file placeholders). */
 	replaceSource?: (pageId: string, moduleId: string) => void;
 }
@@ -226,7 +229,7 @@ export class ModuleHost {
 			}
 			const isNew = !mounted;
 			if (!mounted) mounted = this.mount(m, page.id, paper, kind);
-			this.layout(mounted, m, rank);
+			this.layout(mounted, m, rank, this.o.inkOf(page.id));
 			mounted.module = m;
 			if (key === mounted.key) return;
 			mounted.key = key;
@@ -293,13 +296,13 @@ export class ModuleHost {
 		}
 	}
 
-	private layout(mounted: Mounted, m: AnyModule, rank: number) {
+	private layout(mounted: Mounted, m: AnyModule, rank: number, ink: InkContext | undefined) {
 		const resized = mounted.module.w !== m.w || mounted.module.h !== m.h || (mounted.module as NoteModule).scrollY !== (m as NoteModule).scrollY;
 		mounted.el.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
 		mounted.el.toggleClass('is-selected', this.selectedModules.has(m.id));
 		mounted.el.toggleClass('is-locked', !!m.locked);
-		applyModuleStyle(mounted.el, m);
-		if (resized && m.type === 'note' && mounted.kind === 'note') this.updateOverflow({ ...mounted, module: m });
+		applyModuleStyle(mounted.el, m, ink);
+		if (resized && measuresOverflow(mounted.kind)) this.updateOverflow({ ...mounted, module: m });
 	}
 
 	private renderContent(mounted: Mounted) {
@@ -309,7 +312,7 @@ export class ModuleHost {
 		} catch (e) {
 			placeholder(mounted.body, `Could not render module: ${e instanceof Error ? e.message : String(e)}`);
 		}
-		if (mounted.kind === 'note') void mounted.renderer?.rendered().then(() => this.watchOverflow(mounted));
+		if (measuresOverflow(mounted.kind)) void mounted.renderer?.rendered().then(() => this.watchOverflow(mounted));
 	}
 
 	private watchOverflow(m: Mounted) {
@@ -324,7 +327,8 @@ export class ModuleHost {
 	}
 
 	private updateOverflow(m: Mounted) {
-		const note = m.module as NoteModule;
+		// Text boxes have no overflow setting: they always clip, and still say so.
+		const note: Partial<NoteModule> = m.module.type === 'note' ? (m.module as NoteModule) : {};
 		m.el.toggleClass('is-overflowing', applyOverflow(m.el, m.body, note.overflow ?? 'clip', note.scrollY));
 	}
 
@@ -401,3 +405,6 @@ export class ModuleHost {
 		this.o.parent.removeChild(this.component);
 	}
 }
+
+/** Renderers whose markdown can be too long for its box (linked frames mark that themselves). */
+const measuresOverflow = (kind: string) => kind === 'note' || kind === 'text';

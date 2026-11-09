@@ -250,6 +250,13 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - While panning into new pages, modules first show a light-grey box, then fill in over a few frames, instead of the whole board stuttering.
 - **Settings → Patchwork → PDF render cache** (MB, default 512). Lowering it frees memory; very low values just mean more re-rendering.
 
+### 6. Export parity and automatic ink (2026-11-10)
+- Give a page a dark background: text, header, footer, page number, trackers and plain shape outlines turn light, on screen and in a PNG export. A yellow-background note on that page stays dark.
+- Turn on *Use app theme for pages* in dark mode: pages are dark with light text, and the export matches (same font, same line breaks).
+- A PDF region with opacity 50 % and a border with a corner radius: the PDF export shows it faded and clipped to the rounded corners.
+- Under the Minimal theme, change a note's *Text scale*: the text size changes.
+- Export a board with a note too long for its box: the problems notice names it.
+
 ## Still worth checking from M0
 
 - Export a page with a note section and a rulebook crop; open in two PDF viewers; select text in both.

@@ -1,10 +1,35 @@
 import type { Rect } from './geometry';
 import type { AnyModule } from './schema';
+import { tintColor } from './tint';
+
+/**
+ * A card colour (style.tint) draws a coloured edge inside the box; content keeps at least this much room
+ * from it (mm), or text sat on the edge. Also the card's smallest corner radius (mm).
+ */
+export const TINT_PADDING = 1.5;
+export const TINT_RADIUS = 1.5;
+
+/** Padding inside the border (mm): the module's own, or at least TINT_PADDING on a card. */
+export function effectivePadding(m: AnyModule): number {
+	const p = Math.max(0, m.style?.padding ?? 0);
+	return tintColor(m.style?.tint) ? Math.max(p, TINT_PADDING) : p;
+}
 
 /** Space between a module's edge and its content: border width plus padding (mm). */
 export function moduleInset(m: AnyModule): number {
-	const s = m.style;
-	return Math.max(0, (s?.border?.width ?? 0) + (s?.padding ?? 0));
+	return Math.max(0, m.style?.border?.width ?? 0) + effectivePadding(m);
+}
+
+/** Corner radius of the module's outer edge (mm), as CSS draws it: cards are always a little rounded. */
+export function outerRadius(m: AnyModule): number {
+	const r = Math.max(0, m.style?.border?.radius ?? 0);
+	return tintColor(m.style?.tint) ? Math.max(r, TINT_RADIUS) : r;
+}
+
+/** Module opacity, 0–1 (1 when unset or invalid). */
+export function moduleOpacity(m: AnyModule): number {
+	const o = m.style?.opacity;
+	return typeof o === 'number' && Number.isFinite(o) ? Math.min(1, Math.max(0, o)) : 1;
 }
 
 /**

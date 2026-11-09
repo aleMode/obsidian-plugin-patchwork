@@ -15,6 +15,10 @@ import { moduleTitle } from './OutlineRenderer';
 import { TINT_PRESETS } from '../model/tint';
 import { FIT_LABELS, insets, PLAIN_NUMBER, uniformInset, withField, withStyle } from '../ui/formHelpers';
 import { isImage, isPdf } from '../sources/fileKinds';
+import { moduleInk } from '../model/contrast';
+
+/** Module types as the panel names them. */
+const TYPE_NAMES: Record<string, string> = { note: 'Note', pdf: 'PDF region', text: 'Text box', image: 'Image', toc: 'Table of contents', frame: 'Text frame', tracker: 'Tracker', shape: 'Shape' };
 
 /** Where a custom card colour starts: a neutral blue that reads on light and dark themes. */
 const DEFAULT_CUSTOM_TINT = '#4a90d9';
@@ -26,7 +30,7 @@ class Form {
 	/** `settle` closes the undo group after a discrete choice, so two picks of the same field are two undo steps. */
 	constructor(private host: () => HTMLElement, private unit: DisplayUnit, private settle: () => void = () => {}) {}
 
-	/** What an unset text colour looks like: the app theme's, or the paper's dark ink (the default, also in exports). */
+	/** What an unset text colour looks like: light or dark, following the background (model/contrast). */
 	textAuto = 'Auto';
 
 	heading(text: string) {
@@ -42,6 +46,20 @@ class Form {
 			}),
 		);
 		s.controlEl.createSpan({ cls: 'pw-unit-suffix', text: this.unit });
+	}
+
+	/** A 0–1 fraction edited as a percentage (opacity). Empty means unset. */
+	percent(name: string, value: number | undefined, set: (v: number | undefined) => void) {
+		const s = new Setting(this.host()).setName(name).addText((t) => {
+			t.inputEl.type = 'number';
+			t.setPlaceholder('100');
+			t.setValue(value === undefined ? '' : String(Math.round(value * 100))).onChange((v) => {
+				if (v.trim() === '') return set(undefined);
+				const n = Number(v);
+				if (Number.isFinite(n) && n >= 0 && n <= 100) set(n / 100);
+			});
+		});
+		s.controlEl.createSpan({ cls: 'pw-unit-suffix', text: '%' });
 	}
 
 	number(name: string, value: number | undefined, set: (v: number | undefined) => void, opts: { min?: number; max?: number; placeholder?: string } = {}) {
@@ -143,7 +161,6 @@ export class PropertiesForm {
 		this.makeSections();
 		const file = board.boardStore.file;
 		const form = new Form(() => this.el, file.board.displayUnit, () => board.boardStore.endCoalesce());
-		form.textAuto = file.board.useAppTheme ? 'Auto: theme' : 'Auto: dark';
 		if (board.boardStore.readOnly) return void this.el.createDiv({ cls: 'pw-panel-empty', text: 'This patchwork is read-only.' });
 		const page = file.pages.find((p) => p.id === board.selected?.pageId);
 		const mod = page?.modules.find((m) => m.id === board.selected?.moduleId);
@@ -210,6 +227,8 @@ export class PropertiesForm {
 		form.length('Y', page.y, (mm) => setPage('y', (p) => ({ ...p, y: mm })));
 		form.length('Width', page.w, (mm) => setPage('w', (p) => ({ ...p, w: mm })), { min: 5 });
 		form.length('Height', page.h, (mm) => setPage('h', (p) => ({ ...p, h: mm })), { min: 5 });
+		form.length('Safe area', uniformInset(page.safeArea), (mm) => setPage('safe', (p) => withField(p, 'safeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
+		this.el.createDiv({ cls: 'pw-panel-hint', text: 'A dashed margin guide on the board; never printed.' });
 		if (Math.max(page.w, page.h) > MAX_PAGE_SIDE_MM) {
 			this.el.createDiv({ cls: 'pw-panel-hint mod-warning', text: `Larger than a PDF page can be (${formatLength(MAX_PAGE_SIDE_MM, board.boardStore.file.board.displayUnit)} per side): export it on a sheet size, which splits it into tiles.` });
 		}
@@ -232,12 +251,12 @@ export class PropertiesForm {
 		form.color('Background', page.background, (v) => setPage('background', (p) => withField(p, 'background', v)));
 		this.renderMaster(form, board, page);
 		this.in('furniture');
-		form.heading('Page furniture');
+		form.heading('Number, header and footer');
 		this.overrideRow('Number', page.numberLabel === false ? 'none' : page.numberLabel, (v) => setPage('numberLabel', (p) => withField(p, 'numberLabel', v === 'none' ? false : v)), 'Automatic');
 		const inherit = page.master ? 'From master' : 'Patchwork default';
 		this.overrideRow('Header', page.header === '' ? 'none' : page.header, (v) => setPage('header', (p) => withField(p, 'header', v === 'none' ? '' : v)), inherit);
 		this.overrideRow('Footer', page.footer === '' ? 'none' : page.footer, (v) => setPage('footer', (p) => withField(p, 'footer', v === 'none' ? '' : v)), inherit);
-		form.length('Safe area', uniformInset(page.safeArea), (mm) => setPage('safe', (p) => withField(p, 'safeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
+		this.el.createDiv({ cls: 'pw-panel-hint', text: 'Tokens: {page}, {pages}, {name} (the page name), {title}, {date}.' });
 	}
 
 	/** Master pages (M4): flag this page as one, or pick the master it uses. */
@@ -295,7 +314,9 @@ export class PropertiesForm {
 
 	private renderModule(form: Form, board: BoardViewport, page: Page, m: AnyModule) {
 		const set = (field: string, fn: (x: AnyModule) => AnyModule) => this.update(board, field, (f) => mapModule(f, page.id, m.id, fn));
-		form.heading(`${m.type[0]!.toUpperCase()}${m.type.slice(1)} module: ${moduleTitle(m)}`);
+		const ink = board.inkOf(page.id);
+		form.textAuto = ink && moduleInk(m, ink).ink === 'light' ? 'Auto: light' : 'Auto: dark';
+		form.heading(`${TYPE_NAMES[m.type] ?? m.type}: ${moduleTitle(m)}`);
 		this.in('advanced');
 		form.text('Label', m.label, (v) => set('label', (x) => withField(x, 'label', v)), 'Shown in the outline');
 		this.in('layout');
@@ -374,7 +395,7 @@ export class PropertiesForm {
 		const setStyle = (field: string, key: keyof ModuleStyle & string, value: unknown) => set(`style.${field}`, (x) => withStyle(x, key, value));
 		this.in('style');
 		form.heading('Style');
-		form.number('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v), { min: 0, max: 1, placeholder: '1' });
+		form.percent('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v));
 		this.in('advanced');
 		form.text('CSS class', s.cssClass, (v) => setStyle('cssClass', 'cssClass', v), 'For CSS snippets');
 	}
@@ -442,7 +463,11 @@ export class PropertiesForm {
 		form.number('To line', lines?.[1], (v) => set('lines', (x) => withField(x, 'lines', v === undefined ? undefined : [Math.min(v, (x as NoteModule).lines?.[0] ?? 1), v])), { min: 1, placeholder: 'end' });
 		this.el.createDiv({ cls: 'pw-panel-hint', text: 'Lines count from the start of the section (or of the note), 1-based.' });
 		this.in('content');
-		form.dropdown('Overflow', { clip: 'Clip', fit: 'Shrink to fit', grow: 'Grow' }, m.overflow ?? 'clip', (v) => set('overflow', (x) => withField(x, 'overflow', v === 'clip' ? undefined : v)));
+		form.dropdown('Overflow', { clip: 'Clip', fit: 'Shrink to fit', grow: 'Grow' }, m.overflow ?? 'clip', (v) => {
+			set('overflow', (x) => withField(x, 'overflow', v === 'clip' ? undefined : v));
+			this.rerender();
+		});
+		if (m.overflow === 'grow') this.el.createDiv({ cls: 'pw-panel-hint', text: 'The box gets taller to fit the text, and may cover items below it. Its stored height does not change.' });
 		if ((m.overflow ?? 'clip') === 'clip') {
 			form.length('Scroll', m.scrollY ?? 0, (mm) => set('scrollY', (x) => withField(x, 'scrollY', mm > 0 ? mm : undefined)), { min: 0 });
 			this.el.createDiv({ cls: 'pw-panel-hint', text: 'Shows a later part of a note that is too long for its box. Scroll the mouse wheel over the selected note to do it by hand.' });
@@ -465,7 +490,8 @@ export class PropertiesForm {
 		form.heading('PDF');
 		this.fileRow(m, isPdf, set);
 		form.number('Page', m.page, (v) => v !== undefined && Number.isInteger(v) && set('page', (x) => ({ ...x, page: v })), { min: 1 });
-		const crop = m.crop ? m.crop.map((v) => v.toFixed(3)).join(', ') : 'Full page';
+		const pct = (v: number) => `${Math.round(v * 100)} %`;
+		const crop = m.crop ? `${pct(m.crop[2] - m.crop[0])} × ${pct(m.crop[3] - m.crop[1])} of the page, from ${pct(m.crop[0])} left, ${pct(m.crop[1])} top` : 'Full page';
 		form.button('Crop', 'Edit crop…', () => board.editCrop(page.id, m.id), crop);
 		form.dropdown('Fit', FIT_LABELS, m.fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
 		this.in('advanced');
@@ -490,12 +516,12 @@ export class PropertiesForm {
 		const options: Record<string, string> = { '': 'None' };
 		for (const t of TINT_PRESETS) options[t.id] = t.name;
 		options.custom = 'Custom';
-		form.dropdown('Colour', options, !tint ? '' : preset ? tint : 'custom', (v) => {
+		form.dropdown('Card colour', options, !tint ? '' : preset ? tint : 'custom', (v) => {
 			if (v === 'custom') set(tint && !preset ? tint : DEFAULT_CUSTOM_TINT);
 			else set(v === '' ? undefined : v);
 			this.rerender();
 		});
-		if (tint && !preset) form.color('Custom colour', tint, set);
+		if (tint && !preset) form.color('Custom card colour', tint, set);
 	}
 
 	private renderStyle(form: Form, m: AnyModule, set: (field: string, fn: (x: AnyModule) => AnyModule) => void) {
@@ -512,11 +538,14 @@ export class PropertiesForm {
 		}
 		form.color('Background', s.background, (v) => setStyle('background', 'background', v));
 		this.tintRows(form, s.tint, (v) => setStyle('tint', 'tint', v));
-		form.number('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v), { min: 0, max: 1, placeholder: '1' });
-		form.number('Text scale', s.fontScale, (v) => setStyle('fontScale', 'fontScale', v === 1 ? undefined : v), { min: 0.1, max: 5, placeholder: '1' });
-		form.color('Text colour', s.color, (v) => setStyle('color', 'color', v), form.textAuto);
-		form.dropdown('Alignment', { '': 'Default', left: 'Left', center: 'Centre', right: 'Right', justify: 'Justify' }, s.align ?? '', (v) => setStyle('align', 'align', v === '' ? undefined : v));
-		form.text('Font', s.fontFamily, (v) => setStyle('fontFamily', 'fontFamily', v), 'Same as the page');
+		form.percent('Opacity', s.opacity, (v) => setStyle('opacity', 'opacity', v === 1 ? undefined : v));
+		// PDF regions and images have no text, so text formatting would do nothing there.
+		if (m.type !== 'pdf' && m.type !== 'image') {
+			form.number('Text scale', s.fontScale, (v) => setStyle('fontScale', 'fontScale', v === 1 ? undefined : v), { min: 0.1, max: 5, placeholder: '1' });
+			form.color('Text colour', s.color, (v) => setStyle('color', 'color', v), form.textAuto);
+			form.dropdown('Alignment', { '': 'Default', left: 'Left', center: 'Centre', right: 'Right', justify: 'Justify' }, s.align ?? '', (v) => setStyle('align', 'align', v === '' ? undefined : v));
+			form.text('Font', s.fontFamily, (v) => setStyle('fontFamily', 'fontFamily', v), 'Same as the page');
+		}
 		this.in('advanced');
 		form.text('CSS class', s.cssClass, (v) => setStyle('cssClass', 'cssClass', v), 'For CSS snippets');
 	}

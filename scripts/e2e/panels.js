@@ -32,7 +32,7 @@ try {
 
 	s.select({ pageId: view.store.file.pages[0].id, moduleId: 'n' });
 	await sleep(100);
-	check('inspector shows the selected module', panel('patchwork-inspector').contentEl.innerText.includes('Note module'));
+	check('inspector shows the selected module', panel('patchwork-inspector').contentEl.innerText.includes('Note: '));
 	typeInto('Width', '12');
 	typeInto('Width', '120');
 	check('typing a width updates the module', view.store.file.pages[0].modules[0].w === 120, view.store.file.pages[0].modules[0].w);

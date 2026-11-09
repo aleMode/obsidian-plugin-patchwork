@@ -13,7 +13,7 @@ const TABS: Record<'module' | 'page', [PropertiesSection, string][]> = {
 	page: [
 		['content', 'Page'],
 		['layout', 'Layout'],
-		['furniture', 'Numbers'],
+		['furniture', 'Header & footer'],
 	],
 };
 

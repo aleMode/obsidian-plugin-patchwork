@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { batches, drawOrder, oversizedPages, vectorModules, vectorTarget } from '../../src/model/exportPlan';
+import { batches, coveringVectorModules, drawOrder, oversizedPages, vectorFrame, vectorModules, vectorTarget } from '../../src/model/exportPlan';
 import type { AnyModule, Page, PdfModule } from '../../src/model/schema';
 import { mmToPt } from '../../src/model/units';
 
@@ -10,6 +10,32 @@ const page = (modules: AnyModule[]): Page => ({ id: 'p', x: 0, y: 0, w: 210, h: 
 describe('drawOrder', () => {
 	it('sorts by z, then array order', () => {
 		expect(drawOrder([text('a', 0, { z: 2 }), text('b', 0), text('c', 0, { z: -1 }), text('d', 0)]).map((m) => m.id)).toEqual(['c', 'b', 'd', 'a']);
+	});
+});
+
+describe('coveringVectorModules', () => {
+	it('lists forced-vector regions with something stacked above them', () => {
+		const p = page([pdf('forced', 0, { render: 'vector' }), text('over', 20), pdf('auto', 100), text('over2', 110), pdf('free', 150, { y: 100, render: 'vector' })]);
+		expect(coveringVectorModules(p).map((m) => m.id)).toEqual(['forced']);
+	});
+});
+
+describe('vectorFrame', () => {
+	it('clips inside the border with the inner radius, in PDF units', () => {
+		const f = vectorFrame(pdf('a', 10, { y: 20, style: { opacity: 0.4, border: { width: 1, color: '#000', radius: 6 } } }), mmToPt(297));
+		expect(f.opacity).toBe(0.4);
+		expect(f.radius).toBeCloseTo(mmToPt(5));
+		expect(f.clip.x).toBeCloseTo(mmToPt(11));
+		expect(f.clip.w).toBeCloseTo(mmToPt(48));
+		expect(f.clip.y).toBeCloseTo(mmToPt(297 - 69));
+	});
+
+	it('no style: the whole box, square, opaque', () => {
+		const f = vectorFrame(pdf('a', 0), mmToPt(297));
+		expect([f.opacity, f.radius, f.clip.x]).toEqual([1, 0, 0]);
+		expect(f.clip.y).toBeCloseTo(mmToPt(247));
+		expect(f.clip.w).toBeCloseTo(mmToPt(50));
+		expect(f.clip.h).toBeCloseTo(mmToPt(50));
 	});
 });
 

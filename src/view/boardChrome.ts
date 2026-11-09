@@ -152,7 +152,7 @@ export class Minimap {
 	}
 
 	/** Cheap enough to redraw every camera frame. `faint`: pages as Use mode shows them. */
-	draw(pages: readonly Rect[], camera: Camera, vp: { w: number; h: number }, faint = false) {
+	draw(pages: readonly (Rect & { background?: string })[], camera: Camera, vp: { w: number; h: number }, faint = false) {
 		if (!this.shown) return;
 		const area = visibleRect(camera, vp);
 		const all = bounds([...pages, area]);
@@ -171,8 +171,17 @@ export class Minimap {
 		const ox = MAP_PAD + (MAP_W - 2 * MAP_PAD - all.w * k) / 2 - all.x * k;
 		const oy = MAP_PAD + (MAP_H - 2 * MAP_PAD - all.h * k) / 2 - all.y * k;
 		this.frame = { x: ox, y: oy, k };
-		c.fillStyle = faint ? colors.faint : '#ffffff';
-		for (const p of pages) c.fillRect(ox + p.x * k, oy + p.y * k, Math.max(1, p.w * k), Math.max(1, p.h * k));
+		for (const p of pages) {
+			// Each page in its own background, so a dark page doesn't show as white paper.
+			c.fillStyle = faint ? colors.faint : p.background ?? '#ffffff';
+			c.fillRect(ox + p.x * k, oy + p.y * k, Math.max(1, p.w * k), Math.max(1, p.h * k));
+		}
+		// A faint edge keeps dark pages visible on the dark map.
+		c.strokeStyle = colors.fg;
+		c.globalAlpha = 0.5;
+		c.lineWidth = 1;
+		for (const p of pages) c.strokeRect(ox + p.x * k + 0.5, oy + p.y * k + 0.5, Math.max(1, p.w * k - 1), Math.max(1, p.h * k - 1));
+		c.globalAlpha = 1;
 		c.strokeStyle = colors.accent;
 		c.lineWidth = 1.5;
 		c.strokeRect(ox + area.x * k, oy + area.y * k, area.w * k, area.h * k);

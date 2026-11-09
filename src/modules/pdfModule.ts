@@ -135,7 +135,10 @@ export class PdfModuleRenderer implements ModuleRenderer {
 		const want = (this.ctx.resolution?.() ?? PX_PER_MM * window.devicePixelRatio) * SCREEN_OVERSAMPLE;
 		const pxPerMm = this.pxPerMm ?? bucketResolution(want, PX_PER_MM);
 		const w = Math.min(MAX_CANVAS_SIDE, Math.max(1, Math.ceil(unrotated.w * pxPerMm)));
-		const h = Math.min(MAX_CANVAS_SIDE, Math.max(1, Math.ceil(unrotated.h * pxPerMm)));
+		// Pixels keep the crop's own proportions; CSS stretches them to the box. `draw` scales the page by
+		// width, so a canvas shaped like a stretched box left a blank strip (or cut the crop off).
+		const cropAspect = ((crop[3] - crop[1]) * vp1.height) / ((crop[2] - crop[0]) * vp1.width);
+		const h = Math.min(MAX_CANVAS_SIDE, Math.max(1, Math.ceil(w * cropAspect)));
 		return { crop, rot, placed, unrotated, px: { w, h }, pxPerMm };
 	}
 

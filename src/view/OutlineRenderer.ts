@@ -1,3 +1,4 @@
+import { plainText } from '../model/mdFormat';
 import { type App, setIcon } from 'obsidian';
 import { orderedPages } from '../model/ordering';
 import type { AnyModule, ShapeModule } from '../model/schema';
@@ -17,7 +18,7 @@ export function moduleTitle(m: AnyModule): string {
 		case 'pdf':
 			return `${file} p. ${String(m.page)}`;
 		case 'text':
-			return (typeof m.markdown === 'string' ? m.markdown : '').replace(/[#*_`>]/g, '').trim().slice(0, 40) || 'Text';
+			return plainText(typeof m.markdown === 'string' ? m.markdown : '').slice(0, 40) || 'Text';
 		case 'image':
 			return file;
 		case 'toc':

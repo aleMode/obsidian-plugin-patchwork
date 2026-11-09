@@ -1,3 +1,5 @@
+import type { Ink } from '../model/contrast';
+
 /**
  * Light "paper" inside a dark app (SPEC 5.5, spike S1). Obsidian declares its derived colour
  * variables (--background-primary: var(--color-base-00), …) on `body`, where they resolve once
@@ -37,7 +39,26 @@ export function refreshPaperScope(doc: Document = activeDocument): void {
 		sheets.set(doc, sheet);
 		doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
 	}
-	sheet.replaceSync(`.pw-paper { ${collectBodyVariables(doc, sheet).join(' ')} color: var(--text-normal); background-color: var(--background-primary); }`);
+	const vars = collectBodyVariables(doc, sheet).join(' ');
+	// `.pw-rescope` re-themes a page or module whose background needs the other ink (see model/contrast): the
+	// element also gets `theme-dark` or `theme-light` for the base colours, and the same re-declaration.
+	sheet.replaceSync(`.pw-paper { ${vars} color: var(--text-normal); background-color: var(--background-primary); } .pw-rescope { ${vars} color: var(--text-normal); }`);
+}
+
+/** Ink of a page with no background: dark on paper, else the app theme's. */
+export function themeInk(appTheme: boolean, doc: Document = activeDocument): Ink {
+	return appTheme && doc.body.hasClass('theme-dark') ? 'light' : 'dark';
+}
+
+/**
+ * Re-theme `el` for `ink` when it differs from the ink around it (`base`): light ink is the dark theme's
+ * text colours, dark ink the light theme's. `paper` keeps the element's own light paper scope otherwise.
+ */
+export function applyInk(el: HTMLElement, ink: Ink, base: Ink, paper = false) {
+	const flip = ink !== base;
+	el.toggleClass('pw-rescope', flip);
+	el.toggleClass('theme-dark', flip && ink === 'light');
+	el.toggleClass('theme-light', flip ? ink === 'dark' : paper);
 }
 
 export function removePaperScope(doc: Document = activeDocument): void {

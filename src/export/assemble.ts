@@ -1,5 +1,5 @@
-import { clip, degrees, endPath, grayscale, PDFDocument, PDFHexString, PDFName, type PDFPage, popGraphicsState, pushGraphicsState, rectangle, rgb, translate } from '@cantoo/pdf-lib';
-import { drawOrder, vectorTarget } from '../model/exportPlan';
+import { appendBezierCurve, clip, closePath, degrees, endPath, grayscale, lineTo, moveTo, PDFDocument, PDFHexString, PDFName, type PDFOperator, type PDFPage, popGraphicsState, pushGraphicsState, rectangle, rgb, translate } from '@cantoo/pdf-lib';
+import { drawOrder, vectorFrame, vectorTarget } from '../model/exportPlan';
 import { cropToUserBox, drawPlacement, FULL_PAGE } from '../model/pdfGeometry';
 import type { PdfPageLabel } from '../model/numbering';
 import type { Page, PdfModule } from '../model/schema';
@@ -77,10 +77,35 @@ async function drawVectorModule(out: PDFDocument, target: PDFPage, pageHeightPt:
 	const embedded = await out.embedPage(sp, box);
 	const { content, clip: c } = vectorTarget(m, { w: cb.width, h: cb.height, rotate }, pageHeightPt);
 	const p = drawPlacement({ w: embedded.width, h: embedded.height }, rotate + (m.rotation ?? 0), content);
-	// Clip to the module box: "cover" overflows it, and modules never draw outside their box.
-	target.pushOperators(pushGraphicsState(), rectangle(c.x, c.y, c.w, c.h), clip(), endPath());
-	target.drawPage(embedded, { x: p.x, y: p.y, xScale: p.xScale, yScale: p.yScale, rotate: degrees(p.rotate) });
+	const frame = vectorFrame(m, pageHeightPt);
+	// Clip like the screen: to the rounded area inside the border, then to the content box ("cover" overflows
+	// it, and modules never draw outside their box). Successive clips intersect.
+	target.pushOperators(pushGraphicsState(), ...roundedRect(frame.clip, frame.radius), clip(), endPath(), rectangle(c.x, c.y, c.w, c.h), clip(), endPath());
+	// The HTML layer already printed the module's background and border at this opacity.
+	target.drawPage(embedded, { x: p.x, y: p.y, xScale: p.xScale, yScale: p.yScale, rotate: degrees(p.rotate), ...(frame.opacity < 1 ? { opacity: frame.opacity } : {}) });
 	target.pushOperators(popGraphicsState());
+}
+
+/** Bézier handle length for a quarter circle. */
+const KAPPA = 0.5523;
+
+/** Path of a rectangle with round corners (PDF units); a plain rectangle when `r` is 0. */
+function roundedRect(b: Rect, r: number): PDFOperator[] {
+	if (r <= 0) return [rectangle(b.x, b.y, b.w, b.h)];
+	const k = r * KAPPA;
+	const x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h;
+	return [
+		moveTo(x0 + r, y0),
+		lineTo(x1 - r, y0),
+		appendBezierCurve(x1 - r + k, y0, x1, y0 + r - k, x1, y0 + r),
+		lineTo(x1, y1 - r),
+		appendBezierCurve(x1, y1 - r + k, x1 - r + k, y1, x1 - r, y1),
+		lineTo(x0 + r, y1),
+		appendBezierCurve(x0 + r - k, y1, x0, y1 - r + k, x0, y1 - r),
+		lineTo(x0, y0 + r),
+		appendBezierCurve(x0, y0 + r - k, x0 + r - k, y0, x0 + r, y0),
+		closePath(),
+	];
 }
 
 function addOutline(doc: PDFDocument, entries: { title: string; pageIndex: number }[]) {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AnyModule } from '../../src/model/schema';
-import { clampScroll, contentBox, moduleInset, textScale } from '../../src/model/style';
+import { clampScroll, contentBox, effectivePadding, moduleInset, moduleOpacity, outerRadius, textScale } from '../../src/model/style';
 
 const m = (extra: Partial<AnyModule> = {}): AnyModule => ({ id: 'a', type: 'text', markdown: '', x: 0, y: 0, w: 50, h: 30, ...extra });
 
@@ -8,6 +8,21 @@ describe('module style geometry', () => {
 	it('inset is border plus padding', () => {
 		expect(moduleInset(m())).toBe(0);
 		expect(moduleInset(m({ style: { padding: 3, border: { width: 0.5, color: '#000' } } }))).toBe(3.5);
+	});
+
+	it('a card colour keeps the content off its coloured edge and rounds the corners', () => {
+		expect(effectivePadding(m({ style: { tint: '4' } }))).toBe(1.5);
+		expect(effectivePadding(m({ style: { tint: '#4a90d9', padding: 3 } }))).toBe(3);
+		expect(effectivePadding(m({ style: { tint: 'nonsense' } }))).toBe(0);
+		expect(outerRadius(m({ style: { tint: '1' } }))).toBe(1.5);
+		expect(outerRadius(m({ style: { tint: '1', border: { width: 1, color: '#000', radius: 5 } } }))).toBe(5);
+		expect(outerRadius(m())).toBe(0);
+	});
+
+	it('opacity is clamped to 0–1', () => {
+		expect(moduleOpacity(m())).toBe(1);
+		expect(moduleOpacity(m({ style: { opacity: 0.35 } }))).toBe(0.35);
+		expect(moduleOpacity(m({ style: { opacity: 7 } }))).toBe(1);
 	});
 
 	it('content box is inset on all sides', () => {

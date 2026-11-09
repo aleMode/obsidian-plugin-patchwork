@@ -68,7 +68,14 @@ try {
 
 	const paper = el('note1').closest('.pw-page-paper');
 	const p = getComputedStyle(el('note1').querySelector('p, li') ?? el('note1'));
-	check('note text is dark on light paper', p.color === 'rgb(34, 34, 34)' && getComputedStyle(paper).backgroundColor === 'rgb(255, 255, 255)', p.color);
+	// Read the colour back as pixels: the small-text contrast rule reports it in oklch(), not rgb().
+	const rgbOf = (css) => {
+		const c = document.createElement('canvas').getContext('2d');
+		c.fillStyle = css;
+		c.fillRect(0, 0, 1, 1);
+		return Array.from(c.getImageData(0, 0, 1, 1).data.slice(0, 3));
+	};
+	check('note text is dark on light paper', Math.max(...rgbOf(p.color)) < 80 && getComputedStyle(paper).backgroundColor === 'rgb(255, 255, 255)', [p.color, rgbOf(p.color)]);
 
 	// Live updates: the source note, and a note embedded by a module's note.
 	await editNote('Rules/Combat.md', (t) => t.replace('- You can only crawl', '- E2E-LIVE-EDIT\n- You can only crawl'));
