@@ -1,4 +1,5 @@
 import { newPage } from '../model/defaults';
+import { flowChains } from '../model/flow';
 import type { AnyModule, Page, PatchworkFile } from '../model/schema';
 
 // Immutable edits used with BoardStore.update. Each returns the same object when nothing changes,
@@ -87,12 +88,24 @@ export function restack(file: PatchworkFile, pageId: string, moduleId: string, t
 	});
 }
 
-/** Copy of a module with a new ID, nudged so it doesn't sit exactly on the original. */
-export function duplicateModule(file: PatchworkFile, pageId: string, moduleId: string, newId: string, offset = 5): PatchworkFile {
-	return mapPage(file, pageId, (p) => {
-		const m = p.modules.find((x) => x.id === moduleId);
-		return m ? { ...p, modules: [...p.modules, { ...structuredClone(m), id: newId, x: m.x + offset, y: m.y + offset, locked: undefined }] } : p;
-	});
+/**
+ * Copies of modules, each nudged on its own page, with new IDs. Linked frames are re-linked so no two
+ * frames continue the same text: a copy whose source was copied too continues that copy (a copied
+ * chain is a new chain); any other copied frame joins the end of its original chain.
+ */
+export function duplicateModules(file: PatchworkFile, picks: readonly { pageId: string; moduleId: string }[], ids: () => string, offset = 5): { file: PatchworkFile; copies: { pageId: string; moduleId: string }[] } {
+	const idMap = new Map<string, string>();
+	const copies: { pageId: string; moduleId: string }[] = [];
+	let next = file;
+	for (const { pageId, moduleId } of picks) {
+		const m = findModule(file, pageId, moduleId);
+		if (!m || idMap.has(m.id)) continue;
+		const id = ids();
+		idMap.set(m.id, id);
+		copies.push({ pageId, moduleId: id });
+		next = addModule(next, pageId, { ...structuredClone(m), id, x: m.x + offset, y: m.y + offset, locked: undefined });
+	}
+	return { file: relinkCopiedFrames(file, next, idMap), copies };
 }
 
 /** Copy of a page and its modules (all with new IDs), placed to the right of everything. */
@@ -101,8 +114,42 @@ export function duplicatePage(file: PatchworkFile, pageId: string, ids: () => st
 	if (!p) return file;
 	const right = Math.max(...file.pages.map((x) => x.x + x.w));
 	const copy = { ...structuredClone(p), id: ids(), x: right + 20, name: p.name ? `${p.name} copy` : undefined };
-	copy.modules = copy.modules.map((m) => ({ ...m, id: ids() }));
-	return { ...file, pages: [...file.pages, copy] };
+	const idMap = new Map<string, string>();
+	copy.modules = copy.modules.map((m) => {
+		const id = ids();
+		idMap.set(m.id, id);
+		return { ...m, id };
+	});
+	return relinkCopiedFrames(file, { ...file, pages: [...file.pages, copy] }, idMap);
+}
+
+/**
+ * Point copied frames somewhere valid (see duplicateModules). `before` is the file without the copies,
+ * whose chains say where each original frame's chain ends; `idMap` maps original IDs to copies.
+ */
+function relinkCopiedFrames(before: PatchworkFile, after: PatchworkFile, idMap: ReadonlyMap<string, string>): PatchworkFile {
+	const chains = flowChains(before);
+	/** Current end of each original chain, by head ID, as copies are appended to it. */
+	const tails = new Map<string, string>();
+	const from = new Map<string, string>();
+	for (const [original, copy] of idMap) {
+		const info = chains.get(original);
+		const m = before.pages.flatMap((p) => p.modules).find((x) => x.id === original);
+		if (m?.type !== 'frame' || typeof m.from !== 'string') continue;
+		if (idMap.has(m.from)) {
+			from.set(copy, idMap.get(m.from)!);
+			continue;
+		}
+		if (!info?.ok) continue;
+		const head = info.chain[0]!.module.id;
+		from.set(copy, tails.get(head) ?? info.chain[info.chain.length - 1]!.module.id);
+		tails.set(head, copy);
+	}
+	if (from.size === 0) return after;
+	return {
+		...after,
+		pages: after.pages.map((p) => (p.modules.some((m) => from.has(m.id)) ? { ...p, modules: p.modules.map((m) => (from.has(m.id) ? { ...m, from: from.get(m.id) } : m)) } : p)),
+	};
 }
 
 /** Where a new module goes: inside a 10 mm margin, cascading so new modules don't hide each other. */
@@ -119,5 +166,8 @@ export function moveModuleToPage(file: PatchworkFile, fromPageId: string, module
 	if (fromPageId === toPageId) return moveModule(file, fromPageId, moduleId, x, y);
 	const m = findModule(file, fromPageId, moduleId);
 	if (!m || !file.pages.some((p) => p.id === toPageId)) return file;
-	return addModule(removeModule(file, fromPageId, moduleId), toPageId, { ...m, x, y });
+	// Taken off its page directly, not with removeModule: a moved frame stays in its chain, so its
+	// neighbours must not be re-linked around it.
+	const taken = mapPage(file, fromPageId, (p) => ({ ...p, modules: p.modules.filter((x) => x.id !== moduleId) }));
+	return addModule(taken, toPageId, { ...m, x, y });
 }

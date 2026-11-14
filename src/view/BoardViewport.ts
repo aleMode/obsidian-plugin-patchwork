@@ -34,7 +34,7 @@ import { linkpathsFromDrop } from '../sources/dropLinks';
 import { type PdfDocCache, pdfSourceId } from '../sources/pdfSource';
 import { loadNoteContent } from '../sources/markdownSource';
 import type { BoardStore } from '../store/BoardStore';
-import { addModule, addPage, defaultModuleRect, duplicateModule, duplicatePage, findModule, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { addModule, addPage, defaultModuleRect, duplicateModules, duplicatePage, findModule, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { withField } from '../ui/formHelpers';
 import { PatchworkSettingsModal, type SettingsDraft } from '../ui/PatchworkSettingsModal';
 import { NamedPickerModal, TextPromptModal } from '../ui/prompts';
@@ -1499,14 +1499,20 @@ export class BoardViewport implements BoardSurface {
 			taken.add(id);
 			return id;
 		};
-		const copies: Item[] = [];
+		let copies: Item[] = [];
+		// A selection never mixes pages and modules. Modules are copied together, so a copied chain of
+		// linked frames stays a chain of its own.
+		const picks = this.items.flatMap((it) => (it.moduleId ? [{ pageId: it.pageId, moduleId: it.moduleId }] : []));
+		if (picks.length) {
+			this.store.update((f) => {
+				const r = duplicateModules(f, picks, ids);
+				copies = r.copies;
+				return r.file;
+			});
+			return this.setItems(copies);
+		}
 		this.store.update((f) =>
 			this.items.reduce((acc, it) => {
-				if (it.moduleId) {
-					const id = ids();
-					copies.push({ pageId: it.pageId, moduleId: id });
-					return duplicateModule(acc, it.pageId, it.moduleId, id);
-				}
 				const next = duplicatePage(acc, it.pageId, ids);
 				const added = next.pages[next.pages.length - 1];
 				if (added && next !== acc) copies.push({ pageId: added.id });
