@@ -38,6 +38,31 @@ describe('BoardStore', () => {
 		expect(store.canUndo).toBe(false);
 	});
 
+	it('a fence limits undo and redo to later changes, and lifting it gives the whole history back', () => {
+		const { store, id } = storeWithPage();
+		store.update((f) => movePage(f, id, 10, 0));
+		store.update((f) => movePage(f, id, 20, 0));
+		store.undo(); // x 10, with x 20 to redo
+		store.setFence(true);
+		expect(store.canUndo).toBe(false);
+		expect(store.canRedo).toBe(false);
+		store.redo();
+		expect(store.file.pages[0]!.x).toBe(10);
+		store.update((f) => movePage(f, id, 30, 0));
+		store.update((f) => movePage(f, id, 40, 0));
+		store.undo();
+		store.undo();
+		store.undo();
+		expect(store.file.pages[0]!.x).toBe(10);
+		store.redo();
+		expect(store.file.pages[0]!.x).toBe(30);
+		store.setFence(false);
+		store.undo();
+		store.undo();
+		expect(store.file.pages[0]!.x).toBe(0);
+		expect(store.canUndo).toBe(false);
+	});
+
 	it('does not record no-op changes', () => {
 		const { store, id } = storeWithPage();
 		store.update((f) => movePage(f, id, 0, 0));

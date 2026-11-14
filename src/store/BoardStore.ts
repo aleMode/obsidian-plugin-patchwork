@@ -22,6 +22,12 @@ export class BoardStore {
 	private past: PatchworkFile[] = [];
 	private future: PatchworkFile[] = [];
 	private openGroup: string | null = null;
+	/**
+	 * While set (Use mode, review B10), undo stops at the step that was current when it was set, and
+	 * redo only replays what was undone since: a checkbox tick can't undo an Arrange edit. The stack
+	 * itself is unchanged, so lifting the fence gives the whole history back.
+	 */
+	private fence: { past: number; future: number } | null = null;
 	private listeners = new Set<Listener>();
 	readonly readOnly: boolean;
 
@@ -41,10 +47,14 @@ export class BoardStore {
 		const merging = opts.coalesce !== undefined && opts.coalesce === this.openGroup;
 		if (!merging) {
 			this.past.push(this.current);
-			if (this.past.length > HISTORY_LIMIT) this.past.shift();
+			if (this.past.length > HISTORY_LIMIT) {
+				this.past.shift();
+				if (this.fence) this.fence.past = Math.max(0, this.fence.past - 1);
+			}
 		}
 		this.openGroup = opts.coalesce ?? null;
 		this.future = [];
+		if (this.fence) this.fence.future = 0;
 		this.set(next);
 	}
 
@@ -65,15 +75,22 @@ export class BoardStore {
 		this.openGroup = null;
 	}
 
+	/** Limit undo and redo to changes made from now on (true), or give the whole history back (false). */
+	setFence(on: boolean) {
+		this.fence = on ? { past: this.past.length, future: this.future.length } : null;
+		this.openGroup = null;
+	}
+
 	get canUndo() {
-		return this.past.length > 0;
+		return this.past.length > (this.fence?.past ?? 0);
 	}
 
 	get canRedo() {
-		return this.future.length > 0;
+		return this.future.length > (this.fence?.future ?? 0);
 	}
 
 	undo() {
+		if (!this.canUndo) return;
 		const prev = this.past.pop();
 		if (!prev) return;
 		this.future.push(this.current);
@@ -82,6 +99,7 @@ export class BoardStore {
 	}
 
 	redo() {
+		if (!this.canRedo) return;
 		const next = this.future.pop();
 		if (!next) return;
 		this.past.push(this.current);

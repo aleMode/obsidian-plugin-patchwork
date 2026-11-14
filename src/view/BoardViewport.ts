@@ -399,6 +399,7 @@ export class BoardViewport implements BoardSurface {
 	private applyMode(on: boolean) {
 		if (on === this.useMode) return;
 		this.useMode = on;
+		this.store.setFence(on);
 		if (on) this.setTool(null);
 		this.host.toggleClass('pw-use', on);
 		this.modeButtons?.arrange.toggleClass('is-active', !on);
