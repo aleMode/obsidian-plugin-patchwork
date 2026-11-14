@@ -87,6 +87,8 @@ export default class PatchworkPlugin extends Plugin {
 		this.registerExtensions([BOARD_EXTENSION], VIEW_TYPE_BOARD);
 
 		refreshPaperScope();
+		// Popout windows have their own document; give each the paper rule as it opens.
+		this.registerEvent(this.app.workspace.on('window-open', (_win, window) => refreshPaperScope(window.document)));
 		this.registerEvent(
 			this.app.workspace.on('css-change', () => {
 				refreshAllPaperScopes();

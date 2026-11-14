@@ -112,7 +112,7 @@ export class ContextBar {
 	/** Stay open while something on the bar is in use: a menu, a focused field, the properties popover. */
 	private keepOpen(): boolean {
 		const doc = this.host.doc;
-		return !!doc.querySelector('.menu') || (this.el.contains(doc.activeElement) && doc.activeElement instanceof HTMLInputElement) || this.board.propertiesOpen;
+		return !!doc.querySelector('.menu') || (this.el.contains(doc.activeElement) && !!doc.activeElement?.instanceOf(HTMLInputElement)) || this.board.propertiesOpen;
 	}
 
 	/** Close again once the pointer has been away from the bar for a moment. */
@@ -139,7 +139,7 @@ export class ContextBar {
 	/** Rebuild for the current selection. */
 	refresh() {
 		// Typing in the name field is a model change too: keep the field (and the caret) as it is.
-		if (this.el.contains(this.el.doc.activeElement) && this.el.doc.activeElement instanceof HTMLInputElement) return this.reposition();
+		if (this.el.contains(this.el.doc.activeElement) && !!this.el.doc.activeElement?.instanceOf(HTMLInputElement)) return this.reposition();
 		this.hasControls = !this.board.boardStore.readOnly && this.selectionExists();
 		// A different selection starts collapsed again.
 		const key = this.board.selectedItems.map((it) => `${it.pageId}/${it.moduleId ?? ''}`).join('|');

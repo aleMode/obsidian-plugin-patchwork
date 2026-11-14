@@ -170,8 +170,6 @@ export class BoardViewport implements BoardSurface {
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
 		this.host = container;
-		// The board may live in a popout window, whose document needs its own paper rule.
-		ensurePaperScope(container.doc);
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
 		this.labelLayer = this.root.createDiv({ cls: 'pw-page-labels' });
@@ -963,6 +961,9 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	private onResize() {
+		// Also when a board is moved to another window: its elements are built before they are put there,
+		// so the window's document is only known once they are laid out in it.
+		ensurePaperScope(this.root.doc);
 		// The first fit waits for a real size: while a pane is being laid out it can briefly be a few
 		// pixels wide, and fitting to that opened boards at 2 % zoom.
 		if (!this.fitted && this.root.clientWidth >= MIN_FIT_PX && this.root.clientHeight >= MIN_FIT_PX) {

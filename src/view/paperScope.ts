@@ -12,9 +12,13 @@ import type { Ink } from '../model/contrast';
 // One sheet per window: a popout window has its own document, and a rule installed only in the main
 // window left paper there unscoped (white text on white paper in a dark theme).
 const sheets = new Map<Document, CSSStyleSheet>();
+/** Windows whose rule found no variables (styles not loaded yet when it was built); tried again on ensure. */
+const empty = new Set<Document>();
 
 function collectBodyVariables(doc: Document, own: CSSStyleSheet | undefined): string[] {
 	const decls: string[] = [];
+	// That window's own class: rules in a popout window are not instances of the main window's CSSStyleRule.
+	const StyleRule = doc.defaultView?.CSSStyleRule ?? CSSStyleRule;
 	for (const sheet of Array.from(doc.styleSheets)) {
 		if (sheet === own) continue;
 		let rules: CSSRuleList;
@@ -24,7 +28,7 @@ function collectBodyVariables(doc: Document, own: CSSStyleSheet | undefined): st
 			continue; // cross-origin sheets can't be read; Obsidian's and themes' are same-origin
 		}
 		for (const rule of Array.from(rules)) {
-			if (!(rule instanceof CSSStyleRule) || rule.selectorText !== 'body') continue;
+			if (!(rule instanceof StyleRule) || rule.selectorText !== 'body') continue;
 			for (const prop of Array.from(rule.style)) {
 				if (prop.startsWith('--')) decls.push(`${prop}: ${rule.style.getPropertyValue(prop)};`);
 			}
@@ -41,7 +45,10 @@ export function refreshPaperScope(doc: Document = activeDocument): void {
 		sheets.set(doc, sheet);
 		doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
 	}
-	const vars = collectBodyVariables(doc, sheet).join(' ');
+	const decls = collectBodyVariables(doc, sheet);
+	if (decls.length) empty.delete(doc);
+	else empty.add(doc);
+	const vars = decls.join(' ');
 	// `.pw-rescope` re-themes a page or module whose background needs the other ink (see model/contrast): the
 	// element also gets `theme-dark` or `theme-light` for the base colours, and the same re-declaration.
 	sheet.replaceSync(`.pw-paper { ${vars} color: var(--text-normal); background-color: var(--background-primary); } .pw-rescope { ${vars} color: var(--text-normal); }`);
@@ -65,14 +72,17 @@ export function applyInk(el: HTMLElement, ink: Ink, base: Ink, paper = false) {
 
 /** Make sure a window that is about to show paper has the rule (a board opened in a popout window). */
 export function ensurePaperScope(doc: Document): void {
-	if (!sheets.has(doc)) refreshPaperScope(doc);
+	if (!sheets.has(doc) || empty.has(doc)) refreshPaperScope(doc);
 }
 
 /** Theme or snippets changed: rebuild the rule in every window that has one. Closed windows are dropped. */
 export function refreshAllPaperScopes(): void {
 	for (const doc of [...sheets.keys()]) {
 		if (doc.defaultView) refreshPaperScope(doc);
-		else sheets.delete(doc);
+		else {
+			sheets.delete(doc);
+			empty.delete(doc);
+		}
 	}
 }
 
@@ -81,6 +91,7 @@ export function removePaperScope(doc: Document = activeDocument): void {
 	if (!sheet) return;
 	doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter((s) => s !== sheet);
 	sheets.delete(doc);
+	empty.delete(doc);
 }
 
 export function removeAllPaperScopes(): void {
