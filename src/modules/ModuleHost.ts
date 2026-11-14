@@ -104,7 +104,14 @@ export class ModuleHost {
 		this.component.registerEvent(app.metadataCache.on('changed', (file) => this.sourceChanged(file.path)));
 		this.component.registerEvent(app.vault.on('delete', (file) => this.sourceChanged(file.path)));
 		this.component.registerEvent(app.vault.on('rename', (file: TAbstractFile, old: string) => this.sourceChanged(old, file.path)));
-		this.component.registerEvent(app.vault.on('modify', (file) => o.ctx.pdfDocs.invalidate(file.path)));
+		// Notes re-render on `changed` above, once Obsidian has re-parsed them (their sections move). Any other
+		// file (an image, a PDF embedded in a note whose document is no longer open) re-renders on `modify`;
+		// an open PDF document is dropped first and its listeners re-render.
+		this.component.registerEvent(
+			app.vault.on('modify', (file) => {
+				if (!o.ctx.pdfDocs.invalidate(file.path) && !file.path.toLowerCase().endsWith('.md')) this.sourceChanged(file.path);
+			}),
+		);
 		this.component.register(o.ctx.pdfDocs.onInvalidate((path) => this.sourceChanged(path)));
 		// Zoomed out right after rendering: show previews as they finish encoding (once per frame).
 		const thumbs = o.ctx.thumbs;

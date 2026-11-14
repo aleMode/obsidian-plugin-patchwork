@@ -190,11 +190,15 @@ export class PdfDocCache {
 		}
 	}
 
-	/** The file changed or went away: drop the parsed document and tell modules to re-render. */
-	invalidate(path: string) {
-		if (!this.entries.has(path)) return;
+	/**
+	 * The file changed or went away: drop the parsed document and tell modules to re-render. Returns
+	 * false when the document wasn't open (nobody was told).
+	 */
+	invalidate(path: string): boolean {
+		if (!this.entries.has(path)) return false;
 		this.drop(path);
 		for (const l of this.listeners) l(path);
+		return true;
 	}
 
 	onInvalidate(listener: (path: string) => void): () => void {
