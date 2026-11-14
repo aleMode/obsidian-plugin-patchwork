@@ -1,5 +1,5 @@
 import { type InkContext, pageInk } from '../model/contrast';
-import { themeInk } from './paperScope';
+import { ensurePaperScope, themeInk } from './paperScope';
 import { type App, Menu, Notice, setIcon, TFile } from 'obsidian';
 import { exportBoardPdf } from '../export/exportPdf';
 import { pdfToPngs } from '../export/exportPng';
@@ -170,6 +170,8 @@ export class BoardViewport implements BoardSurface {
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
 		this.host = container;
+		// The board may live in a popout window, whose document needs its own paper rule.
+		ensurePaperScope(container.doc);
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
 		this.labelLayer = this.root.createDiv({ cls: 'pw-page-labels' });

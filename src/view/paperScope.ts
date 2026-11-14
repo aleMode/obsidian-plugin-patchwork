@@ -9,7 +9,9 @@ import type { Ink } from '../model/contrast';
  * The rule has to be generated at runtime (it copies whatever the current theme and snippets
  * declare), so it can't live in styles.css. It is a constructable stylesheet, not a <style> element.
  */
-const sheets = new WeakMap<Document, CSSStyleSheet>();
+// One sheet per window: a popout window has its own document, and a rule installed only in the main
+// window left paper there unscoped (white text on white paper in a dark theme).
+const sheets = new Map<Document, CSSStyleSheet>();
 
 function collectBodyVariables(doc: Document, own: CSSStyleSheet | undefined): string[] {
 	const decls: string[] = [];
@@ -31,7 +33,7 @@ function collectBodyVariables(doc: Document, own: CSSStyleSheet | undefined): st
 	return decls;
 }
 
-/** Install or refresh the scope rule. Call on load and on the workspace `css-change` event. */
+/** Install or refresh the scope rule in one window's document. */
 export function refreshPaperScope(doc: Document = activeDocument): void {
 	let sheet = sheets.get(doc);
 	if (!sheet) {
@@ -61,9 +63,26 @@ export function applyInk(el: HTMLElement, ink: Ink, base: Ink, paper = false) {
 	el.toggleClass('theme-light', flip ? ink === 'dark' : paper);
 }
 
+/** Make sure a window that is about to show paper has the rule (a board opened in a popout window). */
+export function ensurePaperScope(doc: Document): void {
+	if (!sheets.has(doc)) refreshPaperScope(doc);
+}
+
+/** Theme or snippets changed: rebuild the rule in every window that has one. Closed windows are dropped. */
+export function refreshAllPaperScopes(): void {
+	for (const doc of [...sheets.keys()]) {
+		if (doc.defaultView) refreshPaperScope(doc);
+		else sheets.delete(doc);
+	}
+}
+
 export function removePaperScope(doc: Document = activeDocument): void {
 	const sheet = sheets.get(doc);
 	if (!sheet) return;
 	doc.adoptedStyleSheets = doc.adoptedStyleSheets.filter((s) => s !== sheet);
 	sheets.delete(doc);
+}
+
+export function removeAllPaperScopes(): void {
+	for (const doc of [...sheets.keys()]) removePaperScope(doc);
 }

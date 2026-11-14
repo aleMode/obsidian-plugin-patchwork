@@ -183,7 +183,9 @@ function findProblems(host: HTMLElement): string[] {
 }
 
 export async function printPages(pages: readonly Page[], o: PrintOptions): Promise<PrintResult> {
-	const doc = activeDocument;
+	// Always the main window: printToPDF prints the main window's web contents (printAdapter), so a host
+	// built in a popout window (the active one when exporting from there) printed as an empty page.
+	const doc = window.document;
 	const component = new Component();
 	o.parent.addChild(component);
 	// Renderers that follow the zoom on screen (PDF embeds in notes) draw at the export's DPI here.

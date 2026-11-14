@@ -16,7 +16,7 @@ import { BoardViewport } from './view/BoardViewport';
 import { HOVER_SOURCE } from './view/liveContent';
 import { InspectorView, VIEW_TYPE_INSPECTOR } from './view/InspectorView';
 import { OutlineView, VIEW_TYPE_OUTLINE } from './view/OutlineView';
-import { refreshPaperScope, removePaperScope } from './view/paperScope';
+import { refreshAllPaperScopes, refreshPaperScope, removeAllPaperScopes } from './view/paperScope';
 import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from './view/PatchworkView';
 
 /**
@@ -89,7 +89,7 @@ export default class PatchworkPlugin extends Plugin {
 		refreshPaperScope();
 		this.registerEvent(
 			this.app.workspace.on('css-change', () => {
-				refreshPaperScope();
+				refreshAllPaperScopes();
 				for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_BOARD)) {
 					const surface = leaf.view instanceof PatchworkView ? leaf.view.surface : null;
 					if (surface instanceof BoardViewport) surface.themeChanged();
@@ -146,7 +146,7 @@ export default class PatchworkPlugin extends Plugin {
 	onunload() {
 		if (this.idleTimer !== null) window.clearTimeout(this.idleTimer);
 		CropModal.closeAll();
-		removePaperScope();
+		removeAllPaperScopes();
 		this.pdfDocs.destroyAll();
 		this.bitmaps.clear();
 		this.thumbs.clear();
