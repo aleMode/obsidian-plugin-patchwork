@@ -1,6 +1,7 @@
 import { fitRect, intersects, type Rect } from './geometry';
 import { displayedCropSize, FULL_PAGE } from './pdfGeometry';
-import { type AnyModule, MAX_PAGE_SIDE_MM, type Page, type PdfModule } from './schema';
+import { type AnyModule, MAX_PAGE_SIDE_MM, type Page, type PdfModule, type ShapeModule } from './schema';
+import { shapePaints } from './shapes';
 import { contentBox, moduleOpacity, outerRadius } from './style';
 import { mmToPt } from './units';
 
@@ -11,9 +12,15 @@ export function drawOrder(modules: readonly AnyModule[]): AnyModule[] {
 	return modules.map((m, i) => ({ m, i })).sort((a, b) => (a.m.z ?? 0) - (b.m.z ?? 0) || a.i - b.i).map((x) => x.m);
 }
 
+/** Whether `above` would be hidden under a vector PDF region `m` (shapes only where they paint). */
+function covers(above: AnyModule, m: AnyModule): boolean {
+	return above.type === 'shape' ? shapePaints(above as ShapeModule, m) : intersects(m, above);
+}
+
 /**
  * Which PDF modules are drawn as vector in stage 2. Vector content is drawn after the HTML layer,
- * so it lands on top of everything; a module with anything stacked above it falls back to raster.
+ * so it lands on top of everything; a module with anything stacked above it falls back to raster
+ * (a shape counts only where it paints: an outline around a region leaves it vector).
  * Colour filters (a module's `invert`, the ink saver) only work on pixels, so they force raster too.
  */
 export function vectorModules(page: Page, quality: 'best' | 'small', inkSaver = false): Set<string> {
@@ -24,7 +31,7 @@ export function vectorModules(page: Page, quality: 'best' | 'small', inkSaver = 
 		if (m.type !== 'pdf') return;
 		const mode = (m as PdfModule).render ?? 'auto';
 		if (mode === 'raster' || (m as PdfModule).invert) return;
-		const covered = ordered.slice(i + 1).some((above) => intersects(m, above));
+		const covered = ordered.slice(i + 1).some((above) => covers(above, m));
 		if (mode === 'vector' || !covered) out.add(m.id);
 	});
 	return out;
@@ -37,7 +44,7 @@ export function vectorModules(page: Page, quality: 'best' | 'small', inkSaver = 
 export function coveringVectorModules(page: Page): PdfModule[] {
 	const ordered = drawOrder(page.modules);
 	const forced = (m: AnyModule): m is PdfModule => m.type === 'pdf' && (m as PdfModule).render === 'vector' && !(m as PdfModule).invert;
-	return ordered.flatMap((m, i) => (forced(m) && ordered.slice(i + 1).some((above) => intersects(m, above)) ? [m] : []));
+	return ordered.flatMap((m, i) => (forced(m) && ordered.slice(i + 1).some((above) => covers(above, m)) ? [m] : []));
 }
 
 /** Pages that can't be a single PDF page (SPEC 9.2 guardrail). Tiling comes in M2. */

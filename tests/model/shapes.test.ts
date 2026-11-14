@@ -8,6 +8,7 @@ import {
 	convertShape,
 	isArrow,
 	LINE_MIN_BOX,
+	segmentRectDistance,
 	lineFromEnds,
 	linePoints,
 	shapeAtClick,
@@ -224,5 +225,15 @@ describe('file format', () => {
 		const parsed = parseBoard(serializeBoard(f));
 		expect(parsed.ok).toBe(false);
 		if (!parsed.ok) expect(parsed.errors.join('\n')).toMatch(/stroke.*thick[\s\S]*endHead/);
+	});
+});
+
+describe('segmentRectDistance', () => {
+	const r = { x: 0, y: 0, w: 10, h: 10 };
+	it('is 0 when the segment meets the rectangle, else the gap', () => {
+		expect(segmentRectDistance({ x: -5, y: 5 }, { x: 15, y: 5 }, r)).toBe(0);
+		expect(segmentRectDistance({ x: 5, y: 5 }, { x: 50, y: 50 }, r)).toBe(0);
+		expect(segmentRectDistance({ x: 12, y: -5 }, { x: 12, y: 15 }, r)).toBeCloseTo(2);
+		expect(segmentRectDistance({ x: 13, y: 14 }, { x: 20, y: 20 }, r)).toBeCloseTo(5);
 	});
 });

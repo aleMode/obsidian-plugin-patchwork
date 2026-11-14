@@ -45,6 +45,18 @@ describe('vectorModules', () => {
 		expect([...vectorModules(p, 'best')].sort()).toEqual(['alone', 'top']);
 	});
 
+	it('an outline around a region leaves it vector; a line or fill across it does not', () => {
+		const shape = (id: string, extra: Record<string, unknown>) => ({ id, type: 'shape', x: 10, y: 10, w: 70, h: 70, ...extra }) as AnyModule;
+		const region = pdf('r', 20, { y: 20, w: 50, h: 50 });
+		expect([...vectorModules(page([region, shape('frame', { shape: 'rect', radius: 3 })]), 'best')]).toEqual(['r']);
+		expect([...vectorModules(page([region, shape('ring', { shape: 'ellipse', x: -20, y: -20, w: 130, h: 130 })]), 'best')]).toEqual(['r']);
+		expect([...vectorModules(page([region, shape('filled', { shape: 'rect', fill: '#fff' })]), 'best')]).toEqual([]);
+		expect([...vectorModules(page([region, shape('tight', { shape: 'rect', x: 20, y: 20, w: 50, h: 50 })]), 'best')]).toEqual([]);
+		expect([...vectorModules(page([region, shape('cross', { shape: 'line' })]), 'best')]).toEqual([]);
+		expect([...vectorModules(page([region, shape('beside', { shape: 'line', p1: [0, 0], p2: [0.1, 1] })]), 'best')]).toEqual(['r']);
+		expect(coveringVectorModules(page([{ ...region, render: 'vector' }, shape('frame', { shape: 'rect' })]))).toEqual([]);
+	});
+
 	it('something below does not matter', () => {
 		expect([...vectorModules(page([text('note', 0), pdf('over', 20)]), 'best')]).toEqual(['over']);
 	});

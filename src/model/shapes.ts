@@ -1,4 +1,4 @@
-import type { Point, Rect } from './geometry';
+import { intersects, type Point, type Rect } from './geometry';
 import type { HeadKind, ShapeKind, ShapeModule } from './schema';
 
 // Simple shapes (rectangle, ellipse, line, arrow). Everything here is millimetres relative to the
@@ -254,4 +254,63 @@ function placeHead(out: ShapeDrawing['heads'], tip: Point, ux: number, uy: numbe
 	const r = Math.max(1, sw * 1.6);
 	out.push({ prim: { t: 'circle', cx: tip.x, cy: tip.y, r }, filled: true });
 	return tip;
+}
+
+/**
+ * Whether a shape paints anywhere over `r` (both in page mm). Export uses it to decide if a PDF region
+ * under the shape must go raster: a vector region is drawn last and would hide the paint, but an
+ * outline that only surrounds the region (a frame drawn around a crop) never touches it. Dashes are
+ * treated as solid; anything unsure counts as touching.
+ */
+export function shapePaints(m: ShapeModule, r: Rect): boolean {
+	if (!intersects(m, r)) return false;
+	const d = shapeDrawing(m);
+	const sw = d.stroke.width;
+	if (m.shape !== 'line' && d.fill) return true;
+	if (m.shape !== 'line' && sw === 0) return false;
+	if (m.shape === 'rect') {
+		// Inside the outline's inner edge, pulled in further where rounded corners bulge inwards.
+		const inset = sw + (d.body.t === 'rect' ? d.body.rx * 0.3 : 0);
+		return !inside(r, { x: m.x + inset, y: m.y + inset, w: m.w - 2 * inset, h: m.h - 2 * inset });
+	}
+	if (m.shape === 'ellipse') {
+		const rx = m.w / 2 - sw, ry = m.h / 2 - sw;
+		if (rx <= 0 || ry <= 0) return true;
+		const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+		const corners = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]];
+		// The ellipse is convex: the rectangle is inside it when all four corners are.
+		return !corners.every(([x, y]) => ((x! - cx) / rx) ** 2 + ((y! - cy) / ry) ** 2 < 1);
+	}
+	const at = (x: number, y: number): Point => ({ x: m.x + x, y: m.y + y });
+	if (d.body.t === 'line' && sw > 0 && segmentRectDistance(at(d.body.x1, d.body.y1), at(d.body.x2, d.body.y2), r) <= sw / 2) return true;
+	return d.heads.some(({ prim }) => {
+		const pts = prim.t === 'poly' ? prim.points : prim.t === 'circle' ? [[prim.cx - prim.r, prim.cy - prim.r], [prim.cx + prim.r, prim.cy + prim.r]] : [];
+		const xs = pts.map((p) => m.x + p[0]!), ys = pts.map((p) => m.y + p[1]!);
+		const box = { x: Math.min(...xs) - sw / 2, y: Math.min(...ys) - sw / 2, w: Math.max(...xs) - Math.min(...xs) + sw, h: Math.max(...ys) - Math.min(...ys) + sw };
+		return intersects(box, r);
+	});
+}
+
+const inside = (a: Rect, b: Rect) => b.w > 0 && b.h > 0 && a.x > b.x && a.y > b.y && a.x + a.w < b.x + b.w && a.y + a.h < b.y + b.h;
+
+/** Shortest distance between segment a–b and rectangle r; 0 when they meet. */
+export function segmentRectDistance(a: Point, b: Point, r: Rect): number {
+	const inR = (p: Point) => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h;
+	if (inR(a) || inR(b)) return 0;
+	const c: Point[] = [{ x: r.x, y: r.y }, { x: r.x + r.w, y: r.y }, { x: r.x + r.w, y: r.y + r.h }, { x: r.x, y: r.y + r.h }];
+	const edges = c.map((p, i) => [p, c[(i + 1) % 4]!] as const);
+	if (edges.some(([p, q]) => segmentsCross(a, b, p, q))) return 0;
+	return Math.min(...c.map((p) => pointSegment(p, a, b)), ...edges.flatMap(([p, q]) => [pointSegment(a, p, q), pointSegment(b, p, q)]));
+}
+
+function pointSegment(p: Point, a: Point, b: Point): number {
+	const dx = b.x - a.x, dy = b.y - a.y;
+	const len2 = dx * dx + dy * dy;
+	const t = len2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+	return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function segmentsCross(a: Point, b: Point, c: Point, d: Point): boolean {
+	const side = (p: Point, q: Point, s: Point) => Math.sign((q.x - p.x) * (s.y - p.y) - (q.y - p.y) * (s.x - p.x));
+	return side(a, b, c) !== side(a, b, d) && side(c, d, a) !== side(c, d, b);
 }

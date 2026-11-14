@@ -347,7 +347,7 @@ Strategies:
 
 **PNG export:** render the final PDF with PDF.js, sheet by sheet, within the raster tile cap (section 8).
 
-**PDF module render mode.** Each PDF module has `render: "auto" | "vector" | "raster"` (default `auto`). `auto` means vector, unless another module is stacked above it on the same page: vector content is drawn after the HTML layer and would cover it, so such a module falls back to raster. The export dialog has a quality switch: **Best quality** (default; honours module modes) or **Smallest file** (everything raster).
+**PDF module render mode.** Each PDF module has `render: "auto" | "vector" | "raster"` (default `auto`). `auto` means vector, unless another module is stacked above it on the same page: vector content is drawn after the HTML layer and would cover it, so such a module falls back to raster. A shape above it counts only where it paints (v0.19): an outline that surrounds the region without touching it, such as a frame drawn around a crop, leaves it vector; a fill, or a line or outline crossing it, does not. The export dialog has a quality switch: **Best quality** (default; honours module modes) or **Smallest file** (everything raster).
 
 Known costs of vector modules (spike S8), stated in the export dialog's help: the file carries the whole source page's resources (a crop of an illustrated page can add several MB), and text outside the crop stays in the file, invisible but findable by search.
 
@@ -560,3 +560,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - `PdfModule.renderDpi` removed: it was never read. Raster PDF regions use the export DPI. Older files keep the key.
   - Linked frames are kept off master pages (review B8): a chain there would restart on every page using the master. *Next frame* refuses on a master, a linked module can't be dragged onto one, and a page holding any part of a chain can't become a master. Each case says why in a notice.
   - Undo in Use mode is limited to the edits made since entering it (review B10); back in Arrange the same history continues (section 5.7).
+  - A shape over a PDF region forces it to raster only where the shape paints over the region (section 9.1): a frame drawn around a crop no longer turns it into an image. A line or outline across the region still does, since vector content is drawn last and would hide it.
