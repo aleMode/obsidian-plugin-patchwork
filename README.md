@@ -40,6 +40,7 @@ To install manually, download `main.js`, `manifest.json` and `styles.css` from t
 - **Desktop only** (Windows, macOS, Linux). PDF export uses Electron's print engine, which the mobile apps don't have.
 - Obsidian 1.6.7 or later.
 - Pages are fixed in size. Text doesn't reflow from one page to the next unless you link text frames.
+- A vector PDF region keeps its whole source page in the exported file. Text outside the crop is hidden but can still be searched and copied. Before sharing a sheet made from a PDF you can't redistribute, export it with **Quality: Smallest file**, which turns PDF regions into images.
 
 ## Privacy and permissions
 
