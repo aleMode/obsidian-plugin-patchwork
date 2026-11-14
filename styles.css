@@ -1847,3 +1847,21 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	color: var(--text-muted);
 	width: 40%;
 }
+
+/* A blank page says what to do (board only; Use mode and exports never show it). */
+.pw-empty-hint {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20mm;
+	text-align: center;
+	font-size: 5mm;
+	line-height: 1.4;
+	color: var(--text-faint);
+	pointer-events: none;
+}
+.pw-use .pw-empty-hint {
+	display: none;
+}

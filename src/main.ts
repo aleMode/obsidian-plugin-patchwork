@@ -99,11 +99,10 @@ export default class PatchworkPlugin extends Plugin {
 			}),
 		);
 
-		this.addCommand({
-			id: 'new-board',
-			name: 'New patchwork',
-			callback: () => void this.createBoard(this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? '')),
-		});
+		const newHere = () => void this.createBoard(this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? ''));
+		this.addCommand({ id: 'new-board', name: 'New patchwork', callback: newHere });
+		// Where Obsidian's own "new note" and "new canvas" live; the folder right-click menu has it too.
+		this.addRibbonIcon('layout-dashboard', 'New patchwork', newHere);
 		this.addBoardCommand('add-page', 'Add page', (v) => v.showAddPageMenu(), true);
 		this.addBoardCommand('add-note', 'Add note to page', (v) => v.pickNote(), true);
 		this.addBoardCommand('add-pdf', 'Add PDF to page', (v) => v.pickPdf(), true);
