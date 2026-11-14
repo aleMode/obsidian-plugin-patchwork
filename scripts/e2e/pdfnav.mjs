@@ -31,13 +31,13 @@ try {
 	check('contents list the PDF bookmarks with pages', options.includes('Chapter 2: Spells (p. 2)') && options.some((o) => o.endsWith('Fireball (p. 2)')), options);
 	await modal("const sel = m.querySelector('.pw-crop-contents'); sel.value = '3'; sel.dispatchEvent(new Event('change'));");
 	await sleep(800);
-	check('choosing a bookmark jumps to its page', (await modal("return m.querySelector('.pw-crop-page').innerText;")) === 'Page 3 of 4');
+	check('choosing a bookmark jumps to its page', (await modal("return m.querySelector('.pw-crop-page-input').value;")) === '3');
 
 	const status = await search('Goblin Skirmisher');
 	check('search finds the term', status.startsWith('1 matches') || status.startsWith('1'), status);
 	await modal("m.querySelector('.pw-crop-hit').click();");
 	await sleep(1000);
-	check('clicking a hit goes to its page', (await modal("return m.querySelector('.pw-crop-page').innerText;")) === 'Page 1 of 4');
+	check('clicking a hit goes to its page', (await modal("return m.querySelector('.pw-crop-page-input').value;")) === '1');
 	await modal("Array.from(m.querySelectorAll('button')).find((b) => b.innerText === 'Apply').click();");
 	await sleep(300);
 	const crop = await inView('return view.store.file.pages[0].modules[0].crop;');

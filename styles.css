@@ -629,10 +629,12 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	color: var(--text-muted);
 }
 
-/* The preview scrolls when zoomed in. */
+/* The preview scrolls when zoomed in. The padding holds the crop handles, which stick out past the
+   page: overflowing by a few pixels made a scrollbar come and go, shifting the page under the pointer. */
 .pw-crop-viewport {
 	max-height: 60vh;
 	overflow: auto;
+	padding: 8px;
 }
 
 .pw-crop-tools {
