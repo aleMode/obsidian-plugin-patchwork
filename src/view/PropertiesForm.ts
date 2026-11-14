@@ -7,7 +7,7 @@ import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
 import type { AnyModule, DisplayUnit, HeadKind, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, ShapeKind, ShapeModule, TextModule, TocModule, TrackerModule } from '../model/schema';
 import { convertShape, DASH_LABELS, DEFAULT_STROKE_COLOR, HEAD_LABELS, strokeOf } from '../model/shapes';
 import { formatLength, formatLengthValue, parseLength } from '../model/units';
-import { MAX_PAGE_SIDE_MM } from '../model/schema';
+import { isKnownModule, isModuleType, MAX_PAGE_SIDE_MM, type ModuleType, unhandledType } from '../model/schema';
 import { mapModule, mapPage, restack } from '../store/pageOps';
 import { FilePickerModal, sectionsOf } from '../ui/pickers';
 import { ALIGN_ACTIONS, type BoardViewport } from './BoardViewport';
@@ -18,7 +18,7 @@ import { isImage, isPdf } from '../sources/fileKinds';
 import { moduleInk } from '../model/contrast';
 
 /** Module types as the panel names them. */
-const TYPE_NAMES: Record<string, string> = { note: 'Note', pdf: 'PDF region', text: 'Text box', image: 'Image', toc: 'Table of contents', frame: 'Text frame', tracker: 'Tracker', shape: 'Shape' };
+const TYPE_NAMES: Record<ModuleType, string> = { note: 'Note', pdf: 'PDF region', text: 'Text box', image: 'Image', toc: 'Table of contents', frame: 'Text frame', tracker: 'Tracker', shape: 'Shape' };
 
 /** Where a custom card colour starts: a neutral blue that reads on light and dark themes. */
 const DEFAULT_CUSTOM_TINT = '#4a90d9';
@@ -320,7 +320,7 @@ export class PropertiesForm {
 		const set = (field: string, fn: (x: AnyModule) => AnyModule) => this.update(board, field, (f) => mapModule(f, page.id, m.id, fn));
 		const ink = board.inkOf(page.id);
 		form.textAuto = ink && moduleInk(m, ink).ink === 'light' ? 'Auto: light' : 'Auto: dark';
-		form.heading(`${TYPE_NAMES[m.type] ?? m.type}: ${moduleTitle(m)}`);
+		form.heading(`${isModuleType(m.type) ? TYPE_NAMES[m.type] : m.type}: ${moduleTitle(m)}`);
 		this.in('advanced');
 		form.text('Label', m.label, (v) => set('label', (x) => withField(x, 'label', v)), 'Shown in the outline');
 		this.in('layout');
@@ -335,7 +335,8 @@ export class PropertiesForm {
 			.addButton((b) => b.setButtonText('To back').onClick(() => board.boardStore.update((f) => restack(f, page.id, m.id, 'back'))));
 
 		this.in('content');
-		switch (m.type) {
+		// A type from a newer version has no content form; every known type must have its own case.
+		if (isKnownModule(m)) switch (m.type) {
 			case 'note':
 				this.renderNote(form, board, page, m as NoteModule, set);
 				break;
@@ -365,6 +366,8 @@ export class PropertiesForm {
 				this.overrideRow('Heading', (m as TocModule).heading === '' ? 'none' : (m as TocModule).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
 				this.el.createDiv({ cls: 'pw-panel-hint', text: 'Lists every named page in output order with its number. Entries are links in exported PDFs.' });
 				break;
+			default:
+				unhandledType(m);
 		}
 		if (m.type === 'shape') this.renderShapeStyle(form, m, set);
 		else this.renderStyle(form, m, set);

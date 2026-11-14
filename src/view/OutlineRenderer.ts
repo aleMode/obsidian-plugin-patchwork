@@ -1,12 +1,12 @@
 import { plainText } from '../model/mdFormat';
 import { type App, setIcon } from 'obsidian';
 import { orderedPages } from '../model/ordering';
-import type { AnyModule, ShapeModule } from '../model/schema';
+import { type AnyModule, isModuleType, type ModuleType, type ShapeModule } from '../model/schema';
 import { isArrow } from '../model/shapes';
 import { TextPromptModal } from '../ui/prompts';
 import type { BoardViewport } from './BoardViewport';
 
-const ICONS: Record<string, string> = { note: 'file-text', pdf: 'book-open', text: 'type', image: 'image', toc: 'list-ordered', frame: 'link', tracker: 'list-checks', shape: 'shapes' };
+const ICONS: Record<ModuleType, string> = { note: 'file-text', pdf: 'book-open', text: 'type', image: 'image', toc: 'list-ordered', frame: 'link', tracker: 'list-checks', shape: 'shapes' };
 
 /** A short name for a module: its label, else what it shows. */
 export function moduleTitle(m: AnyModule): string {
@@ -70,7 +70,7 @@ export class OutlineRenderer {
 			for (const m of page.modules) {
 				const mrow = el.createDiv({ cls: 'pw-outline-row pw-outline-module' });
 				mrow.toggleClass('is-selected', isSel(page.id, m.id));
-				setIcon(mrow.createSpan({ cls: 'pw-outline-icon' }), ICONS[m.type] ?? 'help-circle');
+				setIcon(mrow.createSpan({ cls: 'pw-outline-icon' }), isModuleType(m.type) ? ICONS[m.type] : 'help-circle');
 				mrow.createSpan({ text: moduleTitle(m) });
 				if (m.locked) setIcon(mrow.createSpan({ cls: 'pw-outline-lock' }), 'lock');
 				mrow.addEventListener('click', (e) => this.reveal(e, page.id, m.id));

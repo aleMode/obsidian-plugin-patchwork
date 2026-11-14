@@ -216,10 +216,27 @@ export interface ForeignModule extends BaseModule {
 
 export type AnyModule = Module | ForeignModule;
 
-const MODULE_TYPES = ['pdf', 'note', 'text', 'image', 'toc', 'frame', 'tracker', 'shape'] as const;
+export type ModuleType = Module['type'];
+
+/**
+ * Every module type, written as a record so the compiler checks it against `Module`. Per-type tables
+ * elsewhere are `Record<ModuleType, …>` and per-type switches are exhaustive, so a new type fails to
+ * compile until every place that needs it (serialize, render, print, forms…) handles it.
+ */
+const MODULE_TYPE_SET: Record<ModuleType, true> = { pdf: true, note: true, text: true, image: true, toc: true, frame: true, tracker: true, shape: true };
+export const MODULE_TYPES = Object.keys(MODULE_TYPE_SET) as ModuleType[];
+
+export function isModuleType(t: unknown): t is ModuleType {
+	return typeof t === 'string' && Object.prototype.hasOwnProperty.call(MODULE_TYPE_SET, t);
+}
 
 export function isKnownModule(m: AnyModule): m is Module {
-	return (MODULE_TYPES as readonly string[]).includes(m.type);
+	return isModuleType(m.type);
+}
+
+/** The end of an exhaustive switch over module types: unreachable unless a type was left out. */
+export function unhandledType(m: never): never {
+	throw new Error(`Unhandled module type: ${(m as { type?: unknown }).type as string}`);
 }
 
 export interface ModuleStyle {

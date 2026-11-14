@@ -1,4 +1,4 @@
-import type { PatchworkFile } from './schema';
+import { isModuleType, type ModuleType, type PatchworkFile } from './schema';
 
 // Pretty JSON with a stable key order so boards diff well in git (SPEC 6). Known keys come first in
 // a fixed order; unknown keys follow in their original order and are written back untouched.
@@ -14,7 +14,7 @@ const STYLE: Shape = {
 	children: { border: { keys: ['width', 'color', 'radius'] } },
 };
 
-const MODULE_KEYS: Record<string, readonly string[]> = {
+const MODULE_KEYS: Record<ModuleType, readonly string[]> = {
 	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'invert', 'sourceId', 'renderDpi', 'render'],
 	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow', 'scrollY', 'scale', 'frozen'],
 	text: ['markdown'],
@@ -71,7 +71,7 @@ function shaped(o: unknown, shape: Shape): unknown {
 }
 
 function moduleOut(m: Json): Json {
-	const typeKeys = MODULE_KEYS[m.type as string];
+	const typeKeys = isModuleType(m.type) ? MODULE_KEYS[m.type] : undefined;
 	// Modules of unknown type are written verbatim (key order included).
 	if (!typeKeys) return m;
 	return ordered(m, [...MODULE_BASE, ...typeKeys, 'style'], (k, v) => {

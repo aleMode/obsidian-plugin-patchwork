@@ -1,7 +1,7 @@
 import { Menu, setIcon, TFile } from 'obsidian';
 import { flowChains } from '../model/flow';
 import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
-import type { AnyModule, ImageModule, NoteModule, Page, PdfModule, ShapeModule, TrackerModule } from '../model/schema';
+import { type AnyModule, type ImageModule, isKnownModule, type NoteModule, type Page, type PdfModule, type ShapeModule, type TrackerModule, unhandledType } from '../model/schema';
 import { DASH_LABELS, isLine, SHAPE_COLORS, STROKE_WIDTHS, strokeOf } from '../model/shapes';
 import { findModule, mapModule, mapPage } from '../store/pageOps';
 import { isImage } from '../sources/fileKinds';
@@ -255,6 +255,8 @@ export class ContextBar {
 	}
 
 	private module(page: Page, m: AnyModule): Ctl[] {
+		// A type from a newer version gets no controls; every known type must have its own case.
+		if (!isKnownModule(m)) return [];
 		switch (m.type) {
 			case 'note':
 				return this.note(page, m as NoteModule);
@@ -273,7 +275,7 @@ export class ContextBar {
 			case 'toc':
 				return [{ icon: 'heading', text: 'Heading', tip: 'Change the heading of the table of contents', onClick: () => this.board.showProperties('content') }];
 			default:
-				return [];
+				return unhandledType(m);
 		}
 	}
 

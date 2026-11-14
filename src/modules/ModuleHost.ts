@@ -1,7 +1,7 @@
 import type { InkContext } from '../model/contrast';
 import { Component, TAbstractFile } from 'obsidian';
 import { isInheritedId, resolvePage } from '../model/masters';
-import { type AnyModule, isKnownModule, type NoteModule, type Page, type TrackerModule } from '../model/schema';
+import { type AnyModule, isKnownModule, isModuleType, type ModuleType, type NoteModule, type Page, type TrackerModule } from '../model/schema';
 import type { BoardStore } from '../store/BoardStore';
 import { ImageModuleRenderer } from './imageModule';
 import { drawShape, ShapeRenderer } from './shapeModule';
@@ -19,8 +19,10 @@ import { tocEntries } from '../model/toc';
 import { type ModuleContext, type ModuleRenderer, placeholder } from './types';
 
 /** Fields that change what a module shows. Anything else (position, label, …) is layout only. */
-const CONTENT_KEYS: Record<string, readonly string[]> = {
+const CONTENT_KEYS: Record<ModuleType, readonly string[]> = {
 	note: ['file', 'subpath', 'lines', 'includeHeading', 'overflow', 'frozen'],
+	// A frame shows its part of a chain: the chain's signature is added to its key (`identity`).
+	frame: [],
 	pdf: ['file', 'page', 'crop', 'fit', 'rotation', 'invert', 'sourceId', 'w', 'h', 'style'],
 	text: ['markdown'],
 	image: ['file', 'fit'],
@@ -36,7 +38,7 @@ const CONTENT_KEYS: Record<string, readonly string[]> = {
 const FRAME_BUDGET_MS = 8;
 
 function contentKey(m: AnyModule): string {
-	return JSON.stringify([m.type, ...(CONTENT_KEYS[m.type] ?? []).map((k) => m[k])]);
+	return JSON.stringify([m.type, ...(isModuleType(m.type) ? CONTENT_KEYS[m.type] : []).map((k) => m[k])]);
 }
 
 interface Mounted {
