@@ -1,9 +1,0 @@
-{
-	"id": "patchwork-spikes",
-	"name": "Patchwork spikes",
-	"version": "0.0.0",
-	"minAppVersion": "1.0.0",
-	"description": "Throwaway risk spikes for Patchwork development.",
-	"author": "aleMode",
-	"isDesktopOnly": true
-}

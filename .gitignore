@@ -26,3 +26,7 @@ test-vault/PDFs/*.pdf
 # local Obsidian profile used for automated spike runs
 .dev/
 .dev-build.log
+
+# local-only development material (kept on disk, not published)
+CLAUDE.md
+spikes/
