@@ -571,3 +571,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - A blank page says what to do ("Drag a note, PDF or image here…"; board only, gone with the first item). A ribbon icon creates a new patchwork.
   - Export: the Export button stays at the bottom of the dialog; "Open after export" is remembered (a personal setting, not stored in the patchwork); problems are listed in a dialog after the export, each with *Show*, which selects the item it is about; a page's right-click menu has *Export this page…*.
   - Crop editor: page number field, Page Up / Page Down, zoom, and double-click on text to crop to its paragraph (section 5.3).
+  - The settings tab declares its settings (`getSettingDefinitions`), so they show up in Obsidian's settings search; older Obsidian versions still get the hand-built tab. Both write through one method with the same checks and side effects.
