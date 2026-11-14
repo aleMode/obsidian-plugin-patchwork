@@ -218,3 +218,17 @@ describe('saved views in the file', () => {
 		expect(bad.ok).toBe(false);
 	});
 });
+
+describe('shapes and saved views in the file', () => {
+	it('shape modules get a stable key order and lose float noise, like other modules', () => {
+		const f = newBoardFile();
+		f.pages = [{ id: 'p', x: 0, y: 0, w: 210, h: 297, modules: [{ id: 's', type: 'shape', shape: 'line', y: 1, x: 0.1 + 0.2, w: 10, h: 10, p1: [0.1 + 0.2, 0], stroke: { width: 0.1 + 0.2, color: '#222222' } } as never] }];
+		const m = JSON.parse(serializeBoard(f)).pages[0].modules[0];
+		expect(Object.keys(m)).toEqual(['id', 'type', 'x', 'y', 'w', 'h', 'shape', 'stroke', 'p1']);
+		expect(m.x).toBe(0.3);
+		expect(m.p1).toEqual([0.3, 0]);
+		expect(m.stroke).toEqual({ color: '#222222', width: 0.3 });
+		expect(Object.keys(m.stroke)).toEqual(['color', 'width']);
+	});
+
+});

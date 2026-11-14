@@ -23,7 +23,9 @@ const MODULE_KEYS: Record<string, readonly string[]> = {
 	toc: ['heading'],
 	frame: ['from'],
 	tracker: ['kind', 'label', 'value', 'min', 'max', 'step', 'items', 'printBlank'],
+	shape: ['shape', 'fill', 'stroke', 'radius', 'p1', 'p2', 'startHead', 'endHead'],
 };
+const STROKE: Shape = { keys: ['color', 'width', 'dash'] };
 const MODULE_BASE = ['id', 'type', 'x', 'y', 'w', 'h', 'z', 'locked', 'label'];
 
 const BOARD: Shape = {
@@ -74,6 +76,7 @@ function moduleOut(m: Json): Json {
 	return ordered(m, [...MODULE_BASE, ...typeKeys, 'style'], (k, v) => {
 		if (k === 'style') return shaped(v, STYLE);
 		if (k === 'frozen') return shaped(v, FROZEN);
+		if (k === 'stroke') return shaped(v, STROKE);
 		if (k === 'items' && Array.isArray(v)) return v.map((it: Json) => shaped(it, ITEM));
 		return tidy(v);
 	});
