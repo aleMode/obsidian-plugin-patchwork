@@ -130,7 +130,7 @@ export class LiveContent {
 }
 
 /** Why a checkbox in this module can't be ticked, or null when it can. */
-function cannotTick(m: AnyModule | undefined, shown: string | undefined, rendered: number, readOnly: boolean): string | null {
+export function cannotTick(m: AnyModule | undefined, shown: string | undefined, rendered: number, readOnly: boolean): string | null {
 	if (!m || shown === undefined) return 'Checkboxes in linked text frames and master pages can’t be ticked here yet: tick them in the note.';
 	if (m.type === 'note' && (m as NoteModule).frozen) return 'This note is frozen (a snapshot). Unfreeze it to tick its checkboxes.';
 	if (m.type === 'text' && (readOnly || (m as TextModule).markdown !== shown)) return 'This patchwork is read-only.';
