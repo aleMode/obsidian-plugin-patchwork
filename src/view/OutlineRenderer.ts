@@ -39,13 +39,19 @@ export function moduleTitle(m: AnyModule): string {
  * sidebar outline and the floating panel on the board share it.
  */
 export class OutlineRenderer {
+	/** What the list was last built from; rebuilding 300 rows on every frame of a drag cost ~12 ms a frame. */
+	private shown: { board: BoardViewport | null; key: string } | null = null;
+
 	constructor(private app: App, private el: HTMLElement, private board: () => BoardViewport | null) {}
 
 	render() {
 		const el = this.el;
+		const board = this.board();
+		const key = board ? outlineKey(board) : '';
+		if (this.shown && this.shown.board === board && this.shown.key === key && el.hasChildNodes()) return;
+		this.shown = { board, key };
 		el.empty();
 		el.addClass('pw-outline');
-		const board = this.board();
 		if (!board) {
 			el.createDiv({ cls: 'pw-panel-empty', text: 'Open a patchwork to see its pages here.' });
 			return;
@@ -114,4 +120,13 @@ export class OutlineRenderer {
 		board.select(item);
 		board.revealSelection(item);
 	}
+}
+
+/** Everything the outline shows, so moving or resizing an item (which it doesn't show) doesn't rebuild it. */
+function outlineKey(board: BoardViewport): string {
+	const file = board.boardStore.file;
+	const sel = board.selectedItems.map((it) => `${it.pageId}/${it.moduleId ?? ''}`).join(',');
+	const views = board.views.map((v) => `${v.id}:${v.name}`).join(',');
+	const pages = orderedPages(file).map((p) => `${p.id}|${p.isMaster ? 'M' : ''}|${p.name ?? ''}|${p.modules.map((m) => `${m.id}:${m.type}:${m.locked ? 'L' : ''}:${moduleTitle(m)}`).join(';')}`);
+	return JSON.stringify([board.boardStore.readOnly, sel, views, pages]);
 }
