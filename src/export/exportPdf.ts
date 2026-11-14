@@ -43,7 +43,30 @@ export interface ExportResult {
 /** Pages per Chromium print call. Keeps the offscreen DOM (and canvases) small on large boards. */
 const PAGES_PER_BATCH = 8;
 
+/** One export at a time in the whole app: every export prints through the main window's one print host. */
+let running = false;
+
+export function isExporting(): boolean {
+	return running;
+}
+
 export async function exportBoardPdf(
+	env: { app: App; pdfDocs: PdfDocCache; parent: Component },
+	board: PatchworkFile,
+	boardPath: string,
+	opts: ExportOptions,
+	progress: (message: string) => void,
+): Promise<ExportResult> {
+	if (running) throw new Error('Another export is still running.');
+	running = true;
+	try {
+		return await exportPages(env, board, boardPath, opts, progress);
+	} finally {
+		running = false;
+	}
+}
+
+async function exportPages(
 	env: { app: App; pdfDocs: PdfDocCache; parent: Component },
 	board: PatchworkFile,
 	boardPath: string,

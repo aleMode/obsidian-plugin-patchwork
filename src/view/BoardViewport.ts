@@ -1,7 +1,7 @@
 import { type InkContext, pageInk } from '../model/contrast';
 import { ensurePaperScope, themeInk } from './paperScope';
 import { type App, Menu, Notice, setIcon, TFile } from 'obsidian';
-import { exportBoardPdf } from '../export/exportPdf';
+import { exportBoardPdf, isExporting } from '../export/exportPdf';
 import { pdfToPngs } from '../export/exportPng';
 import { parseRange } from '../model/sheetPlan';
 import { arrangePages } from '../model/arrange';
@@ -843,8 +843,11 @@ export class BoardViewport implements BoardSurface {
 
 	async runExport(choices: ExportChoices) {
 		const app = this.view.app;
-		// Remember the choices in the board, like other export defaults (SPEC 6).
-		this.store.update((f) => {
+		// Two exports would share the one print host window and mix up their pages.
+		if (isExporting()) return void new Notice('Another export is still running. Try again when it has finished.');
+		// Remember the choices in the board, like other export defaults (SPEC 6). Not an undo step: the
+		// first Ctrl+Z after an export would otherwise seem to do nothing.
+		this.store.updateOutsideHistory((f) => {
 			const e = f.board.export;
 			const next = { ...e, format: choices.format, sheet: choices.sheet, orientation: choices.orientation, tileOverlap: choices.overlap, quality: choices.quality, dpi: choices.dpi, fitSmallPages: choices.fitSmallPages || undefined, tileLabels: choices.tileLabels || undefined, inkSaver: choices.inkSaver || undefined, layout: choices.layout === 'booklet' ? choices.layout : undefined, bleed: choices.bleed || undefined, cropMarks: choices.cropMarks };
 			return JSON.stringify(next) === JSON.stringify(e) ? f : { ...f, board: { ...f.board, export: next } };
