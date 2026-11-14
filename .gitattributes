@@ -1,0 +1,6 @@
+# The repo stores LF; check out LF on every platform too. Fixture notes are sliced by character
+# offset in the tests, so a CRLF checkout (Windows, core.autocrlf) made them fail.
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary
