@@ -99,7 +99,7 @@ Note module rules:
 PDF module rules:
 - Crop is stored as normalized `[x0, y0, x1, y1]` (0–1, top-left origin) of the PDF page so it survives zoom and DPI changes.
 - Crop is applied first, on the page as normally displayed (the PDF's own page rotation already applied). The module's `rotation` then rotates the cropped result.
-- A crop editor lets the user drag a rectangle over the PDF page preview.
+- A crop editor lets the user drag a rectangle over the PDF page preview. It has a page number field, Page Up / Page Down, zoom (100–400 %, the preview scrolls), the PDF's bookmarks and text search; double-clicking text crops to its paragraph (text items grown to their block, `model/textBlocks`).
 - `fit`: `contain` (default), `cover`, or `stretch`.
 
 ### 5.4 Page order and numbering
@@ -570,3 +570,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Copy, cut and paste of items (Ctrl/Cmd+C, X, V), on the same page (nudged 5 mm), onto another page (same place) or into another patchwork. The clipboard holds the items in a custom format plus plain text for other apps. Pasting plain text makes a text box; pasting an image saves it where Obsidian puts attachments and places it. Pasted chains of linked frames are new chains. Esc deselects; Ctrl/Cmd+0 zooms to fit and Ctrl/Cmd+1 to 100 % (both in Use mode too). *View → Keyboard and mouse* lists every gesture.
   - A blank page says what to do ("Drag a note, PDF or image here…"; board only, gone with the first item). A ribbon icon creates a new patchwork.
   - Export: the Export button stays at the bottom of the dialog; "Open after export" is remembered (a personal setting, not stored in the patchwork); problems are listed in a dialog after the export, each with *Show*, which selects the item it is about; a page's right-click menu has *Export this page…*.
+  - Crop editor: page number field, Page Up / Page Down, zoom, and double-click on text to crop to its paragraph (section 5.3).

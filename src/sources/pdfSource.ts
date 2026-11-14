@@ -109,6 +109,20 @@ export async function searchPdf(doc: PdfDocument, term: string, limit = 100, pro
 	return hits;
 }
 
+/** Every text item's box on a page, as fractions of the displayed page (for "crop to block"). */
+export async function pageTextBoxes(doc: PdfDocument, n: number): Promise<{ x0: number; y0: number; x1: number; y1: number }[]> {
+	const page = await doc.getPage(n);
+	const vp = page.getViewport({ scale: 1 });
+	const items = ((await pageText(doc, n, page)) ?? []).filter((i): i is PdfTextItem => 'str' in i && !!i.str.trim());
+	return items.map((it) => {
+		const [ax, ay] = vp.convertToViewportPoint(it.transform[4]!, it.transform[5]!);
+		const [bx] = vp.convertToViewportPoint(it.transform[4]! + it.width, it.transform[5]!);
+		const h = it.height || Math.hypot(it.transform[2]!, it.transform[3]!);
+		// Same box as a search hit: from the cap height down to just under the baseline.
+		return { x0: Math.min(ax!, bx!) / vp.width, y0: (ay! - h) / vp.height, x1: Math.max(ax!, bx!) / vp.width, y1: (ay! + h * 0.25) / vp.height };
+	});
+}
+
 /**
  * A page's text items, or null if it can't be read. PDF.js shares one page object per page across
  * all users; a renderer calling cleanup() on it mid-extraction can stall the text stream forever

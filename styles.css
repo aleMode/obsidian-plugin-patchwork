@@ -612,6 +612,29 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-pdf-canvas.is-inverted {
 	color: var(--text-muted);
 }
 
+.pw-crop-page-input {
+	width: 4.5em;
+}
+
+.pw-crop-zoom {
+	display: flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	margin-left: auto;
+}
+
+.pw-crop-zoom-label {
+	min-width: 3.5em;
+	text-align: center;
+	color: var(--text-muted);
+}
+
+/* The preview scrolls when zoomed in. */
+.pw-crop-viewport {
+	max-height: 60vh;
+	overflow: auto;
+}
+
 .pw-crop-tools {
 	display: flex;
 	gap: var(--size-4-2);

@@ -1,8 +1,9 @@
-import { App, Modal, Setting } from 'obsidian';
+import { App, Modal, Notice, Setting } from 'obsidian';
 import { type Handle, resizeRect } from '../model/geometry';
 import { cropAroundHit, cropFromPoints, FULL_PAGE, moveCrop, tidyCrop } from '../model/pdfGeometry';
 import type { Crop } from '../model/schema';
-import { type PdfDocCache, type PdfDocument, pdfOutline, pdfSourceId, searchPdf } from '../sources/pdfSource';
+import { blockAround, cropAroundBlock } from '../model/textBlocks';
+import { type PdfDocCache, type PdfDocument, pageTextBoxes, pdfOutline, pdfSourceId, searchPdf } from '../sources/pdfSource';
 
 export interface CropResult {
 	page: number;
@@ -23,6 +24,9 @@ type Gesture =
 /** Largest preview, in CSS px; the page is fitted inside, leaving room for the tools and buttons. */
 const MAX_W = 720;
 const MAX_H_VH = 0.5;
+/** Preview zoom steps; the largest page canvas side is capped so deep zoom can't exhaust memory. */
+const ZOOMS = [1, 1.5, 2, 3, 4];
+const MAX_CANVAS_PX = 6000;
 
 /**
  * Pick a page and drag a crop rectangle over it (SPEC 5.3). Draw a new rectangle on empty space,
@@ -46,7 +50,11 @@ export class CropModal extends Modal {
 	private stage!: HTMLElement;
 	private canvas: HTMLCanvasElement | null = null;
 	private box!: HTMLElement;
-	private pageLabel!: HTMLElement;
+	private pageInput!: HTMLInputElement;
+	private pageTotal!: HTMLElement;
+	private zoomLabel!: HTMLElement;
+	private zoom = 1;
+	private viewport!: HTMLElement;
 	private contents!: HTMLElement;
 	private results!: HTMLElement;
 	private gesture: Gesture | null = null;
@@ -73,18 +81,32 @@ export class CropModal extends Modal {
 		this.modalEl.addClass('pw-crop-modal');
 		this.setTitle(`Crop: ${this.path.replace(/^.*\//, '')}${this.titleNote ? ` (${this.titleNote})` : ''}`);
 		const nav = this.contentEl.createDiv({ cls: 'pw-crop-nav' });
-		nav.createEl('button', { text: 'Previous' }, (b) => b.addEventListener('click', () => void this.goTo(this.page - 1)));
-		this.pageLabel = nav.createSpan({ cls: 'pw-crop-page' });
-		nav.createEl('button', { text: 'Next' }, (b) => b.addEventListener('click', () => void this.goTo(this.page + 1)));
+		nav.createEl('button', { text: 'Previous', attr: { 'aria-label': 'Previous page (page up key)' } }, (b) => b.addEventListener('click', () => void this.goTo(this.page - 1)));
+		const pageField = nav.createSpan({ cls: 'pw-crop-page' });
+		pageField.createSpan({ text: 'Page ' });
+		this.pageInput = pageField.createEl('input', { type: 'number', cls: 'pw-crop-page-input', attr: { min: '1', 'aria-label': 'Page number' } });
+		this.pageTotal = pageField.createSpan();
+		// Typing a page number jumps there on Enter or when the field is left.
+		const jump = () => void this.goTo(Math.round(Number(this.pageInput.value)) || this.page).then(() => (this.pageInput.value = String(this.page)));
+		this.pageInput.addEventListener('change', jump);
+		this.pageInput.addEventListener('keydown', (e) => e.key === 'Enter' && (e.preventDefault(), jump()));
+		nav.createEl('button', { text: 'Next', attr: { 'aria-label': 'Next page (page down key)' } }, (b) => b.addEventListener('click', () => void this.goTo(this.page + 1)));
 		nav.createEl('button', { text: 'Full page' }, (b) => b.addEventListener('click', () => this.setCrop(FULL_PAGE)));
+		const zoom = nav.createSpan({ cls: 'pw-crop-zoom' });
+		zoom.createEl('button', { text: '−', attr: { 'aria-label': 'Zoom out' } }, (b) => b.addEventListener('click', () => this.stepZoom(-1)));
+		this.zoomLabel = zoom.createSpan({ cls: 'pw-crop-zoom-label', text: '100 %' });
+		zoom.createEl('button', { text: '+', attr: { 'aria-label': 'Zoom in' } }, (b) => b.addEventListener('click', () => this.stepZoom(1)));
+		this.scope.register([], 'PageDown', () => (void this.goTo(this.page + 1), false));
+		this.scope.register([], 'PageUp', () => (void this.goTo(this.page - 1), false));
 		this.contents = this.contentEl.createDiv({ cls: 'pw-crop-tools' });
 		this.buildSearch(this.contents);
 		this.results = this.contentEl.createDiv({ cls: 'pw-crop-results' });
-		this.stage = this.contentEl.createDiv({ cls: 'pw-crop-stage' });
+		this.viewport = this.contentEl.createDiv({ cls: 'pw-crop-viewport' });
+		this.stage = this.viewport.createDiv({ cls: 'pw-crop-stage' });
 		this.box = this.stage.createDiv({ cls: 'pw-crop-box' });
 		for (const h of ['nw', 'ne', 'se', 'sw']) this.box.createDiv({ cls: `pw-crop-handle pw-handle-${h}`, attr: { 'data-handle': h } });
 		this.bindPointer();
-		this.contentEl.createEl('p', { cls: 'setting-item-description', text: 'Drag on the page to draw a crop, drag inside it to move it, drag a corner to resize.' });
+		this.contentEl.createEl('p', { cls: 'setting-item-description', text: 'Drag on the page to draw a crop, drag inside it to move it, drag a corner to resize. Double-click text to crop to its paragraph.' });
 		new Setting(this.contentEl).setName('Resize module to the crop shape').addToggle((t) => t.setValue(this.resizeModule).onChange((v) => (this.resizeModule = v)));
 		new Setting(this.contentEl)
 			.addButton((b) => b.setButtonText('Cancel').onClick(() => this.close()))
@@ -103,14 +125,17 @@ export class CropModal extends Modal {
 		if (!this.pdfDoc || page < 1 || page > this.pageCount) return;
 		if (page !== this.page) this.crop = FULL_PAGE;
 		this.page = page;
-		this.pageLabel.setText(`Page ${page} of ${this.pageCount}`);
+		this.pageInput.value = String(page);
+		this.pageInput.max = String(this.pageCount);
+		this.pageTotal.setText(` of ${this.pageCount}`);
 		const p = await this.pdfDoc.getPage(page);
 		const vp1 = p.getViewport({ scale: 1 });
 		this.pageAspect = vp1.width / vp1.height;
 		const maxH = window.innerHeight * MAX_H_VH;
-		const cssW = Math.min(MAX_W, maxH * this.pageAspect);
+		const cssW = Math.min(MAX_W, maxH * this.pageAspect) * this.zoom;
 		const dpr = window.devicePixelRatio || 1;
-		const vp = p.getViewport({ scale: (cssW * dpr) / vp1.width });
+		const longest = Math.max(cssW, cssW / this.pageAspect) * dpr;
+		const vp = p.getViewport({ scale: (cssW * dpr * Math.min(1, MAX_CANVAS_PX / longest)) / vp1.width });
 		const canvas = createEl('canvas', { cls: 'pw-crop-canvas' });
 		canvas.width = Math.ceil(vp.width);
 		canvas.height = Math.ceil(vp.height);
@@ -134,6 +159,33 @@ export class CropModal extends Modal {
 		this.stage.prepend(canvas);
 		this.stage.setCssProps({ '--pw-crop-w': `${cssW}px`, '--pw-crop-h': `${cssW / this.pageAspect}px` });
 		this.setCrop(this.crop);
+	}
+
+	/** Zoom the preview in steps, keeping the middle of what is in view in the middle. */
+	private stepZoom(direction: 1 | -1) {
+		const i = Math.min(ZOOMS.length - 1, Math.max(0, ZOOMS.indexOf(this.zoom) + direction));
+		if (ZOOMS[i] === this.zoom) return;
+		const v = this.viewport;
+		const cx = (v.scrollLeft + v.clientWidth / 2) / Math.max(1, v.scrollWidth);
+		const cy = (v.scrollTop + v.clientHeight / 2) / Math.max(1, v.scrollHeight);
+		this.zoom = ZOOMS[i]!;
+		this.zoomLabel.setText(`${Math.round(this.zoom * 100)} %`);
+		void this.goTo(this.page).then(() => {
+			v.scrollLeft = cx * v.scrollWidth - v.clientWidth / 2;
+			v.scrollTop = cy * v.scrollHeight - v.clientHeight / 2;
+		});
+	}
+
+	/** Double-click on text: crop to the paragraph (or table) it is in. */
+	private async cropToBlock(p: { x: number; y: number }) {
+		const doc = this.pdfDoc;
+		const page = this.page;
+		if (!doc) return;
+		const boxes = await pageTextBoxes(doc, page).catch(() => []);
+		if (doc !== this.pdfDoc || page !== this.page) return;
+		const block = blockAround(boxes, p);
+		if (block) this.setCrop(cropAroundBlock(block));
+		else new Notice(boxes.length ? 'No text there to crop to.' : 'This page has no text to crop to (it may be a scan).');
 	}
 
 	/** Jump by bookmark instead of paging (SPEC 4 M3: pick a PDF section from its outline). */
@@ -193,7 +245,7 @@ export class CropModal extends Modal {
 		this.box.setCssProps({ '--pw-x': `${x0 * 100}%`, '--pw-y': `${y0 * 100}%`, '--pw-w': `${(x1 - x0) * 100}%`, '--pw-h': `${(y1 - y0) * 100}%` });
 	}
 
-	private point(e: PointerEvent) {
+	private point(e: MouseEvent) {
 		const r = this.stage.getBoundingClientRect();
 		return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height };
 	}
@@ -230,6 +282,7 @@ export class CropModal extends Modal {
 		};
 		this.stage.addEventListener('pointerup', end);
 		this.stage.addEventListener('pointercancel', end);
+		this.stage.addEventListener('dblclick', (e) => void this.cropToBlock(this.point(e)));
 	}
 
 	private isFullPage() {
