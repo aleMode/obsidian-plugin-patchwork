@@ -1,6 +1,9 @@
 // End-to-end check of the crop editor's contents (PDF outline) and search-to-region (SPEC 4 M3).
 import { connect } from '../cdpClient.mjs';
 
+// Any large PDF you keep locally; override with E2E_LARGE_PDF / E2E_LARGE_PDF_QUERY (a word it contains).
+const LARGE_PDF = process.env.E2E_LARGE_PDF ?? 'PDFs/Large rulebook.pdf';
+const LARGE_PDF_QUERY = process.env.E2E_LARGE_PDF_QUERY ?? 'the';
 const cdp = await connect();
 const results = [];
 const check = (name, ok, detail) => results.push({ name, ok: !!ok, ...(ok ? {} : { detail }) });
@@ -45,13 +48,14 @@ try {
 	const inside = crop && crop[0] < 24 / 210 && crop[2] > 60 / 210 && crop[1] < 152 / 297 && crop[3] > 160 / 297;
 	check('proposed crop contains the hit', inside, crop);
 
-	const hasRulebook = await cdp.evaluate("return !!app.vault.getAbstractFileByPath('PDFs/Crown of the Fungal Queen 1.03.pdf');");
+	// Optional: a large real PDF kept locally (test-vault/PDFs/*.pdf is gitignored) to time search on a long document.
+	const hasRulebook = await cdp.evaluate(`return !!app.vault.getAbstractFileByPath(${JSON.stringify(LARGE_PDF)});`);
 	if (hasRulebook) {
-		await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: [{ id: 'big', type: 'pdf', file: 'PDFs/Crown of the Fungal Queen 1.03.pdf', page: 1, x: 10, y: 10, w: 100, h: 140 }] }] }));
+		await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: [{ id: 'big', type: 'pdf', file: ${JSON.stringify(LARGE_PDF)}, page: 1, x: 10, y: 10, w: 100, h: 140 }] }] }));
 			s.editCrop(view.store.file.pages[0].id, 'big'); await new Promise((r) => setTimeout(r, 2000));`);
 		const t0 = Date.now();
-		const st = await search('Agatha');
-		check('searching a 159-page rulebook finds matches', /^\d+\+? matches/.test(st), st);
+		const st = await search(LARGE_PDF_QUERY);
+		check('searching a large PDF finds matches', /^\d+\+? matches/.test(st), st);
 		check('…in reasonable time (< 10 s)', Date.now() - t0 < 10000, Date.now() - t0);
 		await cdp.evaluate("for (let k = 0; k < 20 && document.querySelector('.modal-container'); k++) { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await new Promise((r) => setTimeout(r, 50)); }");
 	}
