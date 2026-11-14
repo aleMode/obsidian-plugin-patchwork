@@ -102,6 +102,7 @@ export default class PatchworkPlugin extends Plugin {
 		);
 
 		const newHere = () => void this.createBoard(this.app.fileManager.getNewFileParent(this.app.workspace.getActiveFile()?.path ?? ''));
+		// Lint warns that the name repeats the plugin's; kept, since "patchwork" is the file type this creates (like "New canvas").
 		this.addCommand({ id: 'new-board', name: 'New patchwork', callback: newHere });
 		// Where Obsidian's own "new note" and "new canvas" live; the folder right-click menu has it too.
 		this.addRibbonIcon('layout-dashboard', 'New patchwork', newHere);
@@ -127,11 +128,14 @@ export default class PatchworkPlugin extends Plugin {
 		this.addBoardCommand('toggle-outline', 'Toggle outline and views panel', (v) => v.toggleOutline());
 		this.addBoardCommand('toggle-minimap', 'Toggle minimap', (v) => v.toggleMinimap());
 
-		this.addCommand({
-			id: 'generate-stress-board',
-			name: 'Generate stress-test patchwork',
-			callback: () => new StressBoardModal(this.app, (pages, modulesPerPage) => void this.createStressBoard(pages, modulesPerPage)).open(),
-		});
+		// A performance tool for development; users have no use for it.
+		if (PW_DEV) {
+			this.addCommand({
+				id: 'generate-stress-board',
+				name: 'Generate stress-test board',
+				callback: () => new StressBoardModal(this.app, (pages, modulesPerPage) => void this.createStressBoard(pages, modulesPerPage)).open(),
+			});
+		}
 
 		this.registerEvent(
 			this.app.workspace.on('file-menu', (menu, file) => {
