@@ -1,4 +1,5 @@
 import { App, FuzzySuggestModal, SuggestModal, TFile, setIcon } from 'obsidian';
+import { headingSubpaths } from '../model/subpaths';
 
 export class FilePickerModal extends FuzzySuggestModal<TFile> {
 	constructor(app: App, private files: TFile[], placeholder: string, private onPick: (file: TFile) => void) {
@@ -31,7 +32,9 @@ export interface SectionChoice {
 export function sectionsOf(app: App, file: TFile): SectionChoice[] {
 	const cache = app.metadataCache.getFileCache(file);
 	const out: SectionChoice[] = [{ label: 'Whole note', level: 0 }];
-	for (const h of cache?.headings ?? []) out.push({ label: h.heading, subpath: `#${h.heading}`, level: h.level });
+	const headings = cache?.headings ?? [];
+	const subpaths = headingSubpaths(headings);
+	headings.forEach((h, i) => out.push({ label: h.heading, subpath: subpaths[i], level: h.level }));
 	for (const id of Object.keys(cache?.blocks ?? {})) out.push({ label: `^${id}`, subpath: `#^${id}`, level: 0, detail: 'block' });
 	return out;
 }
