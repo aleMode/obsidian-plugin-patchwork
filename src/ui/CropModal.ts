@@ -51,6 +51,10 @@ export class CropModal extends Modal {
 	private results!: HTMLElement;
 	private gesture: Gesture | null = null;
 	private resizeModule = true;
+	/** Called once the editor has closed, applied or not (several dropped PDFs open one after another). */
+	onClosed: (() => void) | null = null;
+	/** Shown after the file name, e.g. "2 of 3" for a queue of dropped PDFs. */
+	titleNote = '';
 
 	constructor(
 		app: App,
@@ -67,7 +71,7 @@ export class CropModal extends Modal {
 	async onOpen() {
 		CropModal.open.add(this);
 		this.modalEl.addClass('pw-crop-modal');
-		this.setTitle(`Crop: ${this.path.replace(/^.*\//, '')}`);
+		this.setTitle(`Crop: ${this.path.replace(/^.*\//, '')}${this.titleNote ? ` (${this.titleNote})` : ''}`);
 		const nav = this.contentEl.createDiv({ cls: 'pw-crop-nav' });
 		nav.createEl('button', { text: 'Previous' }, (b) => b.addEventListener('click', () => void this.goTo(this.page - 1)));
 		this.pageLabel = nav.createSpan({ cls: 'pw-crop-page' });
@@ -250,5 +254,6 @@ export class CropModal extends Modal {
 		if (this.pdfDoc) this.pdfDocs.release(this.path);
 		this.pdfDoc = null;
 		this.contentEl.empty();
+		this.onClosed?.();
 	}
 }

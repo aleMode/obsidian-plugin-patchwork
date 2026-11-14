@@ -116,7 +116,7 @@ PDF module rules:
 - Board-level font override optional. Per-module font scale.
 
 ### 5.6 Editing interactions
-- Drag a file from the file explorer onto a page: `.md` becomes a `note` module, `.pdf` becomes a `pdf` module (page 1, with a page picker), images become `image` modules.
+- Drag a file from the file explorer onto a page: `.md` becomes a `note` module, `.pdf` becomes a `pdf` module (page 1, with a page picker), images become `image` modules. Several PDFs dropped at once open their crop editors one after another ("2 of 3" in the title); cancelling one skips that file.
 - Double-click a text box or a note module (or Enter on it) edits it in place as raw markdown in a text area over the module; Escape or clicking away finishes. A text box saves into the patchwork as one undo step; a note is written back to its file, only the part the module shows (section, lines). Frozen notes cannot be edited, and nothing is written if the note changed while the text area was open. The "Open" button on the context bar, and double-click on a linked frame, open the note in a side pane. Double-click a PDF module opens the crop editor.
 - Inspector panel (right side) edits the selection. Outline panel lists pages and modules.
 - Multi-select, align, distribute, duplicate, lock, z-order, smart guides, arrow-key nudge, undo/redo.
@@ -561,3 +561,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Linked frames are kept off master pages (review B8): a chain there would restart on every page using the master. *Next frame* refuses on a master, a linked module can't be dragged onto one, and a page holding any part of a chain can't become a master. Each case says why in a notice.
   - Undo in Use mode is limited to the edits made since entering it (review B10); back in Arrange the same history continues (section 5.7).
   - A shape over a PDF region forces it to raster only where the shape paints over the region (section 9.1): a frame drawn around a crop no longer turns it into an image. A line or outline across the region still does, since vector content is drawn last and would hide it.
+  - Several PDFs dropped at once open their crop editors one after another instead of stacked (section 5.6).

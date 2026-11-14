@@ -1611,10 +1611,23 @@ export class BoardViewport implements BoardSurface {
 		const page = this.store.file.pages.find((p) => p.id === hit?.pageId);
 		if (!page) return void new Notice('Drop files onto a page.');
 		const at = screenToBoard(this.camera, this.local(e));
-		files.forEach((file, i) => this.dropFile(file, page, { x: at.x - page.x + i * 10, y: at.y - page.y + i * 10 }));
+		void this.dropFiles(files, page, { x: at.x - page.x, y: at.y - page.y });
 	}
 
-	private dropFile(file: TFile, page: Page, at: Point) {
+	/** Places dropped files cascading from `at`; PDFs open their crop editors one after another, not stacked. */
+	private async dropFiles(files: TFile[], page: Page, at: Point) {
+		const pdfs = files.filter((f) => f.extension.toLowerCase() === 'pdf').length;
+		let n = 0;
+		for (const [i, file] of files.entries()) {
+			// The board may have closed (or the plugin unloaded) while an editor was open.
+			if (!this.root.isConnected) return;
+			const isPdfFile = file.extension.toLowerCase() === 'pdf';
+			await this.dropFile(file, page, { x: at.x + i * 10, y: at.y + i * 10 }, isPdfFile && pdfs > 1 ? `${++n} of ${pdfs}` : '');
+		}
+	}
+
+	/** Resolves when the file is placed, or for a PDF when its crop editor closes. */
+	private dropFile(file: TFile, page: Page, at: Point, queueNote = ''): Promise<void> {
 		const ext = file.extension.toLowerCase();
 		const place = (w: number, h: number) => ({ x: Math.max(0, Math.min(at.x, page.w - w)), y: Math.max(0, Math.min(at.y, page.h - h)), w, h });
 		const add = (build: (id: string) => AnyModule) => {
@@ -1622,21 +1635,27 @@ export class BoardViewport implements BoardSurface {
 			this.store.update((f) => addModule(f, page.id, build(id)));
 			this.select({ pageId: page.id, moduleId: id });
 		};
-		if (ext === 'md') return add((id): NoteModule => ({ id, type: 'note', ...place(90, 80), file: file.path }));
-		if (isImage(file)) {
-			void imageAspect(this.view.app, file).then((aspect) => add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, 60 / aspect)), file: file.path })));
-			return;
+		if (ext === 'md') {
+			add((id): NoteModule => ({ id, type: 'note', ...place(90, 80), file: file.path }));
+			return Promise.resolve();
 		}
+		if (isImage(file)) return imageAspect(this.view.app, file).then((aspect) => add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, 60 / aspect)), file: file.path })));
 		if (ext === 'pdf') {
-			return new CropModal(this.view.app, this.services.pdfDocs, file.path, { page: 1 }, (r) =>
+			const modal = new CropModal(this.view.app, this.services.pdfDocs, file.path, { page: 1 }, (r) =>
 				add((id): PdfModule => {
 					const w = 90;
 					const h = r.resizeModule ? fitHeight({ w }, r.aspect, page.h).h : 120;
 					return { id, type: 'pdf', ...place(w, h), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}), ...(r.sourceId ? { sourceId: r.sourceId } : {}) };
 				}),
-			).open();
+			);
+			modal.titleNote = queueNote;
+			return new Promise((resolve) => {
+				modal.onClosed = resolve;
+				modal.open();
+			});
 		}
 		new Notice(`Patchwork can't place .${ext} files yet.`);
+		return Promise.resolve();
 	}
 
 	/** Double-click: a text, note or frame module edits its text in place; a PDF module opens the crop editor (SPEC 5.6). */
