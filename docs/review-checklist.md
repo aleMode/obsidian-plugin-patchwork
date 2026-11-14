@@ -84,6 +84,7 @@ Status 2026-11-14: phases 0–2 and the tweaks are done (sections 1–3). What i
   - *Upside:* `export/` would stop importing the view layer, so the print path reads and tests on its own, and a future view change can't break exports by accident.
   - *Downside:* about ten files change imports for no visible change, and a new shared folder (`src/render/` already holds caches) blurs what goes where. `paperScope` and `furniture` touch the DOM, so they can't go into `model/`.
   - *Recommendation:* do it only when one of these files changes for a real reason; today it is churn.
-- [ ] Merge `followups` into `main` after a look at the diff and a manual pass over the QA list (`docs/qa.md`, "Review follow-ups").
+- [x] `followups` merged into `main` (2026-11-14).
+- [ ] Manual pass over the QA list (`docs/qa.md`, "Review follow-ups").
 - [ ] Before a public release (Q8): plugin ID, `@electron/remote` usage in review, test on the oldest claimed Obsidian version.
 - [ ] Dev loop: `npm run dev` copies `styles.css` only when the code rebuilds, so a CSS-only edit needs a touch of a `.ts` file (or a manual copy) to show up.
