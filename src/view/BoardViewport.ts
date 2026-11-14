@@ -37,7 +37,7 @@ import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, n
 import { Minimap, Rulers, ThemeColors } from './boardChrome';
 import { LiveContent } from './liveContent';
 import { showAddMenu, showAddPageMenu, showGroupMenu, showItemMenu, showTrackerMenu, showViewMenu } from './boardMenus';
-import { addText, addToc, addTracker, continueInFrame, dropFiles, editCrop, freezeNote, markPdfChecked, pickImage, pickNote, pickPdf, replaceSource, unfreezeNote } from './boardContent';
+import { addText, addToc, addTracker, continueInFrame, dropFiles, editCrop, fitBoxToText, freezeNote, markPdfChecked, pickImage, pickNote, pickPdf, replaceSource, unfreezeNote } from './boardContent';
 import { exportToCanvas, runBoardExport, showExportDialog } from './boardExport';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
@@ -577,12 +577,22 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** Adds a module to the page new modules go to (`targetPage`) and selects it. */
-	placeModule(build: (page: Page, id: string) => AnyModule) {
+	placeModule(build: (page: Page, id: string) => AnyModule): { pageId: string; id: string } | undefined {
 		const page = this.targetPage();
 		if (!page) return void new Notice('Add a page first.');
 		const id = newId(allIds(this.store.file));
 		this.store.update((f) => addModule(f, page.id, build(page, id)));
 		this.select({ pageId: page.id, moduleId: id });
+		return { pageId: page.id, id };
+	}
+
+	/** The height (mm) that fits a module's text, once rendered; null when it is off screen or shows no text. */
+	fittedHeight(moduleId: string): Promise<number | null> {
+		return this.modules.fittedHeight(moduleId);
+	}
+
+	fitBoxToText(pageId: string, moduleId: string): Promise<void> {
+		return fitBoxToText(this, pageId, moduleId);
 	}
 
 	pickNote() {

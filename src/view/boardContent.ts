@@ -4,7 +4,7 @@ import { flowChains, NO_FRAMES_ON_MASTERS, placeNextFrame } from '../model/flow'
 import type { Point } from '../model/geometry';
 import { newId } from '../model/ids';
 import { today } from '../model/numbering';
-import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule, TrackerModule } from '../model/schema';
+import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PatchworkFile, PdfModule, TrackerModule } from '../model/schema';
 import { isImage, isPdf } from '../sources/fileKinds';
 import { loadNoteContent } from '../sources/markdownSource';
 import { pdfSourceId } from '../sources/pdfSource';
@@ -17,16 +17,45 @@ import type { BoardViewport } from './BoardViewport';
 // tables of contents, the crop editor, linked frames, freezing, and files dropped from the explorer.
 // BoardViewport forwards its public actions here.
 
+/** New text modules start a little inside their box, so the selection outline doesn't cover the first letters. */
+const NEW_TEXT_STYLE = { padding: 1 };
+
+/** A new note: half the page wide, then as tall as its text once that has rendered. */
 export function pickNote(board: BoardViewport) {
-	pickNoteSection(board.app, 'Note to add', (file, choice) =>
-		board.placeModule((page, id): NoteModule => ({
+	pickNoteSection(board.app, 'Note to add', (file, choice) => {
+		const placed = board.placeModule((page, id): NoteModule => ({
 			id,
 			type: 'note',
-			...defaultModuleRect(page),
+			...defaultModuleRect(page, { w: halfWidth(page), h: 60 }),
 			file: file.path,
 			...(choice.subpath ? { subpath: choice.subpath } : {}),
-		})),
-	);
+			style: NEW_TEXT_STYLE,
+		}));
+		if (placed) void fitBoxToText(board, placed.pageId, placed.id, { first: true });
+	});
+}
+
+const halfWidth = (page: Page) => Math.max(40, (page.w - 20) / 2);
+
+/**
+ * Set a note's or text box's height to what its text needs, kept on the page. The first fit of a new
+ * note is not an undo step of its own: undoing the add removes the note, fitted or not.
+ */
+export async function fitBoxToText(board: BoardViewport, pageId: string, moduleId: string, opts: { first?: boolean } = {}) {
+	const h = await board.fittedHeight(moduleId);
+	const store = board.boardStore;
+	const page = store.file.pages.find((p) => p.id === pageId);
+	const m = page?.modules.find((x) => x.id === moduleId);
+	if (!page || !m) return;
+	if (h === null) {
+		if (!opts.first) new Notice('Bring the item into view first: its text is measured on screen.');
+		return;
+	}
+	const next = Math.round(Math.max(5, Math.min(h, page.h - m.y)) * 10) / 10;
+	if (Math.abs(next - m.h) < 0.05) return;
+	const recipe = (f: PatchworkFile) => mapModule(f, pageId, moduleId, (x) => ({ ...x, h: next }));
+	if (opts.first) store.updateOutsideHistory(recipe);
+	else store.update(recipe);
 }
 
 /** Point a module at another file, e.g. after its note, PDF or image was deleted (SPEC 5.3). */
@@ -60,18 +89,19 @@ export function replaceSource(board: BoardViewport, pageId: string, moduleId: st
 	}
 }
 
-/** A free markdown box (SPEC 5.3 text module), edited in the inspector. */
+/** A free markdown box (SPEC 5.3 text module), opened for typing right away. */
 export function addText(board: BoardViewport) {
-	board.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '**New text**\n\nChange this text with Edit above.' }));
-	board.showProperties('content');
+	const placed = board.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '', style: NEW_TEXT_STYLE }));
+	// The editor needs the module on screen and rendered.
+	if (placed) void board.fittedHeight(placed.id).then(() => board.editInline(placed.pageId, placed.id));
 }
 
 /** Interactive tracker (M5): a counter, a row of boxes or a checklist, edited in the properties popover. */
 export function addTracker(board: BoardViewport, kind: TrackerModule['kind'] = 'counter') {
 	const presets: Record<TrackerModule['kind'], Partial<TrackerModule> & { w: number; h: number }> = {
-		counter: { label: 'Hit points', value: 10, min: 0, w: 50, h: 25 },
-		boxes: { label: 'Spell slots', max: 4, value: 0, w: 60, h: 18 },
-		checklist: { label: 'Quests', items: [{ text: 'Find the queen' }, { text: 'Return the crown' }], w: 70, h: 30 },
+		counter: { label: 'Counter', value: 0, w: 50, h: 25 },
+		boxes: { label: 'Progress', max: 5, value: 0, w: 60, h: 18 },
+		checklist: { label: 'To do', items: [{ text: 'First item' }, { text: 'Second item' }], w: 70, h: 30 },
 	};
 	const { w, h, ...rest } = presets[kind];
 	board.placeModule((page, id) => ({ id, type: 'tracker', kind, ...defaultModuleRect(page, { w, h }), ...rest }));
@@ -205,12 +235,13 @@ function dropFile(board: BoardViewport, file: TFile, page: Page, at: Point, queu
 		const id = newId(allIds(board.boardStore.file));
 		board.boardStore.update((f) => addModule(f, page.id, build(id)));
 		board.select({ pageId: page.id, moduleId: id });
+		return id;
 	};
 	if (ext === 'md') {
-		add((id): NoteModule => ({ id, type: 'note', ...place(90, 80), file: file.path }));
-		return Promise.resolve();
+		const id = add((id): NoteModule => ({ id, type: 'note', ...place(halfWidth(page), 60), file: file.path, style: NEW_TEXT_STYLE }));
+		return fitBoxToText(board, page.id, id, { first: true });
 	}
-	if (isImage(file)) return imageAspect(board.app, file).then((aspect) => add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, 60 / aspect)), file: file.path })));
+	if (isImage(file)) return imageAspect(board.app, file).then((aspect) => void add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, 60 / aspect)), file: file.path })));
 	if (ext === 'pdf') {
 		const modal = new CropModal(board.app, board.services.pdfDocs, file.path, { page: 1 }, (r) =>
 			add((id): PdfModule => {

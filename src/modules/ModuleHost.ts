@@ -8,7 +8,7 @@ import { drawShape, ShapeRenderer } from './shapeModule';
 import { FlowRenderer, NoteModuleRenderer, TextModuleRenderer } from './noteModule';
 import { FlowLayout } from './flowLayout';
 import { chainSignature, type FlowInfo, flowChains } from '../model/flow';
-import { applyOverflow } from './overflow';
+import { applyOverflow, fittedHeight } from './overflow';
 import { applyModuleStyle } from './style';
 import { PdfModuleRenderer } from './pdfModule';
 import { TocModuleRenderer } from './tocModule';
@@ -375,6 +375,14 @@ export class ModuleHost {
 	flowPart(id: string): ReturnType<FlowLayout['part']> {
 		const info = this.flowInfo().get(id);
 		return info?.ok ? this.flowLayout.part(info.chain, info.index) : Promise.resolve(null);
+	}
+
+	/** Once its content has rendered, the height (mm) that fits a mounted module's text; null when off screen or not text. */
+	async fittedHeight(id: string): Promise<number | null> {
+		const m = this.mounted.get(id);
+		if (!m) return null;
+		await m.renderer?.rendered();
+		return this.mounted.get(id) === m ? fittedHeight(m.el, m.body) : null;
 	}
 
 	/** The markdown a mounted module shows (see ModuleRenderer.shownMarkdown). */

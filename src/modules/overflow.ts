@@ -21,9 +21,7 @@ export function applyOverflow(moduleEl: HTMLElement, body: HTMLElement, policy: 
 	content.setCssProps({ '--pw-scroll': '0mm' });
 	if (policy === 'grow') {
 		// The grown height is display-only; the stored `h` never changes (SPEC 5.3).
-		// Border and padding sit around the body; keep them when growing to the content.
-		const chrome = Math.max(0, moduleEl.offsetHeight - body.clientHeight);
-		moduleEl.setCssProps({ '--pw-grow-h': `${Math.max((content.offsetHeight + chrome) / PX_PER_MM, 5)}mm` });
+		moduleEl.setCssProps({ '--pw-grow-h': `${neededHeight(moduleEl, body, content)}mm` });
 		return false;
 	}
 	const box = body.clientHeight;
@@ -33,6 +31,18 @@ export function applyOverflow(moduleEl: HTMLElement, body: HTMLElement, policy: 
 		return true;
 	}
 	return fit(content, box);
+}
+
+/** The box height (mm) that shows all of a module's text at full size, or null if it shows no text. */
+export function fittedHeight(moduleEl: HTMLElement, body: HTMLElement): number | null {
+	const content = body.querySelector<HTMLElement>(':scope > .pw-markdown');
+	return content ? neededHeight(moduleEl, body, content) : null;
+}
+
+function neededHeight(moduleEl: HTMLElement, body: HTMLElement, content: HTMLElement): number {
+	// Border and padding sit around the body; the box keeps them around the content.
+	const chrome = Math.max(0, moduleEl.offsetHeight - body.clientHeight);
+	return Math.max((content.offsetHeight + chrome) / PX_PER_MM, 5);
 }
 
 /**
