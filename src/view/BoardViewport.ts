@@ -118,6 +118,8 @@ const DETAIL_ZOOM = 0.25;
 const MIN_FIT_PX = 120;
 /** Wait this long after the last zoom step before re-rendering for the new zoom (SPEC 8.3). */
 const ZOOM_SETTLE_MS = 150;
+/** Nudges or wheel scrolls further apart than this are separate undo steps. */
+const BURST_MS = 1000;
 
 export class BoardViewport implements BoardSurface {
 	private root: HTMLElement;
@@ -167,6 +169,8 @@ export class BoardViewport implements BoardSurface {
 	private tool: ShapePreset | null = null;
 	private shapeButton: HTMLElement | null = null;
 	private live: LiveContent;
+	/** The last nudge or wheel-scroll group and when it last grew (see burst). */
+	private lastBurst = { key: '', at: 0 };
 
 	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
 		this.host = container;
@@ -1191,7 +1195,7 @@ export class BoardViewport implements BoardSurface {
 		const next = clampScroll(((m as NoteModule).scrollY ?? 0) + deltaPx / (PX_PER_MM * this.camera.zoom), content.offsetHeight / PX_PER_MM, body.clientHeight / PX_PER_MM);
 		const rounded = Math.round(next * 10) / 10;
 		// One undo step per burst of wheel ticks.
-		this.store.update((f) => mapModule(f, sel.pageId, sel.moduleId!, (x) => withField(x, 'scrollY', rounded > 0 ? rounded : undefined)), { coalesce: `scroll:${sel.moduleId}` });
+		this.store.update((f) => mapModule(f, sel.pageId, sel.moduleId!, (x) => withField(x, 'scrollY', rounded > 0 ? rounded : undefined)), { coalesce: this.burst(`scroll:${sel.moduleId}`) });
 		return true;
 	}
 
@@ -1528,7 +1532,18 @@ export class BoardViewport implements BoardSurface {
 		this.setItems(copies);
 	}
 
-	/** Arrow keys move the selection by 1 mm (Shift: 10 mm). Consecutive presses undo as one step. */
+	/**
+	 * Key presses and wheel ticks merge into one undo step only while they come in a quick burst: a group
+	 * left open (no other edit since) would otherwise swallow a nudge made minutes later.
+	 */
+	private burst(key: string): string {
+		const now = performance.now();
+		if (this.lastBurst.key !== key || now - this.lastBurst.at > BURST_MS) this.store.endCoalesce();
+		this.lastBurst = { key, at: now };
+		return key;
+	}
+
+	/** Arrow keys move the selection by 1 mm (Shift: 10 mm). A quick burst of presses undoes as one step. */
 	private nudge(key: string, step: number) {
 		if (this.items.length === 0 || this.store.readOnly) return;
 		const dx = key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0;
@@ -1536,7 +1551,7 @@ export class BoardViewport implements BoardSurface {
 		const shift = <T extends Point>(o: T): T => ({ ...o, x: o.x + dx, y: o.y + dy });
 		this.store.update(
 			(f) => this.items.reduce((acc, it) => (it.moduleId ? mapModule(acc, it.pageId, it.moduleId, (m) => (m.locked ? m : shift(m))) : mapPage(acc, it.pageId, shift)), f),
-			{ coalesce: `nudge:${this.items.map((it) => it.moduleId ?? it.pageId).join(',')}` },
+			{ coalesce: this.burst(`nudge:${this.items.map((it) => it.moduleId ?? it.pageId).join(',')}`) },
 		);
 	}
 
