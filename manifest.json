@@ -5,5 +5,6 @@
 	"minAppVersion": "1.6.7",
 	"description": "Compose boards of fixed-size pages from live references to notes and PDF regions, and export them to PDF or PNG.",
 	"author": "aleMode",
+	"authorUrl": "https://github.com/aleMode",
 	"isDesktopOnly": true
 }
