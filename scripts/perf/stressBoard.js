@@ -49,7 +49,7 @@ async function panFrames(view, frames, step) {
 }
 
 const out = { rssStartMB: rss() };
-const old = app.vault.getAbstractFileByPath('Stress board 100x3.patchwork');
+const old = app.vault.getAbstractFileByPath('Stress patchwork 100x3.patchwork');
 if (old) await app.vault.delete(old);
 
 // 1. Open: the board opens zoomed to fit, so all 100 pages are visible at once. At that zoom pages
