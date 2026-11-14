@@ -40,13 +40,13 @@ export function confirm(app: App, title: string, message: string, cta: string): 
 		new Setting(modal.contentEl)
 			.addButton((b) => b.setButtonText('Cancel').onClick(() => modal.close()))
 			.addButton((b) =>
+				// The class, not setWarning() (deprecated) or setDestructive() (Obsidian 1.13, above minAppVersion).
 				b
 					.setButtonText(cta)
-					.setWarning()
 					.onClick(() => {
 						answer = true;
 						modal.close();
-					}),
+					}).buttonEl.addClass('mod-warning'),
 			);
 		modal.onClose = () => resolve(answer);
 		modal.open();

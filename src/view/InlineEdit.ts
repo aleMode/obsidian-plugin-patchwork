@@ -137,7 +137,7 @@ function followRenamedHeading(d: InlineEditDeps, pageId: string, note: NoteModul
 	const was = title(before);
 	const now = title(after);
 	if (!was || !now || was === now) return;
-	d.store.update((f) => mapModule(f, pageId, note.id, (x) => ({ ...x, subpath: note.subpath!.replace(/#[^#]*$/, `#${now}`) })));
+	d.store.update((f) => mapModule(f, pageId, note.id, (x) => ({ ...x, subpath: note.subpath!.replace(/#[^#]*$/, () => `#${now}`) })));
 }
 
 /** Obsidian re-parses a saved note a moment later; wait for it (or a second) so the module renders the new sections. */

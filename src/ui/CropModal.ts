@@ -39,6 +39,8 @@ export class CropModal extends Modal {
 	private page: number;
 	private crop: Crop;
 	private pdfDoc: PdfDocument | null = null;
+	/** Bumped by every search and on close: an older search stops and its results are dropped. */
+	private searchRun = 0;
 	private pageCount = 1;
 	private pageAspect = 1;
 	private stage!: HTMLElement;
@@ -149,16 +151,18 @@ export class CropModal extends Modal {
 		const run = async () => {
 			const doc = this.pdfDoc;
 			if (!doc) return;
+			const run = ++this.searchRun;
+			const stale = () => run !== this.searchRun;
 			this.results.empty();
 			const status = this.results.createDiv({ cls: 'pw-crop-status', text: 'Searching…' });
 			let hits: Awaited<ReturnType<typeof searchPdf>>;
 			try {
-				hits = await searchPdf(doc, input.value, 100, (n) => status.setText(`Searching page ${n} of ${doc.numPages}…`));
+				hits = await searchPdf(doc, input.value, 100, (n) => status.setText(`Searching page ${n} of ${doc.numPages}…`), stale);
 			} catch (e) {
-				status.setText(`Search failed: ${e instanceof Error ? e.message : String(e)}`);
+				if (!stale()) status.setText(`Search failed: ${e instanceof Error ? e.message : String(e)}`);
 				return;
 			}
-			if (this.pdfDoc !== doc) return;
+			if (stale() || this.pdfDoc !== doc) return;
 			status.setText(hits.length ? `${hits.length}${hits.length === 100 ? '+' : ''} matches` : 'No matches.');
 			for (const h of hits) {
 				const row = this.results.createDiv({ cls: 'pw-crop-hit' });
@@ -240,6 +244,7 @@ export class CropModal extends Modal {
 	}
 
 	onClose() {
+		this.searchRun++;
 		CropModal.open.delete(this);
 		if (this.canvas) this.canvas.width = this.canvas.height = 0;
 		if (this.pdfDoc) this.pdfDocs.release(this.path);

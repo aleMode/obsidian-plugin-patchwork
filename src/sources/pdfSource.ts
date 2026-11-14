@@ -73,12 +73,15 @@ export interface TextHit {
 	context: string;
 }
 
-/** Find `term` (case-insensitive) in every page's text, in page order, up to `limit` hits. */
-export async function searchPdf(doc: PdfDocument, term: string, limit = 100, progress?: (page: number) => void): Promise<TextHit[]> {
+/**
+ * Find `term` (case-insensitive) in every page's text, in page order, up to `limit` hits. Stops early
+ * (with what it found so far) once `cancelled` says so: a newer search started, or the dialog closed.
+ */
+export async function searchPdf(doc: PdfDocument, term: string, limit = 100, progress?: (page: number) => void, cancelled: () => boolean = () => false): Promise<TextHit[]> {
 	const needle = term.trim().toLowerCase();
 	const hits: TextHit[] = [];
 	if (!needle) return hits;
-	for (let n = 1; n <= doc.numPages && hits.length < limit; n++) {
+	for (let n = 1; n <= doc.numPages && hits.length < limit && !cancelled(); n++) {
 		progress?.(n);
 		const page = await doc.getPage(n);
 		const vp = page.getViewport({ scale: 1 });

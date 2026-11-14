@@ -1123,7 +1123,8 @@ export class BoardViewport implements BoardSurface {
 		const area = visibleRect(this.camera, vp);
 		const zone = inset(area, Math.max(area.w, area.h) * CULL_MARGIN);
 		// On-screen pages first, then the pre-mount margin: content renders in this order.
-		const inZone = this.store.file.pages.filter((p) => intersects(p, zone));
+		// Use mode hides master pages (CSS); mounting their modules would render content nobody sees.
+		const inZone = this.store.file.pages.filter((p) => intersects(p, zone) && !(this.useMode && p.isMaster));
 		const ordered = [...inZone.filter((p) => intersects(p, area)), ...inZone.filter((p) => !intersects(p, area))].map((p) => p.id);
 		const next = new Set(ordered);
 		const changed = next.size !== this.visible.size || ordered.some((id) => !this.visible.has(id));
@@ -1153,6 +1154,11 @@ export class BoardViewport implements BoardSurface {
 		on('pointercancel', (e) => this.onPointerUp(e));
 		on('keydown', (e) => this.onKey(e, true));
 		on('keyup', (e) => this.onKey(e, false));
+		// Space released in another window (Alt+Tab while holding it) never reaches the board as a keyup.
+		on('blur', () => {
+			this.spaceHeld = false;
+			this.root.removeClass('is-panning');
+		});
 		on('contextmenu', (e) => this.onContextMenu(e));
 		on('dblclick', (e) => this.onDoubleClick(e));
 		// Use mode: links and checkboxes in the content (in Arrange the content doesn't take the pointer).
