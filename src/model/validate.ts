@@ -232,6 +232,7 @@ function validateBoard(raw: unknown): ParseResult {
 	if (!Array.isArray(file.pages)) is.errors.push('pages: expected a list');
 	else checkPages(file.pages, is);
 	if (file.views !== undefined) {
+		const viewIds = new Set<string>();
 		if (!Array.isArray(file.views)) is.errors.push('views: expected a list');
 		else
 			file.views.forEach((v, i) => {
@@ -240,7 +241,9 @@ function validateBoard(raw: unknown): ParseResult {
 				is.required(v, 'name', vp, isStr, 'text');
 				for (const k of ['x', 'y']) is.required(v, k, vp, isNum, 'a number');
 				is.required(v, 'zoom', vp, positive, 'a positive number');
-				if (!isStr(v.id)) v.id = `view-${i}`;
+				// Missing or repeated IDs get a fresh one, or "Go to view" would go to the wrong view.
+				if (!isStr(v.id) || v.id === '' || viewIds.has(v.id)) v.id = newId(viewIds);
+				viewIds.add(v.id as string);
 			});
 	}
 

@@ -231,4 +231,12 @@ describe('shapes and saved views in the file', () => {
 		expect(Object.keys(m.stroke)).toEqual(['color', 'width']);
 	});
 
+	it('views with a missing or repeated id get a fresh, unique one', () => {
+		const raw = JSON.parse(serializeBoard(newBoardFile()));
+		raw.views = [{ name: 'a', x: 0, y: 0, zoom: 1 }, { id: 'view-0', name: 'b', x: 0, y: 0, zoom: 1 }, { id: 'view-0', name: 'c', x: 0, y: 0, zoom: 1 }];
+		const r = parseBoard(JSON.stringify(raw));
+		const ids = r.ok ? (r.file.views ?? []).map((v) => v.id) : [];
+		expect(new Set(ids).size).toBe(3);
+		expect(ids[1]).toBe('view-0');
+	});
 });
