@@ -92,3 +92,17 @@ Stress board with Use mode on: pan along a row at working zoom p50 16.6 ms, p95 
 ## Small-text legibility ramp (2026-10-21)
 
 Colour and stroke on every module body below 100 % zoom (`styles.css`). Stress board, 100 pages × 3 modules, the working zoom of the probe (about 77 %, boost about 0.46), one run without and two with the rule: pan along a row p50 16.3 / 11.3 / 16.8 ms, p95 27.7 / 33.1 / 19.7 ms, frames > 50 ms 4 / 5 / 1 per 240; whole board p50 17.3 / 17.1 / 16.8 ms, p95 19.5 / 19.4 / 19.8 ms; open zoomed to fit ~485 ms in all runs. Within the run-to-run variation seen before (the pan p95 has ranged 19–33 ms); no regression found. The rule restyles once per settled zoom, not per frame.
+
+## Review probes: drag, save, folder rename (2026-11-14)
+
+New steps in `scripts/perf/stressBoard.js` (review P items). Windows 11, Obsidian 1.12.7, window 1024 × 800 at 125 % scaling, sidebar outline open.
+
+| Probe | Before | After |
+|---|---|---|
+| Drag one module for 240 frames at working zoom (one store change per frame, coalesced) | p50 72 ms, p95 97 ms, 239 frames > 50 ms (~14 fps) | p50 18.8 ms, p95 25.3 ms, none > 50 ms |
+| Save: serializations per save (86 KB board, ~0.9 ms each) | 4–6 | 1 (cached per snapshot) |
+| Rename a folder of 200 notes shown on the board | 43–60 ms until every module follows, one board write, no long tasks | (no change needed) |
+
+**Drag regression found and fixed:** the outline (sidebar and floating panel) rebuilt every row on every store change, so a drag rebuilt 300 rows per frame: ~12 ms of script plus the relayout of the whole list. It now rebuilds only when something it shows changes (titles, order, selection, lock, views), so moving and resizing skip it.
+
+Same runs, unchanged probes: open zoomed to fit 372–480 ms; pan along a row p50 17 ms, p95 23–30 ms; whole board p50 23.6–24.7 ms, p95 26–33 ms. The whole-board pan is slower than on the Linux machine (p50 16.6 ms) in the before run too, so it is this machine (125 % scaling, integrated GPU), not a change; not investigated further.
