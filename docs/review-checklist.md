@@ -32,56 +32,57 @@ Each has a recommendation; a one-word answer is enough.
 
 **Product direction (decides what gets built next)**
 
-- [ ] **Q1** At the table you are: player, DM, or both? → decides F8 (encounter tracker) vs a character dashboard template first.
-- [ ] **Q2** What is on the table: laptop, second screen facing players, touch screen? → priority of F3, F14 and bigger hit targets.
-- [ ] **Q3** Session state (HP, slots, roll history) lives in the `.patchwork` file (as now) or in a separate session file? *Recommend: keep it in the file, outside the undo history.*
-- [ ] **Q4** Do you use the Dice Roller plugin? If yes, F1 hands rolls to it instead of parsing dice itself.
-- [ ] **Q8** Public release planned? If yes: plugin ID, `@electron/remote` in review, stress command, tested `minAppVersion`, English only.
-- [ ] **Q9** Do you share exports made from commercial rulebooks? Vector crops carry the whole source page (hidden text too). *Recommend: louder note in the export dialog.*
+- [ ] **Q1** At the table you are: player, DM, or both? → decides F8 (encounter tracker) vs a character dashboard template first. THIS IS MEANT TO BE A UTILITY TOOL, NOT A DUNGEONS AND DRAGONS ONE,
+- [ ] **Q2** What is on the table: laptop, second screen facing players, touch screen? → priority of F3, F14 and bigger hit targets. NO NED, IT'S SUPPOSED TO BE A IMAGE/PDF/DASHBOARD BUILDER
+- [ ] **Q3** Session state (HP, slots, roll history) lives in the `.patchwork` file (as now) or in a separate session file? *Recommend: keep it in the file, outside the undo history.* NO NEED
+- [ ] **Q4** Do you use the Dice Roller plugin? If yes, F1 hands rolls to it instead of parsing dice itself. NO NEED TO IMPLEMENT THIS
+- [ ] **Q8** Public release planned? If yes: plugin ID, `@electron/remote` in review, stress command, tested `minAppVersion`, English only. MAYBE IN THE FUTURE, YES
+- [ ] **Q9** Do you share exports made from commercial rulebooks? Vector crops carry the whole source page (hidden text too). *Recommend: louder note in the export dialog.*IT'S FINE
 
 **Open behaviour questions**
 
-- [ ] **B8** Linked frames on a master page don't work on the pages using it. Fix (rewrite `from` in `resolvePage`, run chains on resolved pages) or block frames on masters? *Recommend: block, with a notice; masters are for furniture.*
-- [ ] **B10** Use mode keeps Ctrl+Z active, and it can undo an Arrange edit after a checkbox tick. Limit undo in Use mode to edits made since entering it, or turn it off there? *Recommend: limit.*
-- [ ] **Q5** Popout windows: supported from now on (they work after B1; add them to the QA list), or "main window only"? *Recommend: supported.*
-- [ ] **Q6 / S** Manual page order (`board.order: "manual"`) has a model but no UI. Build it (drag rows in the outline) or drop it from the spec? *Recommend: drop until a need shows.*
-- [ ] **S** `PdfModule.renderDpi` is validated and saved but never read. Implement (per-module raster DPI) or remove from the spec (keep it in files as an unknown-ish key)? *Recommend: remove from the spec.*
-- [ ] **B14** Retyping a heading in place fixes only that module's link; other modules and boards showing the section break. Follow everywhere (like a rename) or leave it? *Recommend: follow in the open board only.*
-- [ ] **B14** Dropping several PDFs opens one crop dialog per file, stacked. Queue them one after another, or place them uncropped? *Recommend: queue.*
+- [ ] **B8** Linked frames on a master page don't work on the pages using it. Fix (rewrite `from` in `resolvePage`, run chains on resolved pages) or block frames on masters? *Recommend: block, with a notice; masters are for furniture.* YES
+- [ ] **B10** Use mode keeps Ctrl+Z active, and it can undo an Arrange edit after a checkbox tick. Limit undo in Use mode to edits made since entering it, or turn it off there? *Recommend: limit.* YES, LIMIT THEM, BUT RESUME WITH THE SAME STACK, NOT A NEW ONE, ONCE USER RE-ENTERS
+- [ ] **Q5** Popout windows: supported from now on (they work after B1; add them to the QA list), or "main window only"? *Recommend: supported.* YES
+- [ ] **Q6 / S** Manual page order (`board.order: "manual"`) has a model but no UI. Build it (drag rows in the outline) or drop it from the spec? *Recommend: drop until a need shows.* DROP
+- [ ] **S** `PdfModule.renderDpi` is validated and saved but never read. Implement (per-module raster DPI) or remove from the spec (keep it in files as an unknown-ish key)? *Recommend: remove from the spec.* REMOVE IS FINE
+- [ ] **B14** Retyping a heading in place fixes only that module's link; other modules and boards showing the section break. Follow everywhere (like a rename) or leave it? *Recommend: follow in the open board only.* YES
+- [ ] **B14** Dropping several PDFs opens one crop dialog per file, stacked. Queue them one after another, or place them uncropped? *Recommend: queue.* QUEUE
 - [ ] **T** An unfilled shape over a PDF region forces it to raster in exports. Ignore unfilled shapes and lines when deciding? *Recommend: yes.*
+ YES  
 
 **Repo**
 
-- [ ] Remove `image.png` and `image copy.png` (repo root), `test-vault/Untitled board (conflict 2026-10-20 1015).patchwork` and the two exported PDFs in `test-vault/`? Nothing references them. *Recommend: yes.*
-- [ ] Hide *Generate stress-test patchwork* behind a setting (or dev builds only)? *Recommend: yes, before any release.*
-- [ ] Add a Windows job to CI? *Recommend: yes, but first check that `npm ci` installs `@rolldown/binding-win32-x64-msvc` on a clean clone (it didn't here).*
-- [ ] **Q10** Is Windows a supported dev platform now? If yes, `CLAUDE.md` needs Windows setup next to the Linux one.
+- [ ] Remove `image.png` and `image copy.png` (repo root), `test-vault/Untitled board (conflict 2026-10-20 1015).patchwork` and the two exported PDFs in `test-vault/`? Nothing references them. *Recommend: yes.* YES
+- [ ] Hide *Generate stress-test patchwork* behind a setting (or dev builds only)? *Recommend: yes, before any release.* NO
+- [ ] Add a Windows job to CI? *Recommend: yes, but first check that `npm ci` installs `@rolldown/binding-win32-x64-msvc` on a clean clone (it didn't here).* AGREED
+- [ ] **Q10** Is Windows a supported dev platform now? If yes, `CLAUDE.md` needs Windows setup next to the Linux one. YES, ALREADY ON IT
 - [ ] Four e2e suites fail on this machine (Windows, Obsidian 1.12.7, 1024×800 window) **before and after** the fixes: `masters.js`, `toc.js`, `usemode.mjs` (checkbox ticks), `outlinepanel.mjs` (one layout check). Likely window size or version. Run them at 1920×1040 on Linux to confirm, or make the suites size the window themselves?
-
+  THE SECOND ONE
 ## 3. Elaborate (plan before code)
 
 **Foundations**
 
-- [ ] **P** Split `BoardViewport.ts` (1 936 lines): input state machine, actions, toolbar, menus. No behaviour change; e2e is the safety net.
-- [ ] **P** Module-type registry (keys, content keys, board renderer, print renderer, forms) to end the eight-places problem that caused B13.
-- [ ] **P** Unit tests for `linkTracker`, the `PatchworkView` save/conflict flow, `liveContent` checkbox mapping (needs a thin fake of the Obsidian bits).
-- [ ] **S** Move `paperScope`, `furniture` and `moduleTitle` out of `view/` so `export/` doesn't import the view layer.
-- [ ] **P** Perf probes not yet measured: drag one module for 240 frames on the stress board; rename a folder of many notes (batch rename events, compute `moved` once); serialize once per save instead of three times.
+- [ ] **P** Split `BoardViewport.ts` (1 936 lines): input state machine, actions, toolbar, menus. No behaviour change; e2e is the safety net. REMEMBER TO NOT OVERCOMPLICATE HE CODEBAS,E BUT YEAH 2K LINES SOUND LIKE A LOT
+- [ ] **P** Module-type registry (keys, content keys, board renderer, print renderer, forms) to end the eight-places problem that caused B13. AGREED
+- [ ] **P** Unit tests for `linkTracker`, the `PatchworkView` save/conflict flow, `liveContent` checkbox mapping (needs a thin fake of the Obsidian bits). OK
+- [ ] **S** Move `paperScope`, `furniture` and `moduleTitle` out of `view/` so `export/` doesn't import the view layer. UPSIDE/DOWNSIDE?
+- [ ] **P** Perf probes not yet measured: drag one module for 240 frames on the stress board; rename a folder of many notes (batch rename events, compute `moved` once); serialize once per save instead of three times. IMPLEMENT IT IN THE TEST
 
 **Tweaks (T) and UX (U), small each, worth one plan together**
 
-- [ ] New note module: half the page wide, height fitted to content, "Fit box to text" on the context bar; default padding 1.5–2 mm.
-- [ ] Text box starts in edit mode instead of the "Change this text with Edit above" placeholder.
-- [ ] Context bar opens on selection (or one-time hint) instead of the 30 × 18 px pill; popover opens on the side with free space.
-- [ ] Crop editor: page number field, zoom, PageUp/PageDown; "crop to block" (F10).
-- [ ] Copy / paste (F5); Esc deselects; `Ctrl+0` fit, `Ctrl+1` 100 %; a "Keyboard and mouse" cheat sheet in the View menu.
-- [ ] Empty-page hint, ribbon icon, "New patchwork" in the file explorer.
-- [ ] Export: sticky Export button, remember "Open after export", clickable problems, "Export this page" in the page menu.
-- [ ] Section picker: show the first words of block entries (`^opportunity` alone says little).
-- [ ] Freeze: "Update snapshot" next to "Unfreeze".
-- [ ] Settings tab: implement `getSettingDefinitions()` so settings show in Obsidian's settings search (needs a check against `minAppVersion`).
+- [ ] New note module: half the page wide, height fitted to content, "Fit box to text" on the context bar; default padding 1.5–2 mm. DEFAULT PADDING 1MM
+- [ ] Text box starts in edit mode instead of the "Change this text with Edit above" placeholder. OK
+- [ ] Context bar opens on selection (or one-time hint) instead of the 30 × 18 px pill; popover opens on the side with free space. OK
+- [ ] Crop editor: page number field, zoom, PageUp/PageDown; "crop to block" (F10). OK
+- [ ] Copy / paste (F5); Esc deselects; `Ctrl+0` fit, `Ctrl+1` 100 %; a "Keyboard and mouse" cheat sheet in the View menu. OK
+- [ ] Empty-page hint, ribbon icon, "New patchwork" in the file explorer. OK YESYES
+- [ ] Export: sticky Export button, remember "Open after export", clickable problems, "Export this page" in the page menu OK.
+- [ ] Section picker: show the first words of block entries (`^opportunity` alone says little). NO
+- [ ] Freeze: "Update snapshot" next to "Unfreeze". NOT NECESSARY, WOULD CLUTTER
+- [ ] Settings tab: implement `getSettingDefinitions()` so settings show in Obsidian's settings search (needs a check against `minAppVersion`).YES
 
-**Table play (F), each needs its own short spec section**
+**Table play (F), each needs its own short spec section DO NOT IMPLEMENT THESE**
 
 - [ ] **F2** Tracker upgrade: type a value or delta, Shift-click ±5, `value / max`, reset groups ("long rest").
 - [ ] **F3** Use-mode navigation: fit width, PageUp/PageDown between pages, digits for saved views.
