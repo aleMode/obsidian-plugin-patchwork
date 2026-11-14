@@ -30,6 +30,11 @@ describe('tracker', () => {
 		expect(itemsFromText('b\n\n c \na', c.items)).toEqual([{ text: 'b', done: true }, { text: 'c' }, { text: 'a' }]);
 	});
 
+	it('an edited line keeps the tick and unknown keys of the item on that line', () => {
+		const old = [{ text: 'Find queen', done: true, colour: 'red' }, { text: 'Return crown' }];
+		expect(itemsFromText('Find the queen\nReturn crown', old)).toEqual([{ text: 'Find the queen', done: true, colour: 'red' }, { text: 'Return crown' }]);
+	});
+
 	it('print blank clears state for exports only', () => {
 		const c = t({ kind: 'checklist', printBlank: true, items: [{ text: 'a', done: true }] });
 		expect(printedState(c).items).toEqual([{ text: 'a' }]);

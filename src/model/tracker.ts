@@ -48,17 +48,33 @@ function withDone(it: TrackerItem, done: boolean): TrackerItem {
 	return next;
 }
 
-/** Items from text, one per line; lines that keep their text keep their tick. */
+/**
+ * Items from text, one per line. A line that keeps its text keeps its item (tick and any keys this
+ * version doesn't know, hard rule 3); an edited line keeps the item that was on the same line, if no
+ * other line took it, so fixing a typo doesn't lose the tick.
+ */
 export function itemsFromText(text: string, old: readonly TrackerItem[] = []): TrackerItem[] {
-	const pool = [...old];
-	return text
+	const lines = text
 		.split('\n')
 		.map((l) => l.trim())
-		.filter(Boolean)
-		.map((t) => {
-			const k = pool.findIndex((it) => it.text === t);
-			return k >= 0 ? pool.splice(k, 1)[0]! : { text: t };
-		});
+		.filter(Boolean);
+	const used = new Set<number>();
+	// Exact matches first, so a reordered list keeps every tick.
+	const exact = lines.map((t) => {
+		const k = old.findIndex((it, i) => !used.has(i) && it.text === t);
+		if (k >= 0) used.add(k);
+		return k;
+	});
+	return lines.map((t, i) => {
+		const k = exact[i]!;
+		if (k >= 0) return old[k]!;
+		const same = old[i];
+		if (same && !used.has(i)) {
+			used.add(i);
+			return { ...same, text: t };
+		}
+		return { text: t };
+	});
 }
 
 /** The state an export prints: as on the board, or blank to fill in by hand. */
