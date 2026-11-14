@@ -1,5 +1,6 @@
 import { Menu, Modal, Notice, Scope, TextFileView, TFile, WorkspaceLeaf } from 'obsidian';
 import { serializeBoard } from '../model/serialize';
+import type { PatchworkFile } from '../model/schema';
 import { parseBoard } from '../model/validate';
 import { BoardStore } from '../store/BoardStore';
 import { conflictCopyName, decideSave } from '../store/saveGuard';
@@ -20,6 +21,7 @@ export class PatchworkView extends TextFileView {
 	store: BoardStore | null = null;
 	/** Text last read from or written to disk. Basis for the external-change check. */
 	private lastDisk = '';
+	private serialized: { file: PatchworkFile; text: string } | null = null;
 	/** Edits not yet on disk. (Not `dirty` or `saving`: TextFileView uses those names internally.) */
 	private unsaved = false;
 	/** Set when the file failed to parse: the view must never write to it (hard rule 2). */
@@ -53,7 +55,11 @@ export class PatchworkView extends TextFileView {
 
 	getViewData(): string {
 		if (!this.store || this.broken || this.store.readOnly) return this.lastDisk;
-		return serializeBoard(this.store.file);
+		// A save asks several times (before reading the disk, inside TextFileView.save, after the write);
+		// snapshots are immutable, so one serialization per snapshot is enough.
+		const file = this.store.file;
+		if (this.serialized?.file !== file) this.serialized = { file, text: serializeBoard(file) };
+		return this.serialized.text;
 	}
 
 	setViewData(data: string, clear: boolean): void {
