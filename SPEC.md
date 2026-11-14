@@ -291,7 +291,8 @@ src/
   store/                   BoardStore (immutable snapshots, undo/redo, drag coalescing), pageOps
                            (immutable edits), saveGuard (external-change decision)
   view/                    PatchworkView (TextFileView, file I/O), BoardViewport (camera, input,
-                           selection, toolbar, menus), ContextBar, PropertiesPopover/Form, Outline*,
+                           selection, toolbar), boardMenus, boardContent (adding and dropping
+                           content), boardExport, ContextBar, PropertiesPopover/Form, Outline*,
                            InspectorView, InlineEdit, liveContent (Use mode), paperScope, boardChrome
   modules/                 ModuleHost (mount/unmount, render queue) + one renderer per module type,
                            flowLayout (linked frames), overflow, style

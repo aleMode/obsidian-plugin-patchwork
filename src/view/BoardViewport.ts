@@ -1,23 +1,18 @@
 import { type InkContext, pageInk } from '../model/contrast';
 import { ensurePaperScope, themeInk } from './paperScope';
 import { type App, Menu, Notice, setIcon, TFile } from 'obsidian';
-import { exportBoardPdf, isExporting } from '../export/exportPdf';
-import { pdfToPngs } from '../export/exportPng';
-import { parseRange } from '../model/sheetPlan';
 import { arrangePages } from '../model/arrange';
-import { toJsonCanvas } from '../model/canvasExport';
 import { allIds } from '../model/defaults';
 import { bounds, containsPoint, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect, revealShift } from '../model/geometry';
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
-import { PAGE_PRESETS, swapOrientation } from '../model/presets';
-import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule, ShapeModule, TrackerModule } from '../model/schema';
+import type { AnyModule, NoteModule, Page, ShapeModule, TrackerModule } from '../model/schema';
 import { constrainAngle, isLine, lineFromEnds, linePoints, SHAPE_PRESETS, type ShapePreset, shapeAtClick, shapeFromDrag } from '../model/shapes';
-import { flowChains, isLinked, NO_FRAMES_ON_MASTERS, placeNextFrame } from '../model/flow';
+import { flowChains, isLinked, NO_FRAMES_ON_MASTERS } from '../model/flow';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
-import { masterPreview, pageFurniture } from '../model/numbering';
-import { outputPages, resolvePage } from '../model/masters';
+import { masterPreview, pageFurniture, today } from '../model/numbering';
+import { resolvePage } from '../model/masters';
 import { gridDrawStep, snapPoint, snapValue } from '../model/snapping';
 import { stepByKey } from '../model/tracker';
 import { clampScroll } from '../model/style';
@@ -31,20 +26,19 @@ import type { PropertiesSection } from './PropertiesForm';
 import type { BitmapCache } from '../render/bitmapCache';
 import type { ThumbnailCache } from '../render/thumbnails';
 import { linkpathsFromDrop } from '../sources/dropLinks';
-import { type PdfDocCache, pdfSourceId } from '../sources/pdfSource';
-import { loadNoteContent } from '../sources/markdownSource';
+import type { PdfDocCache } from '../sources/pdfSource';
 import type { BoardStore } from '../store/BoardStore';
-import { addModule, addPage, defaultModuleRect, duplicateModules, duplicatePage, findModule, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
+import { addModule, addPage, duplicateModules, duplicatePage, findModule, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage } from '../store/pageOps';
 import { withField } from '../ui/formHelpers';
 import { PatchworkSettingsModal, type SettingsDraft } from '../ui/PatchworkSettingsModal';
-import { confirm, NamedPickerModal, TextPromptModal } from '../ui/prompts';
-import { CropModal, type CropResult } from '../ui/CropModal';
-import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
-import { FilePickerModal, pickNoteSection } from '../ui/pickers';
-import { isImage, isPdf } from '../sources/fileKinds';
+import { NamedPickerModal, TextPromptModal } from '../ui/prompts';
+import type { ExportChoices } from '../ui/ExportModal';
 import { boardToScreen, type Camera, cameraCentre, cameraCentredOn, fitCamera, nextZoomStop, panBy, screenToBoard, visibleRect, wheelZoomFactor, zoomAt, zoomTo } from './camera';
 import { Minimap, Rulers, ThemeColors } from './boardChrome';
 import { LiveContent } from './liveContent';
+import { showAddMenu, showAddPageMenu, showGroupMenu, showItemMenu, showTrackerMenu, showViewMenu } from './boardMenus';
+import { addText, addToc, addTracker, continueInFrame, dropFiles, editCrop, freezeNote, markPdfChecked, pickImage, pickNote, pickPdf, replaceSource, unfreezeNote } from './boardContent';
+import { exportToCanvas, runBoardExport, showExportDialog } from './boardExport';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
 
@@ -172,7 +166,7 @@ export class BoardViewport implements BoardSurface {
 	/** The last nudge or wheel-scroll group and when it last grew (see burst). */
 	private lastBurst = { key: '', at: 0 };
 
-	constructor(container: HTMLElement, private store: BoardStore, private view: PatchworkView, private services: BoardServices) {
+	constructor(container: HTMLElement, private store: BoardStore, readonly view: PatchworkView, readonly services: BoardServices) {
 		this.host = container;
 		this.root = container.createDiv({ cls: 'pw-board', attr: { tabindex: '0' } });
 		this.layer = this.root.createDiv({ cls: 'pw-board-layer' });
@@ -582,7 +576,8 @@ export class BoardViewport implements BoardSurface {
 		return pages.find((p) => p.id === this.selection?.pageId) ?? pages.find((p) => this.visible.has(p.id)) ?? pages[0];
 	}
 
-	private placeModule(build: (page: Page, id: string) => AnyModule) {
+	/** Adds a module to the page new modules go to (`targetPage`) and selects it. */
+	placeModule(build: (page: Page, id: string) => AnyModule) {
 		const page = this.targetPage();
 		if (!page) return void new Notice('Add a page first.');
 		const id = newId(allIds(this.store.file));
@@ -591,146 +586,44 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	pickNote() {
-		pickNoteSection(this.view.app, 'Note to add', (file, choice) =>
-			this.placeModule((page, id): NoteModule => ({
-				id,
-				type: 'note',
-				...defaultModuleRect(page),
-				file: file.path,
-				...(choice.subpath ? { subpath: choice.subpath } : {}),
-			})),
-		);
+		pickNote(this);
 	}
 
 	/** Point a module at another file, e.g. after its note, PDF or image was deleted (SPEC 5.3). */
 	replaceSource(pageId: string, moduleId: string) {
-		const m = findModule(this.store.file, pageId, moduleId);
-		if (!m || this.store.readOnly) return;
-		const app = this.view.app;
-		const set = (patch: (x: AnyModule) => AnyModule) => this.store.update((f) => mapModule(f, pageId, moduleId, patch));
-		if (m.type === 'note') {
-			pickNoteSection(app, 'Note to show', (file, choice) =>
-				set((x) => {
-					const next = { ...x, file: file.path } as NoteModule;
-					if (choice.subpath) next.subpath = choice.subpath;
-					else delete next.subpath;
-					delete next.lines;
-					return next;
-				}),
-			);
-		} else if (m.type === 'image') {
-			new FilePickerModal(app, app.vault.getFiles().filter(isImage), 'Image to show', (file) => set((x) => ({ ...x, file: file.path }))).open();
-		} else if (m.type === 'pdf') {
-			// A different file: page and crop are kept, and the crop editor opens to check them.
-			new FilePickerModal(app, app.vault.getFiles().filter(isPdf), 'PDF to show', (file) => {
-				set((x) => {
-					const next = { ...x, file: file.path } as PdfModule;
-					delete next.sourceId;
-					return next;
-				});
-				this.editCrop(pageId, moduleId);
-			}).open();
-		}
+		replaceSource(this, pageId, moduleId);
 	}
 
-	/** A free markdown box (SPEC 5.3 text module), edited in the inspector. */
 	addText() {
-		this.placeModule((page, id) => ({ id, type: 'text', ...defaultModuleRect(page, { w: 80, h: 30 }), markdown: '**New text**\n\nChange this text with Edit above.' }));
-		this.showProperties('content');
+		addText(this);
 	}
 
-	/** Interactive tracker (M5): a counter, a row of boxes or a checklist, edited in the properties popover. */
 	addTracker(kind: TrackerModule['kind'] = 'counter') {
-		const presets: Record<TrackerModule['kind'], Partial<TrackerModule> & { w: number; h: number }> = {
-			counter: { label: 'Hit points', value: 10, min: 0, w: 50, h: 25 },
-			boxes: { label: 'Spell slots', max: 4, value: 0, w: 60, h: 18 },
-			checklist: { label: 'Quests', items: [{ text: 'Find the queen' }, { text: 'Return the crown' }], w: 70, h: 30 },
-		};
-		const { w, h, ...rest } = presets[kind];
-		this.placeModule((page, id) => ({ id, type: 'tracker', kind, ...defaultModuleRect(page, { w, h }), ...rest }));
-		this.showProperties('content');
+		addTracker(this, kind);
 	}
 
 	showTrackerMenu(e?: MouseEvent) {
-		const menu = new Menu();
-		menu.addItem((i) => i.setTitle('Counter').setIcon('plus-minus').onClick(() => this.addTracker('counter')));
-		menu.addItem((i) => i.setTitle('Boxes').setIcon('square').onClick(() => this.addTracker('boxes')));
-		menu.addItem((i) => i.setTitle('Checklist').setIcon('list-checks').onClick(() => this.addTracker('checklist')));
-		this.showMenuAt(menu, e);
+		showTrackerMenu(this, e);
 	}
 
-	/** Table of contents (M4): fills the page inside its margins; lists named pages live. */
 	addToc() {
-		this.placeModule((page, id) => ({ id, type: 'toc', ...defaultModuleRect(page, { w: page.w - 40, h: page.h - 40 }), x: 20, y: 20 }));
-		this.showProperties('content');
+		addToc(this);
 	}
 
 	pickImage() {
-		const app = this.view.app;
-		new FilePickerModal(app, app.vault.getFiles().filter(isImage), 'Image to add', (file) =>
-			void imageAspect(app, file).then((aspect) =>
-				this.placeModule((page, id): ImageModule => {
-					const r = defaultModuleRect(page, { w: 80, h: 60 });
-					return { id, type: 'image', ...r, h: Math.max(5, Math.min(r.h * 2, r.w / aspect)), file: file.path };
-				}),
-			),
-		).open();
+		pickImage(this);
 	}
 
 	pickPdf() {
-		const app = this.view.app;
-		const { pdfDocs } = this.services;
-		new FilePickerModal(app, app.vault.getFiles().filter(isPdf), 'PDF to add', (file: TFile) =>
-			new CropModal(app, pdfDocs, file.path, { page: 1 }, (r) =>
-				this.placeModule((page, id): PdfModule => {
-					const rect = defaultModuleRect(page);
-					return { id, type: 'pdf', ...rect, ...(r.resizeModule ? fitHeight(rect, r.aspect, page.h) : {}), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}), ...(r.sourceId ? { sourceId: r.sourceId } : {}) };
-				}),
-			).open(),
-		).open();
+		pickPdf(this);
 	}
 
-	/** Open the crop editor for a PDF module and apply the result as one undoable change. */
 	editCrop(pageId: string, moduleId: string) {
-		const page = this.store.file.pages.find((p) => p.id === pageId);
-		const m = page?.modules.find((x) => x.id === moduleId);
-		if (!page || m?.type !== 'pdf' || this.store.readOnly) return;
-		const pdf = m as PdfModule;
-		new CropModal(this.view.app, this.services.pdfDocs, pdf.file, { page: pdf.page, crop: pdf.crop }, (r: CropResult) =>
-			this.store.update((f) =>
-				mapModule(f, pageId, moduleId, (x) => {
-					const next: PdfModule = { ...(x as PdfModule), page: r.page, ...(r.resizeModule ? fitHeight(x, r.aspect, page.h - x.y) : {}) };
-					if (r.crop) next.crop = r.crop;
-					else delete next.crop;
-					// Re-editing the crop counts as checking it against the current file.
-					if (r.sourceId) next.sourceId = r.sourceId;
-					return next;
-				}),
-			),
-		).open();
+		editCrop(this, pageId, moduleId);
 	}
 
-	/**
-	 * Linked frames (M5): continue the chain this module is in with a new frame on the same page as
-	 * the chain's last frame, in free space beside or under it. Never adds or uses another page; the
-	 * user moves the frame wherever the text should go. One undo step.
-	 */
 	continueInFrame(pageId: string, moduleId: string) {
-		if (this.store.readOnly) return;
-		const file = this.store.file;
-		const info = flowChains(file).get(moduleId);
-		const start = findModule(file, pageId, moduleId);
-		if (!start || !['note', 'text', 'frame'].includes(start.type)) return;
-		if (info && !info.ok) return void new Notice(info.reason);
-		const last = info?.ok ? info.chain[info.chain.length - 1]! : { pageId, module: start };
-		const page = file.pages.find((p) => p.id === last.pageId);
-		if (!page) return;
-		if (page.isMaster) return void new Notice(NO_FRAMES_ON_MASTERS);
-		const id = newId(allIds(file));
-		const r = placeNextFrame(last.module, page.modules, page);
-		const frame: FrameModule = { id, type: 'frame', from: last.module.id, ...r, ...(last.module.style ? { style: last.module.style } : {}) };
-		this.store.update((f) => addModule(f, page.id, frame));
-		this.select({ pageId: page.id, moduleId: id });
+		continueInFrame(this, pageId, moduleId);
 	}
 
 	continueSelectionInFrame() {
@@ -739,37 +632,16 @@ export class BoardViewport implements BoardSurface {
 		else new Notice('Select a note, text or frame module first.');
 	}
 
-	/** Freeze a note module (M4): store what it shows now, so later edits to the note don't change it. */
-	async freezeNote(pageId: string, moduleId: string) {
-		const m = findModule(this.store.file, pageId, moduleId);
-		if (m?.type !== 'note' || this.store.readOnly) return;
-		const content = await loadNoteContent(this.view.app, m as NoteModule);
-		if (!content.ok) return void new Notice(`Can't freeze: ${content.reason}`);
-		this.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, frozen: { at: today(), markdown: content.markdown } })));
+	freezeNote(pageId: string, moduleId: string): Promise<void> {
+		return freezeNote(this, pageId, moduleId);
 	}
 
 	unfreezeNote(pageId: string, moduleId: string) {
-		this.store.update((f) =>
-			mapModule(f, pageId, moduleId, (x) => {
-				const next = { ...x };
-				delete next.frozen;
-				return next;
-			}),
-		);
+		unfreezeNote(this, pageId, moduleId);
 	}
 
-	/** Record the PDF's current version on a crop, clearing its "PDF changed" warning. */
-	async markPdfChecked(pageId: string, moduleId: string) {
-		const m = findModule(this.store.file, pageId, moduleId);
-		if (m?.type !== 'pdf' || this.store.readOnly) return;
-		const { pdfDocs } = this.services;
-		const doc = await pdfDocs.acquire(m.file as string);
-		try {
-			const id = pdfSourceId(doc);
-			if (id) this.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, sourceId: id })));
-		} finally {
-			pdfDocs.release(m.file as string);
-		}
+	markPdfChecked(pageId: string, moduleId: string): Promise<void> {
+		return markPdfChecked(this, pageId, moduleId);
 	}
 
 	showSettings() {
@@ -786,29 +658,7 @@ export class BoardViewport implements BoardSurface {
 	// ---------- export ----------
 
 	showExport() {
-		const file = this.view.file;
-		if (!file) return;
-		const e = this.store.file.board.export;
-		const initial: ExportChoices = {
-			base: file.path.replace(/\.patchwork$/, ''),
-			format: e.format,
-			pages: 'all',
-			range: '',
-			sheet: typeof e.sheet === 'object' ? { w: e.sheet.w, h: e.sheet.h } : e.sheet,
-			orientation: e.orientation,
-			overlap: e.tileOverlap,
-			fitSmallPages: !!e.fitSmallPages,
-			tileLabels: !!e.tileLabels,
-			inkSaver: !!e.inkSaver,
-			layout: e.layout ?? 'single',
-			bleed: e.bleed ?? 0,
-			cropMarks: e.cropMarks,
-			quality: e.quality,
-			dpi: e.dpi,
-			open: true,
-		};
-		const ctx = { pageCount: outputPages(this.store.file).length, selectedCount: this.selectedPageIndices().length, unit: this.store.file.board.displayUnit };
-		new ExportModal(this.view.app, initial, ctx, (choices) => void this.runExport(choices)).open();
+		showExportDialog(this);
 	}
 
 	/** Auto-arrange pages in output order (SPEC 5.4), as one undo step. */
@@ -826,61 +676,12 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** One-way, lossy export to a .canvas next to the board (SPEC 9.3). */
-	async exportCanvas() {
-		const file = this.view.file;
-		if (!file) return;
-		const app = this.view.app;
-		const { canvas, dropped } = toJsonCanvas(this.store.file);
-		const path = file.path.replace(/\.patchwork$/, '.canvas');
-		const text = JSON.stringify(canvas, null, '\t');
-		const existing = app.vault.getAbstractFileByPath(path);
-		// The canvas next to a patchwork may be one the user made by hand; never replace it unasked.
-		if (existing instanceof TFile && !(await confirm(app, 'Replace canvas?', `${path} already exists. Exporting replaces its contents.`, 'Replace'))) return;
-		const out = existing instanceof TFile ? (await app.vault.modify(existing, text), existing) : await app.vault.create(path, text);
-		new Notice(`Exported to ${out.path}.${dropped.length ? ` Not carried over: ${dropped.join(', ')}.` : ''}`, dropped.length ? 8000 : 4000);
-		return out;
+	exportCanvas(): Promise<TFile | undefined> {
+		return exportToCanvas(this);
 	}
 
-	/** Pages of the current selection (pages, or the pages of selected modules), as output-order indices. */
-	private selectedPageIndices(): number[] {
-		const ids = new Set(this.items.map((it) => it.pageId));
-		return outputPages(this.store.file).flatMap((p, i) => (ids.has(p.id) ? [i] : []));
-	}
-
-	async runExport(choices: ExportChoices) {
-		const app = this.view.app;
-		// Two exports would share the one print host window and mix up their pages.
-		if (isExporting()) return void new Notice('Another export is still running. Try again when it has finished.');
-		// Remember the choices in the board, like other export defaults (SPEC 6). Not an undo step: the
-		// first Ctrl+Z after an export would otherwise seem to do nothing.
-		this.store.updateOutsideHistory((f) => {
-			const e = f.board.export;
-			const next = { ...e, format: choices.format, sheet: choices.sheet, orientation: choices.orientation, tileOverlap: choices.overlap, quality: choices.quality, dpi: choices.dpi, fitSmallPages: choices.fitSmallPages || undefined, tileLabels: choices.tileLabels || undefined, inkSaver: choices.inkSaver || undefined, layout: choices.layout === 'booklet' ? choices.layout : undefined, bleed: choices.bleed || undefined, cropMarks: choices.cropMarks };
-			return JSON.stringify(next) === JSON.stringify(e) ? f : { ...f, board: { ...f.board, export: next } };
-		});
-		const pageIndices =
-			choices.pages === 'selected' ? this.selectedPageIndices() : choices.pages === 'range' ? parseRange(choices.range, outputPages(this.store.file).length) ?? undefined : undefined;
-		const notice = new Notice('Exporting…', 0);
-		try {
-			const result = await exportBoardPdf(
-				{ app, pdfDocs: this.services.pdfDocs, parent: this.view },
-				this.store.file,
-				this.view.file?.path ?? '',
-				{ ...choices, date: today(), pageIndices },
-				(msg) => notice.setMessage(msg),
-			);
-			const written: TFile[] = [];
-			if (choices.format === 'pdf') written.push(await writeBinary(app, `${choices.base}.pdf`, result.bytes));
-			else for await (const png of pdfToPngs(result.bytes, choices.dpi, (msg) => notice.setMessage(msg))) written.push(await writeBinary(app, `${choices.base}${png.suffix}.png`, png.bytes));
-			notice.hide();
-			const what = written.length === 1 ? written[0]!.path : `${written.length} files (${written[0]!.path}, …)`;
-			new Notice(`Exported ${result.pageCount} page(s) to ${what}.`);
-			if (result.problems.length) new Notice(`Export finished with problems:\n• ${result.problems.join('\n• ')}`, 0);
-			if (choices.open && written[0]) await app.workspace.getLeaf('tab').openFile(written[0]);
-		} catch (e) {
-			notice.hide();
-			new Notice(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 0);
-		}
+	runExport(choices: ExportChoices): Promise<void> {
+		return runBoardExport(this, choices);
 	}
 
 	// ---------- camera ----------
@@ -1072,6 +873,15 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	// ---------- minimap (SPEC 5.1, M3) ----------
+
+	/** False once the board was closed: work that waited on a dialog stops there. */
+	get isAttached(): boolean {
+		return this.root.isConnected;
+	}
+
+	get minimapShown(): boolean {
+		return this.minimap.shown;
+	}
 
 	toggleMinimap() {
 		this.minimap.shown = !this.minimap.shown;
@@ -1518,7 +1328,7 @@ export class BoardViewport implements BoardSurface {
 		return true;
 	}
 
-	private duplicateSelection() {
+	duplicateSelection() {
 		if (this.items.length === 0 || this.store.readOnly) return;
 		const taken = allIds(this.store.file);
 		const ids = () => {
@@ -1611,51 +1421,7 @@ export class BoardViewport implements BoardSurface {
 		const page = this.store.file.pages.find((p) => p.id === hit?.pageId);
 		if (!page) return void new Notice('Drop files onto a page.');
 		const at = screenToBoard(this.camera, this.local(e));
-		void this.dropFiles(files, page, { x: at.x - page.x, y: at.y - page.y });
-	}
-
-	/** Places dropped files cascading from `at`; PDFs open their crop editors one after another, not stacked. */
-	private async dropFiles(files: TFile[], page: Page, at: Point) {
-		const pdfs = files.filter((f) => f.extension.toLowerCase() === 'pdf').length;
-		let n = 0;
-		for (const [i, file] of files.entries()) {
-			// The board may have closed (or the plugin unloaded) while an editor was open.
-			if (!this.root.isConnected) return;
-			const isPdfFile = file.extension.toLowerCase() === 'pdf';
-			await this.dropFile(file, page, { x: at.x + i * 10, y: at.y + i * 10 }, isPdfFile && pdfs > 1 ? `${++n} of ${pdfs}` : '');
-		}
-	}
-
-	/** Resolves when the file is placed, or for a PDF when its crop editor closes. */
-	private dropFile(file: TFile, page: Page, at: Point, queueNote = ''): Promise<void> {
-		const ext = file.extension.toLowerCase();
-		const place = (w: number, h: number) => ({ x: Math.max(0, Math.min(at.x, page.w - w)), y: Math.max(0, Math.min(at.y, page.h - h)), w, h });
-		const add = (build: (id: string) => AnyModule) => {
-			const id = newId(allIds(this.store.file));
-			this.store.update((f) => addModule(f, page.id, build(id)));
-			this.select({ pageId: page.id, moduleId: id });
-		};
-		if (ext === 'md') {
-			add((id): NoteModule => ({ id, type: 'note', ...place(90, 80), file: file.path }));
-			return Promise.resolve();
-		}
-		if (isImage(file)) return imageAspect(this.view.app, file).then((aspect) => add((id): ImageModule => ({ id, type: 'image', ...place(60, Math.max(5, 60 / aspect)), file: file.path })));
-		if (ext === 'pdf') {
-			const modal = new CropModal(this.view.app, this.services.pdfDocs, file.path, { page: 1 }, (r) =>
-				add((id): PdfModule => {
-					const w = 90;
-					const h = r.resizeModule ? fitHeight({ w }, r.aspect, page.h).h : 120;
-					return { id, type: 'pdf', ...place(w, h), file: file.path, page: r.page, ...(r.crop ? { crop: r.crop } : {}), ...(r.sourceId ? { sourceId: r.sourceId } : {}) };
-				}),
-			);
-			modal.titleNote = queueNote;
-			return new Promise((resolve) => {
-				modal.onClosed = resolve;
-				modal.open();
-			});
-		}
-		new Notice(`Patchwork can't place .${ext} files yet.`);
-		return Promise.resolve();
+		void dropFiles(this, files, page, { x: at.x - page.x, y: at.y - page.y });
 	}
 
 	/** Double-click: a text, note or frame module edits its text in place; a PDF module opens the crop editor (SPEC 5.6). */
@@ -1694,95 +1460,13 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** Align, distribute and bulk actions for a multi-selection. */
-	private showGroupMenu(e: MouseEvent) {
-		const menu = new Menu();
-		for (const [mode, title, icon] of ALIGN_ACTIONS) menu.addItem((i) => i.setTitle(title).setIcon(icon).onClick(() => this.align(mode)));
-		menu.addSeparator();
-		menu.addItem((i) => i.setTitle('Distribute horizontally').setIcon('align-horizontal-distribute-center').setDisabled(this.items.length < 3).onClick(() => this.distribute('h')));
-		menu.addItem((i) => i.setTitle('Distribute vertically').setIcon('align-vertical-distribute-center').setDisabled(this.items.length < 3).onClick(() => this.distribute('v')));
-		menu.addSeparator();
-		if (this.items.some((it) => it.moduleId)) menu.addItem((i) => i.setTitle('Lock or unlock').setIcon('lock').onClick(() => this.toggleLock()));
-		menu.addItem((i) => i.setTitle('Duplicate').setIcon('copy').onClick(() => this.duplicateSelection()));
-		menu.addItem((i) => i.setTitle(`Delete ${this.items.length} items`).setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
-		menu.showAtMouseEvent(e);
-	}
-
 	private onContextMenu(e: MouseEvent) {
 		const hit = this.hit(e);
 		if (!hit || this.store.readOnly || this.useMode) return;
 		e.preventDefault();
-		if (this.items.length > 1 && this.items.some((x) => sameItem(x, hit))) return this.showGroupMenu(e);
+		if (this.items.length > 1 && this.items.some((x) => sameItem(x, hit))) return showGroupMenu(this, e);
 		this.select(hit);
-		const menu = new Menu();
-		const { pageId, moduleId } = hit;
-		if (moduleId) {
-			const m = findModule(this.store.file, pageId, moduleId);
-			menu.addItem((i) => i.setTitle('Item settings…').setIcon('sliders-horizontal').onClick(() => this.showProperties('content')));
-			menu.addItem((i) => i.setTitle('Size and position…').setIcon('move-diagonal').onClick(() => this.showProperties('layout')));
-			menu.addItem((i) => i.setTitle('Style…').setIcon('paintbrush').onClick(() => this.showProperties('style')));
-			menu.addSeparator();
-			if (m?.type === 'pdf') menu.addItem((i) => i.setTitle('Edit crop…').setIcon('crop').onClick(() => this.editCrop(pageId, moduleId)));
-			if (m?.type === 'text' || m?.type === 'frame') {
-				menu.addItem((i) => i.setTitle('Continue in a new frame').setIcon('link').onClick(() => this.continueInFrame(pageId, moduleId)));
-				menu.addSeparator();
-			}
-			const marker = this.services.overflowMarker;
-			if (marker && (m?.type === 'note' || m?.type === 'text' || m?.type === 'frame')) {
-				menu.addItem((i) => i.setTitle('Show overflow marker').setIcon('alert-triangle').setChecked(marker.shown()).onClick(() => marker.set(!marker.shown())));
-				menu.addSeparator();
-			}
-			if (m?.type === 'note') {
-				const current = (m as NoteModule).overflow ?? 'clip';
-				const policies = [['clip', 'Overflow: clip', 'scissors'], ['fit', 'Overflow: shrink to fit', 'shrink'], ['grow', 'Overflow: grow', 'unfold-vertical']] as const;
-				for (const [policy, title, icon] of policies) {
-					menu.addItem((i) =>
-						i
-							.setTitle(title)
-							.setIcon(icon)
-							.setChecked(current === policy)
-							.onClick(() =>
-								this.store.update((f) =>
-									mapModule(f, pageId, moduleId, (x) => {
-										const next = { ...x } as NoteModule;
-										if (policy === 'clip') delete next.overflow;
-										else next.overflow = policy;
-										return next;
-									}),
-								),
-							),
-					);
-				}
-				const frozen = !!(m as NoteModule).frozen;
-				menu.addItem((i) => i.setTitle('Continue in a new frame').setIcon('link').onClick(() => this.continueInFrame(pageId, moduleId)));
-				menu.addItem((i) =>
-					i
-						.setTitle(frozen ? 'Unfreeze' : 'Freeze text (snapshot)')
-						.setIcon(frozen ? 'flame' : 'snowflake')
-						.onClick(() => (frozen ? this.unfreezeNote(pageId, moduleId) : void this.freezeNote(pageId, moduleId))),
-				);
-				menu.addSeparator();
-			}
-			menu.addItem((i) => i.setTitle('Duplicate').setIcon('copy').onClick(() => this.duplicateSelection()));
-			menu.addItem((i) =>
-				i
-					.setTitle(m?.locked ? 'Unlock' : 'Lock')
-					.setIcon(m?.locked ? 'unlock' : 'lock')
-					.onClick(() => this.store.update((f) => mapModule(f, pageId, moduleId, (x) => ({ ...x, locked: x.locked ? undefined : true })))),
-			);
-			menu.addItem((i) => i.setTitle('Bring to front').setIcon('bring-to-front').onClick(() => this.store.update((f) => restack(f, pageId, moduleId, 'front'))));
-			menu.addItem((i) => i.setTitle('Send to back').setIcon('send-to-back').onClick(() => this.store.update((f) => restack(f, pageId, moduleId, 'back'))));
-			menu.addItem((i) => i.setTitle('Delete module').setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
-		} else {
-			menu.addItem((i) => i.setTitle('Page settings…').setIcon('sliders-horizontal').onClick(() => this.showProperties('content')));
-			menu.addItem((i) => i.setTitle('Size and position…').setIcon('move-diagonal').onClick(() => this.showProperties('layout')));
-			menu.addItem((i) => i.setTitle('Page numbers, header and footer…').setIcon('hash').onClick(() => this.showProperties('furniture')));
-			menu.addSeparator();
-			menu.addItem((i) => i.setTitle('Zoom to page').setIcon('scan').onClick(() => this.zoomToSelection()));
-			menu.addItem((i) => i.setTitle('Duplicate page').setIcon('copy').onClick(() => this.duplicateSelection()));
-			menu.addItem((i) => i.setTitle('Swap orientation').setIcon('rotate-cw').onClick(() => this.store.update((f) => mapPage(f, pageId, (p) => swapOrientation(p)))));
-			menu.addItem((i) => i.setTitle('Delete page').setIcon('trash-2').setWarning(true).onClick(() => this.deleteSelection()));
-		}
-		menu.showAtMouseEvent(e);
+		showItemMenu(this, e, hit);
 	}
 
 	// ---------- toolbar ----------
@@ -1846,7 +1530,7 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** At the click, or near the board's corner for menus opened from a command. */
-	private showMenuAt(menu: Menu, e?: MouseEvent) {
+	showMenuAt(menu: Menu, e?: MouseEvent) {
 		if (e) {
 			menu.showAtMouseEvent(e);
 			return;
@@ -1940,17 +1624,8 @@ export class BoardViewport implements BoardSurface {
 		this.store.update((f) => mapModule(f, d.pageId, d.id, (x) => ({ ...x, ...geometry })), { coalesce: `endpoint:${d.id}` });
 	}
 
-	/** Everything that is not a page, a note or a PDF, so the toolbar keeps three add buttons. */
 	showAddMenu(e?: MouseEvent) {
-		const menu = new Menu();
-		menu.addItem((i) => i.setTitle('Text box').setIcon('type').onClick(() => this.addText()));
-		menu.addItem((i) => i.setTitle('Image').setIcon('image').onClick(() => this.pickImage()));
-		menu.addItem((i) => i.setTitle('Table of contents').setIcon('list').onClick(() => this.addToc()));
-		menu.addSeparator();
-		menu.addItem((i) => i.setTitle('Counter').setIcon('plus-minus').onClick(() => this.addTracker('counter')));
-		menu.addItem((i) => i.setTitle('Boxes').setIcon('square').onClick(() => this.addTracker('boxes')));
-		menu.addItem((i) => i.setTitle('Checklist').setIcon('list-checks').onClick(() => this.addTracker('checklist')));
-		this.showMenuAt(menu, e);
+		showAddMenu(this, e);
 	}
 
 	showExportMenu(e?: MouseEvent) {
@@ -1960,42 +1635,10 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	showViewMenu(e?: MouseEvent) {
-		const menu = new Menu();
-		menu.addItem((i) => i.setTitle('Outline and views').setIcon('list-tree').setChecked(this.outlinePanel.isOpen).onClick(() => this.outlinePanel.toggle()));
-		if (this.services.openPanels) menu.addItem((i) => i.setTitle('Inspector and outline in the sidebar').setIcon('panel-right').onClick(() => this.services.openPanels?.()));
-		menu.addItem((i) => i.setTitle('Minimap').setIcon('map').setChecked(this.minimap.shown).onClick(() => this.toggleMinimap()));
-		this.showMenuAt(menu, e);
+		showViewMenu(this, e);
 	}
 
 	showAddPageMenu(e?: MouseEvent) {
-		const menu = new Menu();
-		for (const preset of PAGE_PRESETS) {
-			menu.addItem((i) => i.setTitle(preset.name).onClick(() => this.addPage(preset)));
-			if (preset.w !== preset.h) menu.addItem((i) => i.setTitle(`${preset.name} landscape`).onClick(() => this.addPage(swapOrientation(preset))));
-		}
-		this.showMenuAt(menu, e);
+		showAddPageMenu(this, e);
 	}
 }
-
-/** Width ÷ height of an image file; 4:3 when it cannot be decoded. */
-function imageAspect(app: App, file: TFile): Promise<number> {
-	return new Promise((resolve) => {
-		const img = new Image();
-		img.onload = () => resolve(img.naturalWidth / Math.max(1, img.naturalHeight));
-		img.onerror = () => resolve(4 / 3);
-		img.src = app.vault.getResourcePath(file);
-	});
-}
-
-/** Height that gives `rect` the content's aspect ratio at its current width, kept within `maxH`. */
-function fitHeight(rect: { w: number }, aspect: number, maxH: number): { h: number } {
-	return { h: Math.max(5, Math.min(maxH, Number((rect.w / aspect).toFixed(3)))) };
-}
-
-/** {date}: today's local date as YYYY-MM-DD (exports use the export day). */
-function today(): string {
-	const d = new Date();
-	const pad = (n: number) => String(n).padStart(2, '0');
-	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-

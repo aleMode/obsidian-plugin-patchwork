@@ -110,3 +110,9 @@ export function masterPreview(file: PatchworkFile, master: { header?: string; fo
 	const footer = master.footer ?? file.board.footer;
 	return { number: file.board.numbering.enabled ? '#' : null, pageToken: '#', header: header || null, footer: footer || null };
 }
+
+/** Today as YYYY-MM-DD in local time, for `{date}` and freeze stamps. */
+export function today(now = new Date()): string {
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
