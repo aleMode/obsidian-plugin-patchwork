@@ -13,7 +13,7 @@ import { orderedPages } from '../model/ordering';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { AnyModule, FrameModule, ImageModule, NoteModule, Page, PdfModule, ShapeModule, TrackerModule } from '../model/schema';
 import { constrainAngle, isLine, lineFromEnds, linePoints, SHAPE_PRESETS, type ShapePreset, shapeAtClick, shapeFromDrag } from '../model/shapes';
-import { flowChains, placeNextFrame } from '../model/flow';
+import { flowChains, isLinked, NO_FRAMES_ON_MASTERS, placeNextFrame } from '../model/flow';
 import { type AlignMode, alignRects, distributeRects } from '../model/align';
 import { snapToGuides } from '../model/guides';
 import { masterPreview, pageFurniture } from '../model/numbering';
@@ -724,6 +724,7 @@ export class BoardViewport implements BoardSurface {
 		const last = info?.ok ? info.chain[info.chain.length - 1]! : { pageId, module: start };
 		const page = file.pages.find((p) => p.id === last.pageId);
 		if (!page) return;
+		if (page.isMaster) return void new Notice(NO_FRAMES_ON_MASTERS);
 		const id = newId(allIds(file));
 		const r = placeNextFrame(last.module, page.modules, page);
 		const frame: FrameModule = { id, type: 'frame', from: last.module.id, ...r, ...(last.module.style ? { style: last.module.style } : {}) };
@@ -1401,12 +1402,20 @@ export class BoardViewport implements BoardSurface {
 
 	/** The other page a dragged module's centre is over, if any (SPEC 5.2: re-parent on drop). */
 	private reparentTarget(d: Extract<Drag, { kind: 'module' }>): Page | null {
+		const over = this.pageUnderDrag(d);
+		return over && !over.blocked ? over.page : null;
+	}
+
+	/** The other page under a dragged module's centre; `blocked` if a linked frame is over a master (B8). */
+	private pageUnderDrag(d: Extract<Drag, { kind: 'module' }>): { page: Page; blocked: boolean } | null {
 		const from = this.store.file.pages.find((p) => p.id === d.pageId);
 		const m = from?.modules.find((x) => x.id === d.id);
 		if (!from || !m) return null;
 		const c = { x: from.x + m.x + m.w / 2, y: from.y + m.y + m.h / 2 };
 		if (containsPoint(from, c)) return null;
-		return this.store.file.pages.find((p) => p.id !== from.id && containsPoint(p, c)) ?? null;
+		const page = this.store.file.pages.find((p) => p.id !== from.id && containsPoint(p, c));
+		if (!page) return null;
+		return { page, blocked: !!page.isMaster && isLinked(flowChains(this.store.file), m) };
 	}
 
 	private highlightDropPage(page: Page | null) {
@@ -1420,6 +1429,7 @@ export class BoardViewport implements BoardSurface {
 		const from = this.store.file.pages.find((p) => p.id === d.pageId);
 		const m = from?.modules.find((x) => x.id === d.id);
 		if (!from || !m) return;
+		if (!to && this.pageUnderDrag(d)?.blocked) new Notice(NO_FRAMES_ON_MASTERS);
 		if (!to) return this.keepOnPage(from, m);
 		const grid = this.store.file.board.grid;
 		const rel = snapPoint({ x: from.x + m.x - to.x, y: from.y + m.y - to.y }, grid.snap ? grid.size : 0);

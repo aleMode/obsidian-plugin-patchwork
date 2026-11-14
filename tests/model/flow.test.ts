@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chainSignature, fitCount, flowChains, partOf, placeNextFrame, splicePart, splitBlocks } from '../../src/model/flow';
+import { chainSignature, fitCount, flowChains, linkedModules, partOf, placeNextFrame, splicePart, splitBlocks } from '../../src/model/flow';
 import type { AnyModule } from '../../src/model/schema';
 
 describe('splitBlocks', () => {
@@ -94,6 +94,12 @@ describe('flowChains', () => {
 		expect(chains.get('d')).toMatchObject({ ok: false, reason: expect.stringMatching(/not image/) });
 		expect(chains.get('e')).toMatchObject({ ok: false, reason: expect.stringMatching(/isn’t linked/) });
 		expect(chains.has('i')).toBe(false);
+	});
+
+	it('lists the chain heads and frames on a page, which then can’t become a master', () => {
+		const f = file([[mod('t', 'text'), mod('n', 'note'), mod('s', 'shape')], [mod('f', 'frame', { from: 't' }), mod('b', 'frame', { from: 'gone' })]]);
+		expect(linkedModules(f, f.pages[0]!).map((m) => m.id)).toEqual(['t']);
+		expect(linkedModules(f, f.pages[1]!).map((m) => m.id)).toEqual(['f', 'b']);
 	});
 
 	it('a loop of frames is not a chain', () => {

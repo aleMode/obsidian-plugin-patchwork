@@ -1,6 +1,6 @@
-import { type App, setIcon, Setting, TFile } from 'obsidian';
+import { type App, Notice, setIcon, Setting, TFile } from 'obsidian';
 import { pagesUsing } from '../model/masters';
-import { flowChains } from '../model/flow';
+import { flowChains, linkedModules, NO_FRAMES_ON_MASTERS } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
 import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
@@ -266,6 +266,10 @@ export class PropertiesForm {
 			'Master page',
 			!!page.isMaster,
 			(v) => {
+				if (v && linkedModules(file, page).length) {
+					new Notice(NO_FRAMES_ON_MASTERS);
+					return this.rerender();
+				}
 				// A master can't use another master; its own `master` is dropped when it becomes one.
 				this.update(board, 'isMaster', (f) => mapPage(f, page.id, (p) => withField(withField(p, 'isMaster', v ? true : undefined), 'master', v ? undefined : p.master)));
 				this.rerender();

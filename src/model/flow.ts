@@ -1,5 +1,5 @@
 import { bottom, clamp, intersects, right, type Rect } from './geometry';
-import type { AnyModule, PatchworkFile } from './schema';
+import type { AnyModule, Page, PatchworkFile } from './schema';
 import { contentBox, textScale } from './style';
 
 // Linked text frames (SPEC 4 M5). Not a reflow engine (hard rule 7): markdown is cut into whole
@@ -149,6 +149,21 @@ export function flowChains(file: Pick<PatchworkFile, 'pages'>): Map<string, Flow
 		if (member.module.type === 'frame' && !out.has(member.module.id)) out.set(member.module.id, { ok: false, reason: 'This frame isn’t linked to any text.' });
 	}
 	return out;
+}
+
+// Pages using a master show its modules but not its chains' state, so a chain on a master would
+// restart on every page (review B8). Masters are for page furniture: frames are kept off them.
+export const NO_FRAMES_ON_MASTERS = 'Linked frames don’t work on master pages. Put them on the pages themselves.';
+
+/** Whether a module is part of a chain of linked frames (or is a frame at all, even a broken one). */
+export function isLinked(chains: ReadonlyMap<string, FlowInfo>, m: Pick<AnyModule, 'id' | 'type'>): boolean {
+	return m.type === 'frame' || chains.has(m.id);
+}
+
+/** A page's modules that are part of a chain; a page with any can't become a master. */
+export function linkedModules(file: Pick<PatchworkFile, 'pages'>, page: Page): AnyModule[] {
+	const chains = flowChains(file);
+	return page.modules.filter((m) => isLinked(chains, m));
 }
 
 /** Everything that changes how a chain's text is cut up: the head's content and every frame's box. */

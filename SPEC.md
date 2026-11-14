@@ -183,7 +183,7 @@ export interface Page {
   background?: string;
   numberLabel?: string | false;                  // page-number override; false hides it
   header?: string; footer?: string;
-  isMaster?: boolean;                            // M4: a master page; never exported or numbered
+  isMaster?: boolean;                            // M4: a master page; never exported or numbered; holds no linked frames (v0.19)
   master?: string;                               // M4: ID of the master page this page uses
   modules: Module[];                             // draw order = array order unless z set
 }
@@ -557,3 +557,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Product framing (section 3): a general page, PDF, image and dashboard builder, not a tool for one game. Game-specific features (dice, encounter trackers, character sheets) are not planned.
   - Manual page order dropped (section 5.4): output order is reading order. `board.order` and `board.pageOrder` are no longer read or validated, and are kept as they are in older files.
   - `PdfModule.renderDpi` removed: it was never read. Raster PDF regions use the export DPI. Older files keep the key.
+  - Linked frames are kept off master pages (review B8): a chain there would restart on every page using the master. *Next frame* refuses on a master, a linked module can't be dragged onto one, and a page holding any part of a chain can't become a master. Each case says why in a notice.
