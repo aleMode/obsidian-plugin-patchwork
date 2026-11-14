@@ -100,3 +100,14 @@ Manual:
 - [ ] A shape on a master page shows on every page that uses it and cannot be selected there.
 - [ ] Open a patchwork written by this version in an older one (if you have one): the shapes show as "Unknown module type" and are kept when saved.
 
+
+## Review follow-ups (2026-11-14)
+
+Popout windows are supported from v0.18 (review Q5). Automated checks ran over CDP in the main window only.
+
+- [ ] **Popout:** drag a patchwork tab into its own window. Paper is light with dark text; switching the app theme keeps it right in both windows.
+- [ ] **Popout export:** export from the popout and from the main window; the two PDFs are the same.
+- [ ] **Popout crop editor and dialogs** open in the popout, not behind it in the main window.
+- [ ] **Master pages:** try to add *Next frame* on a master, drag a linked frame onto a master, and mark a page holding a frame as master. Each is refused with a notice.
+- [ ] **Use mode undo:** in Arrange move something, switch to Use, tick a checkbox, press Ctrl+Z twice. Only the tick is undone. Back in Arrange, Ctrl+Z undoes the move.
+- [ ] **Several PDFs dropped:** drop two PDFs from the file explorer onto a page. Their crop editors open one after another ("1 of 2", "2 of 2").

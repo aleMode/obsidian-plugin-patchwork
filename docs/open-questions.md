@@ -92,3 +92,9 @@ Questions raised while building, each with the recommended answer we are proceed
 ### Q19. Text slightly soft at zooms other than 100 %
 - **Decided (2026-10-20): accepted.** The board scales one full-size layout (SPEC 8.1, Q6), so at e.g. 77 % text baselines fall between pixel rows; bold headings look softer than text laid out at its real size (measured: 49 % less edge energy, body text about equal). Laying out at each zoom (CSS `zoom` when the camera settles) would remove it but could wrap lines differently from the export and re-lays out the whole board on every zoom.
 - Fixed alongside: the layer re-rasterises when zoom settles, sits on whole device pixels, and PDF regions/embeds are oversampled on screen (1.5× / 2×).
+
+### Q20. Review checklist decisions (2026-11-14)
+Answers given on `docs/review-checklist.md` section 2; where they change behaviour, SPEC v0.19 has the details.
+- **Product:** a general page, PDF, image and dashboard builder, not a tool for one game. No dice rolling, encounter tracker, character templates or separate session-state file (Q1–Q4); table-play features F1–F15 are not planned. A public release may come later (Q8); exports from commercial PDFs need no extra warning (Q9).
+- **Behaviour:** linked frames kept off master pages (B8). Use-mode undo limited to edits since entering Use, one history shared with Arrange (B10). Popout windows supported (Q5). Manual page order dropped (Q6). `renderDpi` removed. A heading retyped in place is followed across the open patchwork. Dropped PDFs queue their crop editors. A shape forces a PDF region to raster only where it paints over it.
+- **Repo:** stray files removed; the stress-test command stays visible; Windows in CI; Windows is a supported dev platform (Q10); the e2e runner sizes its window.
