@@ -36,7 +36,7 @@ npm run fixtures   # regenerate the binary fixtures in test-vault/
 
 ### Testing in Obsidian
 
-`scripts/launchObsidian.sh` (or `scripts/launchObsidian.ps1` on Windows) starts Obsidian on the test vault with an isolated profile and remote debugging; `npm run e2e` then runs the end-to-end suites in `scripts/e2e/` against the dev build, and `scripts/perf/stressBoard.js` measures performance (see `docs/perf.md`).
+`scripts/launchObsidian.sh` (or `scripts/launchObsidian.ps1` on Windows) starts Obsidian on the test vault with an isolated profile and remote debugging; `npm run e2e` then runs the end-to-end suites in `scripts/e2e/` against the dev build (it sizes the window to 1920 × 1040 for the run, as some checks depend on layout, and restores it after; `E2E_KEEP_WINDOW=1` skips that), and `scripts/perf/stressBoard.js` measures performance (see `docs/perf.md`).
 
 ### Dev loop
 
