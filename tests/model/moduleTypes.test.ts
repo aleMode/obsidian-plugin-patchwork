@@ -27,10 +27,11 @@ describe('module types', () => {
 		file.pages[0]!.modules.push(...(modules as never[]));
 		const parsed = parseBoard(serializeBoard(file));
 		expect(parsed.ok && parsed.warnings).toEqual([]);
-		const saved = JSON.parse(serializeBoard(file)).pages[0].modules.slice(1) as Record<string, unknown>[];
+		const saved = (JSON.parse(serializeBoard(file)) as { pages: { modules: Record<string, unknown>[] }[] }).pages[0]!.modules.slice(1);
 		for (const m of saved) {
-			expect(Object.keys(m).slice(0, 6)).toEqual(['id', 'type', 'x', 'y', 'w', 'h']);
-			expect(Object.keys(m).at(-1)).toBe('zExtra');
+			const keys = Object.keys(m);
+			expect(keys.slice(0, 6)).toEqual(['id', 'type', 'x', 'y', 'w', 'h']);
+			expect(keys[keys.length - 1]).toBe('zExtra');
 		}
 	});
 

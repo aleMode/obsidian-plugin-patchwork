@@ -259,19 +259,19 @@ export class ContextBar {
 		if (!isKnownModule(m)) return [];
 		switch (m.type) {
 			case 'note':
-				return this.note(page, m as NoteModule);
+				return this.note(page, m);
 			case 'pdf':
-				return this.pdf(page, m as PdfModule);
+				return this.pdf(page, m);
 			case 'text':
 				return this.textBox(page, m);
 			case 'image':
-				return this.image(page, m as ImageModule);
+				return this.image(page, m);
 			case 'frame':
 				return this.frame(page, m);
 			case 'tracker':
-				return this.tracker(page, m as TrackerModule);
+				return this.tracker(page, m);
 			case 'shape':
-				return this.shape(page, m as ShapeModule);
+				return this.shape(page, m);
 			case 'toc':
 				return [{ icon: 'heading', text: 'Heading', tip: 'Change the heading of the table of contents', onClick: () => this.board.showProperties('content') }];
 			default:

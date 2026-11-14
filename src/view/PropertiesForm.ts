@@ -4,7 +4,7 @@ import { flowChains, linkedModules, NO_FRAMES_ON_MASTERS } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
 import { DEFAULT_BOXES, itemsFromText } from '../model/tracker';
 import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
-import type { AnyModule, DisplayUnit, HeadKind, ImageModule, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, ShapeKind, ShapeModule, TextModule, TocModule, TrackerModule } from '../model/schema';
+import type { AnyModule, DisplayUnit, HeadKind, ModuleStyle, NoteModule, Page, PatchworkFile, PdfModule, ShapeKind, ShapeModule, TrackerModule } from '../model/schema';
 import { convertShape, DASH_LABELS, DEFAULT_STROKE_COLOR, HEAD_LABELS, strokeOf } from '../model/shapes';
 import { formatLength, formatLengthValue, parseLength } from '../model/units';
 import { isKnownModule, isModuleType, MAX_PAGE_SIDE_MM, type ModuleType, unhandledType } from '../model/schema';
@@ -338,32 +338,32 @@ export class PropertiesForm {
 		// A type from a newer version has no content form; every known type must have its own case.
 		if (isKnownModule(m)) switch (m.type) {
 			case 'note':
-				this.renderNote(form, board, page, m as NoteModule, set);
+				this.renderNote(form, board, page, m, set);
 				break;
 			case 'pdf':
-				this.renderPdf(form, board, page, m as PdfModule, set);
+				this.renderPdf(form, board, page, m, set);
 				break;
 			case 'text':
 				form.heading('Text');
-				form.textarea('Markdown', (m as TextModule).markdown, (v) => set('markdown', (x) => ({ ...x, markdown: v })));
+				form.textarea('Markdown', (m).markdown, (v) => set('markdown', (x) => ({ ...x, markdown: v })));
 				break;
 			case 'image':
 				form.heading('Image');
-				this.fileRow(m as ImageModule, isImage, set);
-				form.dropdown('Fit', FIT_LABELS, (m as ImageModule).fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
+				this.fileRow(m, isImage, set);
+				form.dropdown('Fit', FIT_LABELS, (m).fit ?? 'contain', (v) => set('fit', (x) => withField(x, 'fit', v === 'contain' ? undefined : v)));
 				break;
 			case 'frame':
 				this.renderFrame(form, board, page, m);
 				break;
 			case 'tracker':
-				this.renderTracker(form, m as TrackerModule, set);
+				this.renderTracker(form, m, set);
 				break;
 			case 'shape':
-				this.renderShape(form, m as ShapeModule, set);
+				this.renderShape(form, m, set);
 				break;
 			case 'toc':
 				form.heading('Table of contents');
-				this.overrideRow('Heading', (m as TocModule).heading === '' ? 'none' : (m as TocModule).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
+				this.overrideRow('Heading', (m).heading === '' ? 'none' : (m).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
 				this.el.createDiv({ cls: 'pw-panel-hint', text: 'Lists every named page in output order with its number. Entries are links in exported PDFs.' });
 				break;
 			default:
