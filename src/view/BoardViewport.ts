@@ -37,7 +37,7 @@ import type { BoardStore } from '../store/BoardStore';
 import { addModule, addPage, defaultModuleRect, duplicateModules, duplicatePage, findModule, mapModule, mapPage, moveModule, moveModuleToPage, movePage, removeModule, removePage, restack } from '../store/pageOps';
 import { withField } from '../ui/formHelpers';
 import { PatchworkSettingsModal, type SettingsDraft } from '../ui/PatchworkSettingsModal';
-import { NamedPickerModal, TextPromptModal } from '../ui/prompts';
+import { confirm, NamedPickerModal, TextPromptModal } from '../ui/prompts';
 import { CropModal, type CropResult } from '../ui/CropModal';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
 import { FilePickerModal, pickNoteSection } from '../ui/pickers';
@@ -828,6 +828,8 @@ export class BoardViewport implements BoardSurface {
 		const path = file.path.replace(/\.patchwork$/, '.canvas');
 		const text = JSON.stringify(canvas, null, '\t');
 		const existing = app.vault.getAbstractFileByPath(path);
+		// The canvas next to a patchwork may be one the user made by hand; never replace it unasked.
+		if (existing instanceof TFile && !(await confirm(app, 'Replace canvas?', `${path} already exists. Exporting replaces its contents.`, 'Replace'))) return;
 		const out = existing instanceof TFile ? (await app.vault.modify(existing, text), existing) : await app.vault.create(path, text);
 		new Notice(`Exported to ${out.path}.${dropped.length ? ` Not carried over: ${dropped.join(', ')}.` : ''}`, dropped.length ? 8000 : 4000);
 		return out;

@@ -30,6 +30,29 @@ export class TextPromptModal extends Modal {
 	}
 }
 
+/** Ask yes or no; resolves true only when the confirm button is pressed. */
+export function confirm(app: App, title: string, message: string, cta: string): Promise<boolean> {
+	return new Promise((resolve) => {
+		const modal = new Modal(app);
+		let answer = false;
+		modal.setTitle(title);
+		modal.contentEl.createEl('p', { text: message });
+		new Setting(modal.contentEl)
+			.addButton((b) => b.setButtonText('Cancel').onClick(() => modal.close()))
+			.addButton((b) =>
+				b
+					.setButtonText(cta)
+					.setWarning()
+					.onClick(() => {
+						answer = true;
+						modal.close();
+					}),
+			);
+		modal.onClose = () => resolve(answer);
+		modal.open();
+	});
+}
+
 /** Pick one of a list of named items. */
 export class NamedPickerModal<T extends { name: string }> extends SuggestModal<T> {
 	constructor(app: App, private items: T[], placeholder: string, private onPick: (item: T) => void) {
