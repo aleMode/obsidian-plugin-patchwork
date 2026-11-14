@@ -136,8 +136,9 @@ export class PatchworkView extends TextFileView {
 				if (!clear) this.loadBoard(onDisk);
 				break;
 			case 'conflict':
-				if (!clear) this.loadBoard(onDisk);
-				await this.keepConflictCopy(file, ours, !!clear);
+				// Our version is put somewhere safe before the disk version replaces it; if that fails the
+				// board keeps showing ours (still unsaved), so nothing is lost.
+				if ((await this.keepConflictCopy(file, ours, !!clear)) && !clear) this.loadBoard(onDisk);
 				break;
 			case 'none':
 				this.lastDisk = onDisk;
@@ -148,22 +149,39 @@ export class PatchworkView extends TextFileView {
 	}
 
 	/**
-	 * Never lose either side: the view already shows the disk version; our version goes to a
-	 * conflict copy, with an offer to put it back.
+	 * Never lose either side: the view shows the disk version; our version goes to a conflict copy, with
+	 * an offer to put it back. Returns false when no copy could be written; the text is then offered for
+	 * the clipboard instead.
 	 */
-	private async keepConflictCopy(file: TFile, ours: string, closing: boolean) {
-		const folder = file.parent?.path ?? '';
-		const name = conflictCopyName(file.basename, file.extension, new Date());
-		const copy = await this.app.vault.create(folder && folder !== '/' ? `${folder}/${name}` : name, ours);
+	private async keepConflictCopy(file: TFile, ours: string, closing: boolean): Promise<boolean> {
+		let copy: TFile;
+		try {
+			copy = await this.app.vault.create(this.freeConflictPath(file), ours);
+		} catch (e) {
+			offerClipboard(file.name, ours, e);
+			return false;
+		}
 		if (closing) {
 			new Notice(`Patchwork: "${file.name}" changed on disk while you were editing. Your version was saved as "${copy.path}".`, 0);
-			return;
+			return true;
 		}
 		new ConflictModal(this, file.name, copy.path, async () => {
 			await this.app.vault.modify(file, ours);
 			if (this.file === file) this.loadBoard(ours);
 			await this.app.fileManager.trashFile(copy);
 		}).open();
+		return true;
+	}
+
+	/** A conflict copy path next to the board that no file uses yet (two conflicts can fall in one minute). */
+	private freeConflictPath(file: TFile): string {
+		const folder = file.parent?.path ?? '';
+		const now = new Date();
+		for (let n = 1; ; n++) {
+			const name = conflictCopyName(file.basename, file.extension, now, n);
+			const path = folder && folder !== '/' ? `${folder}/${name}` : name;
+			if (!this.app.vault.getAbstractFileByPath(path)) return path;
+		}
 	}
 
 	private async reloadFromDisk() {
@@ -190,6 +208,21 @@ export class PatchworkView extends TextFileView {
 		this.store = null;
 		this.contentEl.empty();
 	}
+}
+
+/** Last resort when a conflict copy can't be written: keep the user's version one click from the clipboard. */
+function offerClipboard(fileName: string, text: string, error: unknown) {
+	const why = error instanceof Error ? error.message : String(error);
+	const frag = createFragment((f) => {
+		f.createDiv({ text: `Patchwork: "${fileName}" changed on disk while you were editing, and your version could not be saved as a copy (${why}).` });
+		f.createEl('button', { text: 'Copy my version' }, (b) =>
+			b.addEventListener('click', (e) => {
+				e.stopPropagation();
+				void navigator.clipboard.writeText(text).then(() => new Notice('Copied. Paste it into a new .patchwork file to keep it.'));
+			}),
+		);
+	});
+	new Notice(frag, 0);
 }
 
 class ConflictModal extends Modal {

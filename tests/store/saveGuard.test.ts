@@ -32,4 +32,8 @@ describe('conflictCopyName', () => {
 	it('stamps the local date and time', () => {
 		expect(conflictCopyName('Spells', 'patchwork', new Date(2026, 9, 19, 23, 5))).toBe('Spells (conflict 2026-10-19 2305).patchwork');
 	});
+
+	it('numbers further copies made in the same minute', () => {
+		expect(conflictCopyName('Spells', 'patchwork', new Date(2026, 9, 19, 23, 5), 2)).toBe('Spells (conflict 2026-10-19 2305 2).patchwork');
+	});
 });
