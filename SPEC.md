@@ -562,3 +562,4 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - Undo in Use mode is limited to the edits made since entering it (review B10); back in Arrange the same history continues (section 5.7).
   - A shape over a PDF region forces it to raster only where the shape paints over the region (section 9.1): a frame drawn around a crop no longer turns it into an image. A line or outline across the region still does, since vector content is drawn last and would hide it.
   - Several PDFs dropped at once open their crop editors one after another instead of stacked (section 5.6).
+  - Retyping a heading while editing a note in place repoints every note module in the open patchwork that shows that section or one under it (one undo step), not only the edited module (review B14). Other patchworks are not rewritten.

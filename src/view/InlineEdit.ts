@@ -5,6 +5,7 @@ import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import type { ModuleHost } from '../modules/ModuleHost';
 import { noteSection } from '../sources/markdownSource';
 import { sliceBounds } from '../sources/noteSlice';
+import { retitleSection } from '../model/subpaths';
 import type { BoardStore } from '../store/BoardStore';
 import { findModule, mapModule } from '../store/pageOps';
 import { BOARD_EVENTS, shieldFromBoard } from './shield';
@@ -124,20 +125,22 @@ async function editNote(d: InlineEditDeps, pageId: string, note: NoteModule, tar
 			new Notice('The note changed while you were editing, so nothing was saved. Your text is on the clipboard.', 8000);
 			return;
 		}
-		followRenamedHeading(d, pageId, note, initial, value);
+		followRenamedHeading(d, note, initial, value);
 		await metadataUpdated(d.app, file.path);
 	};
 	return open(d, target.id, part ? initial.slice(part.from, part.to) : initial, save);
 }
 
 /** The module points at its section by heading; if that heading was retyped, point at the new one. */
-function followRenamedHeading(d: InlineEditDeps, pageId: string, note: NoteModule, before: string, after: string) {
+function followRenamedHeading(d: InlineEditDeps, note: NoteModule, before: string, after: string) {
 	if (!note.subpath || note.subpath.startsWith('#^') || note.includeHeading === false) return;
 	const title = (s: string) => /^#{1,6}[ \t]+(.*?)[ \t]*#*[ \t]*$/.exec(s.split('\n')[0] ?? '')?.[1];
 	const was = title(before);
 	const now = title(after);
 	if (!was || !now || was === now) return;
-	d.store.update((f) => mapModule(f, pageId, note.id, (x) => ({ ...x, subpath: note.subpath!.replace(/#[^#]*$/, () => `#${now}`) })));
+	// Every module in this patchwork showing that section (or one under it) follows, in one undo step.
+	// Other patchworks aren't open to rewrite; they show "Section not found" until re-picked.
+	d.store.update((f) => retitleSection(f, note.file, note.subpath!, now));
 }
 
 /** Obsidian re-parses a saved note a moment later; wait for it (or a second) so the module renders the new sections. */
