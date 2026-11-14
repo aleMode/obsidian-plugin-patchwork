@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.9 · 2026-10-20 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.18 · 2026-11-14 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -89,7 +89,7 @@ Common: position/size (mm, relative to page), `z`, `locked`, `label`, `style` (p
 | `image` | A vault image | `file`, `fit` |
 
 Note module rules:
-- `subpath` forms: `#Heading`, `#Parent#Child`, `#^blockid`. Heading section = from the heading line to the line before the next heading of equal or higher level.
+- `subpath` forms: `#Heading`, `#Parent#Child`, `#^blockid`. Heading section = from the heading line to the line before the next heading of equal or higher level. The section picker writes `#Heading` when the name is unique in the note, else the full path of ancestors (`#Monsters#Orc#Actions`), since `#Actions` always finds the first.
 - Frontmatter is stripped by default. `includeHeading` toggles the heading line itself.
 - `lines` is relative to the `subpath` section when one is set, otherwise to the whole note. (Provisional; see `docs/open-questions.md`.)
 - Overflow policy: `clip`, `fit` (uniform shrink down to a configurable minimum scale, then clip), or `grow` (module height follows content). The grown height is computed at render time and never written to the file; the stored `h` is left untouched, so opening a board never modifies it. In edit mode an overflow indicator is always shown; it never appears in exports.
@@ -214,6 +214,7 @@ export interface NoteModule extends BaseModule {
   includeHeading?: boolean;
   overflow?: "clip" | "fit" | "grow";
   scale?: number;
+  scrollY?: number;                              // v0.12, clip only: mm the content is moved up in the box
   frozen?: { at: string; markdown: string };     // M4: snapshot shown instead of the live note
 }
 
@@ -271,32 +272,37 @@ Rules:
 - **Round-trip safety:** preserve unknown keys at every level. Never drop data you do not understand.
 - **Migration:** `version` is checked on load; `migrate.ts` upgrades step by step. A file with a newer version than the plugin opens read-only with a warning.
 - **Corrupt file:** if parsing fails, show an error view with the raw text and a copy button. Never overwrite the file.
-- **External changes:** never silently overwrite a change made outside the view (Sync, git, another editor). Remember the text last loaded or saved; before writing, compare it with the file on disk. If they differ: reload from disk when there are no unsaved changes; otherwise write our version to a conflict copy next to the file (`Name (conflict YYYY-MM-DD HHmm).patchwork`), show the disk version, and offer "Use my version" (restores ours, deletes the copy). Nothing is lost either way. Reloading from disk clears the undo history. Obsidian's `TextFileView` both overwrites on save and reloads over pending edits (spike S6, M0), so the check runs in `save` and in `setViewData`.
+- **External changes:** never silently overwrite a change made outside the view (Sync, git, another editor). Remember the text last loaded or saved; before writing, compare it with the file on disk. If they differ: reload from disk when there are no unsaved changes; otherwise write our version to a conflict copy next to the file (`Name (conflict YYYY-MM-DD HHmm).patchwork`, numbered ` 2`, ` 3`… when that name is taken), and only then show the disk version (if the copy can't be written, keep showing ours and offer it for the clipboard), and offer "Use my version" (restores ours, deletes the copy). Nothing is lost either way. Reloading from disk clears the undo history. Obsidian's `TextFileView` both overwrites on save and reloads over pending edits (spike S6, M0), so the check runs in `save` and in `setViewData`.
 - **IDs:** short random strings, unique within the file.
-- **Paths:** vault-relative. On vault `rename`, rewrite references in every `.patchwork` file (use `vault.process` for atomic edits), including links written in text modules and frozen notes that pointed to the renamed file. On `delete`, keep the reference and mark the module missing.
+- **Paths:** vault-relative. On vault `rename`, rewrite references in every `.patchwork` file (use `vault.process` for atomic edits), including links written in text modules and frozen notes that pointed to the renamed file. An open board is rewritten outside its undo history (and the history is rewritten too), so undo never brings back a path that no longer exists. On `delete`, keep the reference and mark the module missing.
 
 ## 7. Architecture
 
 Stack: TypeScript (strict), esbuild, Obsidian API, vanilla DOM (Obsidian's `createEl` helpers) for the board to keep the bundle small, Vitest for pure logic. Start from the official `obsidian-sample-plugin` template. Runtime dependency: `@cantoo/pdf-lib` (MIT, maintained fork of `pdf-lib`, ~580 KB minified), justified by spike S8: Chromium cannot place vector PDF content or write bookmarks and page labels.
 
+As built (v0.18):
+
 ```
 src/
-  main.ts                  plugin entry: registerView, registerExtensions, commands, settings
-  settings.ts
-  model/                   PURE, no Obsidian imports, fully unit-tested
-    schema.ts defaults.ts migrate.ts validate.ts units.ts geometry.ts
-    ordering.ts numbering.ts tiling.ts snapping.ts
-  store/                   board state, selection, undo/redo (command pattern, drag coalescing)
-  view/                    PatchworkView (TextFileView), BoardViewport, PageFrame, ModuleHost,
-                           Inspector, Outline, Toolbar, guides, cropEditor
-  modules/                 registry + pdfModule, noteModule, textModule, imageModule
-  sources/                 markdownSource (resolve file/subpath/lines), pdfSource (doc cache, render,
-                           outline, text search), linkTracker (rename/delete/modify)
-  render/                  scheduler (queue, priorities, cancel), bitmapCache (LRU), virtualization
-  export/                  printAdapter (@electron/remote, isolated), printHost, settle, assemble
-                           (pdf-lib stage: vector modules, sheets, tiling via model/tiling, outline,
-                           labels), pngExport, canvasExport
-tests/                     Vitest
+  main.ts                  plugin entry: registerView, registerExtensions, commands, caches
+  settings.ts              plugin settings (cache budget, overflow marker, panel state)
+  model/                   PURE, no Obsidian imports, unit-tested: schema, defaults, migrate, validate,
+                           serialize, units, geometry, ordering, numbering, tiling, sheetPlan,
+                           exportPlan, snapping, guides, masters, flow, shapes, subpaths, links, …
+  store/                   BoardStore (immutable snapshots, undo/redo, drag coalescing), pageOps
+                           (immutable edits), saveGuard (external-change decision)
+  view/                    PatchworkView (TextFileView, file I/O), BoardViewport (camera, input,
+                           selection, toolbar, menus), ContextBar, PropertiesPopover/Form, Outline*,
+                           InspectorView, InlineEdit, liveContent (Use mode), paperScope, boardChrome
+  modules/                 ModuleHost (mount/unmount, render queue) + one renderer per module type,
+                           flowLayout (linked frames), overflow, style
+  sources/                 markdownSource (file/subpath/lines), noteSlice, pdfSource (shared
+                           documents, render slots, outline, text search), linkTracker (renames)
+  render/                  bitmapCache (LRU of PDF renders), lru, thumbnails (zoomed-out previews)
+  export/                  printAdapter (@electron/remote, isolated), printHost (stage 1 and settle),
+                           assemble (pdf-lib stage), exportPdf (orchestration), exportPng
+  ui/                      modals: CropModal, ExportModal, PatchworkSettingsModal, pickers, prompts
+tests/                     Vitest, mirroring src/
 ```
 
 Layers: `model` knows nothing about Obsidian or the DOM. `store` mutates the model through commands. `view` renders the store. `sources` and `render` supply content to modules. `export` builds an offscreen print host from the same model.
@@ -539,3 +545,13 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - After an export, the problems list names text boxes and notes whose text is cut off (scrolled notes excepted) and hand-set text colours that almost vanish into their background (contrast under 2:1).
   - Text boxes show the overflow marker like notes. Alignment also moves a tracker's boxes and checklist rows.
   - Panels: module headings name the type ("PDF region", "Text box"…); text rows (scale, colour, alignment, font) are hidden for PDF regions and images; "Colour" is "Card colour"; opacity is a percentage; crop reads as "43 % × 27 % of the page, from…"; *Grow* explains that the box may cover items below. The page's third tab is "Header & footer"; *Safe area* moved to Layout. Header/footer token `{name}` (the page name). Outline titles of text boxes are plain text. The overflow entries in the right-click menu have icons. The minimap draws pages in their background colour, with a faint edge.
+- **v0.18 · 2026-11-14 (review fixes; see `docs/review-2026-11.md` and `docs/review-checklist.md`)**
+  - Popout windows: each window gets the light-paper rule, and exports always build the print host in the main window, the one `printToPDF` prints.
+  - Linked frames: moving a frame to another page keeps it in its chain; a copied frame continues the copy of its source when that was copied too (a copied chain is a new chain), otherwise it joins the end of its original chain.
+  - Conflict copies take a free name and are written before the disk version is shown (section 6).
+  - A rename rewrite is not an undo step (section 6); neither is storing the export dialog's choices.
+  - The section picker writes a heading's full path when its name repeats in the note (section 5.3).
+  - *Export to canvas* asks before replacing an existing `.canvas`; canvas export and auto-arrange leave master pages out (auto-arrange puts them in a row below).
+  - One export at a time. Nudges and wheel scrolls more than a second apart are separate undo steps.
+  - Shape modules are serialized with a fixed key order and tidy numbers like other modules; saved views always get unique IDs; editing a checklist line keeps its item's tick and unknown keys.
+  - Repo: `.gitattributes` checks out LF on every platform.
