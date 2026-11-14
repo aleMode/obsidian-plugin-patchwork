@@ -2,16 +2,14 @@
 
 Working list distilled from `docs/review-2026-11.md` (the long version, with file:line references, scenarios and reasoning). IDs point back to it: **B** = bug (§2), **S** = spec drift (§3), **P** = performance and maintainability (§4), **T** = tweak (§5), **U** = UX (§6), **F** = feature (§7), **Q** = question (§9).
 
-How items move: **Decide** items need an answer from the author (usually one line). **Elaborate** items need a short plan or spec section before any code. Once decided or elaborated, an item moves into a phase of the attack plan at the bottom.
+Status 2026-11-14: phases 0–2 and the tweaks are done (sections 1–3). What is still open is in section 4.
 
-## 1. Done (branch `review-fixes`, 2026-11-14)
+## 1. Fixes (branch `review-fixes`, merged to `main` as `8d193fe`)
 
-All checked with `npm run check` (351 unit tests, 0 lint errors) and in the dev Obsidian over CDP where the bug was visible there.
-
-- [x] **B1** Popout windows: light paper rule per window (it also matched no rules there: cross-window `instanceof`); exports always built in the main window. `b4687d3`, `f5253c4`
+- [x] **B1** Popout windows: light paper rule per window; exports always built in the main window. `b4687d3`, `f5253c4`
 - [x] **B2** Linked frames keep their chain when moved to another page, duplicated, or on a duplicated page. `d0bad8c`
 - [x] **B3** Conflict copies take a free name, are written before the disk version loads, and fall back to "Copy my version". `dace27b`
-- [x] **B4** Rename rewrites are not undo steps. `a61c26f` (the `links.js` e2e check now asserts the opposite of before)
+- [x] **B4** Rename rewrites are not undo steps. `a61c26f`
 - [x] **B5** Section picker writes `#Parent#Child` when a heading name repeats. `e822117`
 - [x] **B6** Export to canvas asks before replacing an existing `.canvas`. `80d0e2d`
 - [x] **B7** Images and PDFs embedded in notes re-render when their file changes. `6a1d3be`
@@ -20,87 +18,72 @@ All checked with `npm run check` (351 unit tests, 0 lint errors) and in the dev 
 - [x] **B11** Space-to-pan is released when the board loses focus. `6d59230`
 - [x] **B12** PDF searches in the crop editor are cancelled by a newer search or by closing. `6d59230`
 - [x] **B13** Shapes serialized like other modules. `53903b5`
-- [x] **B14** View IDs unique `0d89297`; masters out of auto-arrange and canvas export `60b0d5f`; `$&` in retyped headings `6d59230`; masters not mounted in Use mode `6d59230`.
+- [x] **B14** View IDs unique; masters out of auto-arrange, canvas export and Use mode; `$&` in retyped headings. `0d89297`, `60b0d5f`, `6d59230`
 - [x] **B15** `.gitattributes` (LF everywhere). `2e33a38`
-- [x] Rule 3 soft spot: editing a checklist line keeps its tick and unknown keys. `3c6b916`
-- [x] **S** SPEC header, §5.3, §6 (`scrollY`, conflict copies, renames), §7 file tree, changelog v0.18; README commands, toolbar, Node version.
-- [x] Withdrawn: "links in tracker checklist items are not rewritten on rename". Items are drawn as plain text, so there are no links to rewrite.
+- [x] Rule 3: editing a checklist line keeps its tick and unknown keys. `3c6b916`
+- [x] **S** SPEC v0.18 and README caught up with the code.
+- [x] Withdrawn: "links in tracker checklist items are not rewritten on rename" (items are plain text).
 
-## 2. Decide
+## 2. Decisions (answered 2026-11-14; recorded in `docs/open-questions.md` Q20 and SPEC v0.19)
 
-Each has a recommendation; a one-word answer is enough.
+**Product direction**
 
-**Product direction (decides what gets built next)**
+- [x] **Q1–Q2** Patchwork is a general utility (an image, PDF and dashboard builder), not a tool for one game. SPEC section 3 reframed `a786576`; new trackers have neutral labels `1799e4c`.
+- [x] **Q3** No separate session file: nothing to do.
+- [x] **Q4** No dice support: F1 is not planned.
+- [x] **Q8** A public release may come later. Keep in mind: plugin ID, `@electron/remote` in review, tested `minAppVersion`.
+- [x] **Q9** No extra warning for exports from commercial PDFs.
 
-- [ ] **Q1** At the table you are: player, DM, or both? → decides F8 (encounter tracker) vs a character dashboard template first. THIS IS MEANT TO BE A UTILITY TOOL, NOT A DUNGEONS AND DRAGONS ONE,
-- [ ] **Q2** What is on the table: laptop, second screen facing players, touch screen? → priority of F3, F14 and bigger hit targets. NO NED, IT'S SUPPOSED TO BE A IMAGE/PDF/DASHBOARD BUILDER
-- [ ] **Q3** Session state (HP, slots, roll history) lives in the `.patchwork` file (as now) or in a separate session file? *Recommend: keep it in the file, outside the undo history.* NO NEED
-- [ ] **Q4** Do you use the Dice Roller plugin? If yes, F1 hands rolls to it instead of parsing dice itself. NO NEED TO IMPLEMENT THIS
-- [ ] **Q8** Public release planned? If yes: plugin ID, `@electron/remote` in review, stress command, tested `minAppVersion`, English only. MAYBE IN THE FUTURE, YES
-- [ ] **Q9** Do you share exports made from commercial rulebooks? Vector crops carry the whole source page (hidden text too). *Recommend: louder note in the export dialog.*IT'S FINE
+**Behaviour**
 
-**Open behaviour questions**
-
-- [ ] **B8** Linked frames on a master page don't work on the pages using it. Fix (rewrite `from` in `resolvePage`, run chains on resolved pages) or block frames on masters? *Recommend: block, with a notice; masters are for furniture.* YES
-- [ ] **B10** Use mode keeps Ctrl+Z active, and it can undo an Arrange edit after a checkbox tick. Limit undo in Use mode to edits made since entering it, or turn it off there? *Recommend: limit.* YES, LIMIT THEM, BUT RESUME WITH THE SAME STACK, NOT A NEW ONE, ONCE USER RE-ENTERS
-- [ ] **Q5** Popout windows: supported from now on (they work after B1; add them to the QA list), or "main window only"? *Recommend: supported.* YES
-- [ ] **Q6 / S** Manual page order (`board.order: "manual"`) has a model but no UI. Build it (drag rows in the outline) or drop it from the spec? *Recommend: drop until a need shows.* DROP
-- [ ] **S** `PdfModule.renderDpi` is validated and saved but never read. Implement (per-module raster DPI) or remove from the spec (keep it in files as an unknown-ish key)? *Recommend: remove from the spec.* REMOVE IS FINE
-- [ ] **B14** Retyping a heading in place fixes only that module's link; other modules and boards showing the section break. Follow everywhere (like a rename) or leave it? *Recommend: follow in the open board only.* YES
-- [ ] **B14** Dropping several PDFs opens one crop dialog per file, stacked. Queue them one after another, or place them uncropped? *Recommend: queue.* QUEUE
-- [ ] **T** An unfilled shape over a PDF region forces it to raster in exports. Ignore unfilled shapes and lines when deciding? *Recommend: yes.*
- YES  
+- [x] **B8** Linked frames kept off master pages, with a notice. `4b6c80d`
+- [x] **B10** Use-mode undo limited to edits since entering Use, one history shared with Arrange. `abe5f90`
+- [x] **Q5** Popout windows supported; added to `docs/qa.md`. `58ee370`
+- [x] **Q6** Manual page order dropped (old files keep the keys). `a786576`
+- [x] **S** `renderDpi` removed from the spec and model (old files keep the key). `a786576`
+- [x] **B14** A heading retyped in place is followed by every module in the open patchwork. `668337f`
+- [x] **B14** Several dropped PDFs queue their crop editors ("1 of 2"). `c65ac74`
+- [x] **T** A shape forces a PDF region to raster only where it paints over it. A frame around a crop leaves it vector; a line across it still forces raster, since vector content is drawn last and would hide the line. `0da0467`
 
 **Repo**
 
-- [ ] Remove `image.png` and `image copy.png` (repo root), `test-vault/Untitled board (conflict 2026-10-20 1015).patchwork` and the two exported PDFs in `test-vault/`? Nothing references them. *Recommend: yes.* YES
-- [ ] Hide *Generate stress-test patchwork* behind a setting (or dev builds only)? *Recommend: yes, before any release.* NO
-- [ ] Add a Windows job to CI? *Recommend: yes, but first check that `npm ci` installs `@rolldown/binding-win32-x64-msvc` on a clean clone (it didn't here).* AGREED
-- [ ] **Q10** Is Windows a supported dev platform now? If yes, `CLAUDE.md` needs Windows setup next to the Linux one. YES, ALREADY ON IT
-- [ ] Four e2e suites fail on this machine (Windows, Obsidian 1.12.7, 1024×800 window) **before and after** the fixes: `masters.js`, `toc.js`, `usemode.mjs` (checkbox ticks), `outlinepanel.mjs` (one layout check). Likely window size or version. Run them at 1920×1040 on Linux to confirm, or make the suites size the window themselves?
-  THE SECOND ONE
-## 3. Elaborate (plan before code)
+- [x] Stray screenshots, the conflict-copy fixture and two exported PDFs removed. `3214cdb`
+- [x] Stress-test command stays visible (answer: no).
+- [x] Windows job in CI. A clean `npm ci` on Windows installs rolldown's binding; the failure during the review came from a stale local `node_modules`. `7803903`
+- [x] **Q10** Windows is a supported dev platform. The author is updating `CLAUDE.md`; README notes the e2e window size.
+- [x] The four e2e failures were the 1024 × 800 window. The runner now sizes the window to 1920 × 1040 and restores it; all 37 suites pass on Windows. `dd4d02b`
+
+## 3. Foundations and tweaks
 
 **Foundations**
 
-- [ ] **P** Split `BoardViewport.ts` (1 936 lines): input state machine, actions, toolbar, menus. No behaviour change; e2e is the safety net. REMEMBER TO NOT OVERCOMPLICATE HE CODEBAS,E BUT YEAH 2K LINES SOUND LIKE A LOT
-- [ ] **P** Module-type registry (keys, content keys, board renderer, print renderer, forms) to end the eight-places problem that caused B13. AGREED
-- [ ] **P** Unit tests for `linkTracker`, the `PatchworkView` save/conflict flow, `liveContent` checkbox mapping (needs a thin fake of the Obsidian bits). OK
-- [ ] **S** Move `paperScope`, `furniture` and `moduleTitle` out of `view/` so `export/` doesn't import the view layer. UPSIDE/DOWNSIDE?
-- [ ] **P** Perf probes not yet measured: drag one module for 240 frames on the stress board; rename a folder of many notes (batch rename events, compute `moved` once); serialize once per save instead of three times. IMPLEMENT IT IN THE TEST
+- [x] **P** `BoardViewport.ts` split without behaviour change (2 001 → 1 648 lines): `boardMenus`, `boardContent` (adding and dropping content), `boardExport`. Camera, input, selection and the toolbar stay, since they share private state; splitting further would mean widening its API for little gain. `b6c0307`
+- [x] **P** Module-type "registry" kept light: one checked `MODULE_TYPES` list, `Record<ModuleType, …>` tables and exhaustive switches. A new type fails to compile until every place handles it (what B13 needed). `fe7e56b`
+- [x] **P** Unit tests for `linkTracker`, the save and conflict flow, and Use-mode checkboxes, on a thin fake of the `obsidian` module (`tests/fakes`). `9042f0d`
+- [x] **P** Perf probes added to `scripts/perf/stressBoard.js` (drag, save, folder rename); results in `docs/perf.md`. The drag probe found a regression: the outline rebuilt every row on every frame (about 14 fps on the stress board). Fixed, now about 19 ms a frame `2617ca1`. Saves serialize once per snapshot `a79edc3`.
+- [ ] **S** Move `paperScope`, `furniture` and `moduleTitle` out of `view/`? Asked for upside and downside, see section 4.
 
-**Tweaks (T) and UX (U), small each, worth one plan together**
+**Tweaks and UX**
 
-- [ ] New note module: half the page wide, height fitted to content, "Fit box to text" on the context bar; default padding 1.5–2 mm. DEFAULT PADDING 1MM
-- [ ] Text box starts in edit mode instead of the "Change this text with Edit above" placeholder. OK
-- [ ] Context bar opens on selection (or one-time hint) instead of the 30 × 18 px pill; popover opens on the side with free space. OK
-- [ ] Crop editor: page number field, zoom, PageUp/PageDown; "crop to block" (F10). OK
-- [ ] Copy / paste (F5); Esc deselects; `Ctrl+0` fit, `Ctrl+1` 100 %; a "Keyboard and mouse" cheat sheet in the View menu. OK
-- [ ] Empty-page hint, ribbon icon, "New patchwork" in the file explorer. OK YESYES
-- [ ] Export: sticky Export button, remember "Open after export", clickable problems, "Export this page" in the page menu OK.
-- [ ] Section picker: show the first words of block entries (`^opportunity` alone says little). NO
-- [ ] Freeze: "Update snapshot" next to "Unfreeze". NOT NECESSARY, WOULD CLUTTER
-- [ ] Settings tab: implement `getSettingDefinitions()` so settings show in Obsidian's settings search (needs a check against `minAppVersion`).YES
+- [x] New note: half the page wide, fitted to its text; *Fit* on the context bar; 1 mm default padding. `1799e4c`
+- [x] New text box opens for typing. `1799e4c`
+- [x] Context bar opens on selection and folds into the pill when the pointer leaves; the popover takes the less crowded side. `f3e375c`
+- [x] Crop editor: page field, Page Up/Down, zoom, double-click to crop to a paragraph (F10). `9cfa21c`, `a4a6574`
+- [x] Copy, cut, paste (F5), also across patchworks; pasted text becomes a text box, a pasted image is saved as an attachment. Esc deselects; Ctrl+0 fit; Ctrl+1 100 %; *View → Keyboard and mouse*. `f3e375c`
+- [x] Empty-page hint; ribbon icon. "New patchwork" stays in the folder menu: Obsidian has no API for its new-file buttons. `a872a4b`
+- [x] Export: sticky Export button, remembered "Open after export", problems dialog with *Show*, *Export this page…*. `1e9529b`
+- [x] Settings tab declares its settings for Obsidian's settings search. `e883c3b`
+- [x] ~~Section picker: first words of block entries~~ (answer: no).
+- [x] ~~Freeze: "Update snapshot"~~ (answer: no, it would clutter).
 
-**Table play (F), each needs its own short spec section DO NOT IMPLEMENT THESE**
+**Table play (F)**: not planned (Q1–Q4). F2, F3, F1, F4, F6, F7, F8, F9, F11–F15 stay in the review for reference only.
 
-- [ ] **F2** Tracker upgrade: type a value or delta, Shift-click ±5, `value / max`, reset groups ("long rest").
-- [ ] **F3** Use-mode navigation: fit width, PageUp/PageDown between pages, digits for saved views.
-- [ ] **F1** Rollable tables in Use mode (die button on markdown tables, `dice:` inline code), no new data. Depends on Q4.
-- [ ] **F4** Templates and starter boards (DM screen, character dashboard, spell-card sheet), "empty slot" note modules.
-- [ ] **F6** Quick add: one search over notes, headings and PDF bookmarks.
-- [ ] **F7** Pages from notes (spell and monster cards). Guard against drifting toward pagination (D3).
-- [ ] **F8** Encounter tracker module. Depends on Q1.
-- [ ] **F9** Visibility flags: hide in export / hide in Use.
-- [ ] **F12** Peek (link opens as a floating card in Use mode); **F13** Find (Ctrl+F); **F11** roll history; **F14** player view; **F15** timer. Later, as needed.
+## 4. Open
 
-## 4. Attack plan
-
-1. **Phase 0, fixes.** Done (section 1). Merge `review-fixes` after a look at the diff and a manual pass over the popout, frames and conflict scenarios.
-2. **Phase 1, decisions.** One sitting through section 2. Answers go into `docs/open-questions.md` (one entry each) and, where they change behaviour, into SPEC with a changelog line.
-3. **Phase 2, foundations.** Split `BoardViewport`, the module registry, the missing unit tests, the layering move. Repo items from section 2. Goal: the next features land in small files with tests.
-4. **Phase 3, table play, small.** F2, F3, then F1 (shape per Q4). Then the decided half of B8 and B10. These make Use mode usable for a real session.
-5. **Phase 4, onboarding and arranging.** The tweaks and UX block of section 3, then F4 templates and F5 copy/paste.
-6. **Phase 5, larger features.** F8 or F7 first (per Q1 and Q2), then F6, F9. Each starts with a SPEC section and a model with unit tests, as M0–M5 did.
-
-Before each phase: re-read the relevant review section, write the plan in a few lines here, then tick items as they land.
+- [ ] **Layering move** (`paperScope`, `furniture`, `moduleTitle` out of `view/`). You asked for the trade-off:
+  - *Upside:* `export/` would stop importing the view layer, so the print path reads and tests on its own, and a future view change can't break exports by accident.
+  - *Downside:* about ten files change imports for no visible change, and a new shared folder (`src/render/` already holds caches) blurs what goes where. `paperScope` and `furniture` touch the DOM, so they can't go into `model/`.
+  - *Recommendation:* do it only when one of these files changes for a real reason; today it is churn.
+- [ ] Merge `followups` into `main` after a look at the diff and a manual pass over the QA list (`docs/qa.md`, "Review follow-ups").
+- [ ] Before a public release (Q8): plugin ID, `@electron/remote` usage in review, test on the oldest claimed Obsidian version.
+- [ ] Dev loop: `npm run dev` copies `styles.css` only when the code rebuilds, so a CSS-only edit needs a touch of a `.ts` file (or a manual copy) to show up.

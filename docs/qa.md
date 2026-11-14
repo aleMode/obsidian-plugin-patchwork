@@ -111,3 +111,9 @@ Popout windows are supported from v0.18 (review Q5). Automated checks ran over C
 - [ ] **Master pages:** try to add *Next frame* on a master, drag a linked frame onto a master, and mark a page holding a frame as master. Each is refused with a notice.
 - [ ] **Use mode undo:** in Arrange move something, switch to Use, tick a checkbox, press Ctrl+Z twice. Only the tick is undone. Back in Arrange, Ctrl+Z undoes the move.
 - [ ] **Several PDFs dropped:** drop two PDFs from the file explorer onto a page. Their crop editors open one after another ("1 of 2", "2 of 2").
+- [ ] **Undo after a new note:** add a note from the picker; it fits its text. One Ctrl+Z removes it (the fit is not a separate step).
+- [ ] **Copy and paste:** copy two items, paste on another page and into another patchwork; paste text copied from a browser (text box) and a screenshot (image saved under the attachment folder).
+- [ ] **Context bar:** select an item; the bar is open. Move the pointer away; it folds into the pill. Drag the item; the bar hides and comes back after the drop.
+- [ ] **Crop editor on a real rulebook:** jump to page 187 with the page field, zoom to 300 %, double-click a paragraph and a table.
+- [ ] **Settings search (Obsidian 1.13+):** type "render cache" in Obsidian's settings search; Patchwork's setting is found.
+

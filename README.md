@@ -13,11 +13,12 @@ Status: pre-alpha, feature-complete against the SPEC milestones M0–M5. See `do
 
 ## Using it
 
-- **Patchwork: New patchwork** (or right-click a folder → *New patchwork*) creates a patchwork with one A4 page and opens it.
+- **Patchwork: New patchwork** (or the ribbon icon, or right-click a folder → *New patchwork*) creates a patchwork with one A4 page and opens it.
 - Toolbar: *Arrange* / *Use* mode switch; add a page, a note section, a PDF region, a shape, or (under *More*) a text box, an image, a table of contents or a tracker; zoom; undo/redo; *Settings* for the whole patchwork; *Export*; *View* (outline and saved views, minimap, sidebar inspector). Drag notes, PDFs and images from the file explorer onto a page.
-- Select an item to get its context bar (hover the small `⋯` pill above it); `⋯` on the bar opens its properties. Double-click a text box or note to edit it in place, a PDF region to crop it.
-- Drag pages and modules to move them (5 mm grid; hold Alt to place freely). Right-click for more: crop, freeze, continue in a new frame, z-order, zoom to page, delete.
-- Pan with the wheel, by dragging empty space, or holding Space; zoom with Ctrl+wheel or a pinch.
+- Select an item to get its context bar above it (it folds into a small `⋯` pill when the pointer moves away); `⋯` on the bar opens its properties. Double-click a text box or note to edit it in place, a PDF region to crop it. In the crop editor, type a page number, zoom, use Page Up / Page Down, or double-click text to crop to its paragraph.
+- Drag pages and modules to move them (5 mm grid; hold Alt to place freely). Right-click for more: crop, freeze, continue in a new frame, z-order, zoom to page, export this page, delete.
+- Ctrl/Cmd+C, X, V copy, cut and paste items, also between patchworks; pasted text becomes a text box and a pasted image is saved as an attachment. Esc deselects. *View → Keyboard and mouse* lists every shortcut.
+- Pan with the wheel, by dragging empty space, or holding Space; zoom with Ctrl+wheel or a pinch; Ctrl/Cmd+0 zooms to fit, Ctrl/Cmd+1 to 100 %.
 - **Use** mode turns the patchwork into a dashboard: links open to the side, checkboxes and trackers work, nothing moves.
 - **Patchwork: Export…** writes a PDF (or PNGs) next to the patchwork.
 
