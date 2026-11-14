@@ -7,7 +7,7 @@ import { BOARD_EXTENSION, PatchworkView, VIEW_TYPE_BOARD } from '../view/Patchwo
 
 /**
  * Keep board references valid when notes, PDFs or folders are renamed (SPEC 6). Open boards are
- * updated through their store (undoable, saved like any edit); closed boards through vault.process.
+ * updated through their store (not an undo step, saved like any edit); closed boards through vault.process.
  * Deletions keep the reference, so the module shows a "not found" placeholder instead of vanishing.
  */
 export async function onVaultRename(app: App, oldPath: string, newPath: string) {
@@ -26,7 +26,9 @@ export async function onVaultRename(app: App, oldPath: string, newPath: string) 
 		const { view, store } = target;
 		if (store.readOnly) continue;
 		const before = store.file;
-		store.update((f) => rewritePaths(f, oldPath, newPath, linkRetarget(app, board.path, oldPath, newPath, moved)));
+		// Outside the undo history, and applied to it too: undo must never bring back a path that no longer
+		// exists (the module would show "Note not found").
+		store.updateOutsideHistory((f) => rewritePaths(f, oldPath, newPath, linkRetarget(app, board.path, oldPath, newPath, moved)));
 		// Other panes on this board reload from disk once it is written; until then they would show the old path as missing.
 		if (store.file !== before) await view.save();
 	}

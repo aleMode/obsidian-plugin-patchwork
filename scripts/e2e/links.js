@@ -65,7 +65,8 @@ try {
 	check('links in the closed board follow', await until(async () => texts(JSON.parse(await vault.read(vault.getAbstractFileByPath(`${DIR}/Closed.patchwork`))))[1] === 'Frozen [[Renamed]]'));
 	// The rewrite went through the pane holding the unsaved edit; the other one reloaded from disk.
 	views[1].store.undo();
-	check('rename is undoable on the open board', views[1].store.file.pages[0].modules[0].file === `${DIR}/notes/Source.md`, views[1].store.file.pages[0].modules[0].file);
+	// A rename is not an undo step, and undoing earlier edits never brings the old path back.
+	check('undo keeps the renamed path', views[1].store.file.pages[0].modules[0].file === `${DIR}/notes/Renamed.md`, views[1].store.file.pages[0].modules[0].file);
 	views[1].store.redo();
 	await views[1].save();
 	views[1].leaf.detach();
