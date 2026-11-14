@@ -64,6 +64,8 @@ export default class PatchworkPlugin extends Plugin {
 				setOutlinePos: (pos: { x: number; y: number } | null) => this.remember('outlinePos', pos),
 				minimap: () => this.settings.showMinimap,
 				setMinimap: (show: boolean) => this.remember('showMinimap', show),
+				openAfterExport: () => this.settings.openAfterExport,
+				setOpenAfterExport: (open: boolean) => this.remember('openAfterExport', open),
 			},
 		};
 		this.registerView(VIEW_TYPE_BOARD, (leaf) =>
@@ -184,7 +186,7 @@ export default class PatchworkPlugin extends Plugin {
 	}
 
 	/** Remember an interface choice in the saved settings (only writes when it actually changed). */
-	private remember<K extends 'outlineOpen' | 'outlinePos' | 'showMinimap'>(key: K, value: PatchworkSettings[K]) {
+	private remember<K extends 'outlineOpen' | 'outlinePos' | 'showMinimap' | 'openAfterExport'>(key: K, value: PatchworkSettings[K]) {
 		if (JSON.stringify(this.settings[key]) === JSON.stringify(value)) return;
 		this.settings[key] = value;
 		void this.saveSettings();

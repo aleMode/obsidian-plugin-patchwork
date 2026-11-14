@@ -6,6 +6,7 @@ import { outputPages } from '../model/masters';
 import { today } from '../model/numbering';
 import { parseRange } from '../model/sheetPlan';
 import { type ExportChoices, ExportModal, writeBinary } from '../ui/ExportModal';
+import { ExportProblemsModal } from '../ui/ExportProblemsModal';
 import { confirm } from '../ui/prompts';
 import type { BoardViewport } from './BoardViewport';
 
@@ -13,7 +14,7 @@ import type { BoardViewport } from './BoardViewport';
 // Kept out of BoardViewport, which only forwards to them.
 
 /** The export dialog, filled from the export defaults stored in the board. */
-export function showExportDialog(board: BoardViewport) {
+export function showExportDialog(board: BoardViewport, start?: { pages: 'selected' }) {
 	const file = board.view.file;
 	if (!file) return;
 	const store = board.boardStore;
@@ -21,7 +22,7 @@ export function showExportDialog(board: BoardViewport) {
 	const initial: ExportChoices = {
 		base: file.path.replace(/\.patchwork$/, ''),
 		format: e.format,
-		pages: 'all',
+		pages: start?.pages ?? 'all',
 		range: '',
 		sheet: typeof e.sheet === 'object' ? { w: e.sheet.w, h: e.sheet.h } : e.sheet,
 		orientation: e.orientation,
@@ -34,7 +35,7 @@ export function showExportDialog(board: BoardViewport) {
 		cropMarks: e.cropMarks,
 		quality: e.quality,
 		dpi: e.dpi,
-		open: true,
+		open: board.services.ui?.openAfterExport() ?? true,
 	};
 	const ctx = { pageCount: outputPages(store.file).length, selectedCount: selectedPageIndices(board).length, unit: store.file.board.displayUnit };
 	new ExportModal(board.app, initial, ctx, (choices) => void runBoardExport(board, choices)).open();
@@ -56,6 +57,15 @@ export async function exportToCanvas(board: BoardViewport): Promise<TFile | unde
 	return out;
 }
 
+/** Select the item a problem is about and bring it into view; the board may have changed meanwhile. */
+function showProblem(board: BoardViewport, at: { pageId: string; moduleId?: string }) {
+	const page = board.boardStore.file.pages.find((p) => p.id === at.pageId);
+	if (!page) return;
+	const item = at.moduleId && page.modules.some((m) => m.id === at.moduleId) ? { pageId: page.id, moduleId: at.moduleId } : { pageId: page.id };
+	board.select(item);
+	board.revealSelection(item);
+}
+
 /** Pages of the current selection (pages, or the pages of selected modules), as output-order indices. */
 function selectedPageIndices(board: BoardViewport): number[] {
 	const ids = new Set(board.selectedItems.map((it) => it.pageId));
@@ -65,6 +75,7 @@ function selectedPageIndices(board: BoardViewport): number[] {
 export async function runBoardExport(board: BoardViewport, choices: ExportChoices): Promise<void> {
 	const app = board.app;
 	const store = board.boardStore;
+	board.services.ui?.setOpenAfterExport(choices.open);
 	// Two exports would share the one print host window and mix up their pages.
 	if (isExporting()) return void new Notice('Another export is still running. Try again when it has finished.');
 	// Remember the choices in the board, like other export defaults (SPEC 6). Not an undo step: the
@@ -90,8 +101,8 @@ export async function runBoardExport(board: BoardViewport, choices: ExportChoice
 		notice.hide();
 		const what = written.length === 1 ? written[0]!.path : `${written.length} files (${written[0]!.path}, …)`;
 		new Notice(`Exported ${result.pageCount} page(s) to ${what}.`);
-		if (result.problems.length) new Notice(`Export finished with problems:\n• ${result.problems.join('\n• ')}`, 0);
 		if (choices.open && written[0]) await app.workspace.getLeaf('tab').openFile(written[0]);
+		if (result.problems.length) new ExportProblemsModal(app, written[0], result.problems, (at) => showProblem(board, at)).open();
 	} catch (e) {
 		notice.hide();
 		new Notice(`Export failed: ${e instanceof Error ? e.message : String(e)}`, 0);

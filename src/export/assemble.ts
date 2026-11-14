@@ -1,4 +1,5 @@
 import { appendBezierCurve, clip, closePath, degrees, endPath, grayscale, lineTo, moveTo, PDFDocument, PDFHexString, PDFName, type PDFOperator, type PDFPage, popGraphicsState, pushGraphicsState, rectangle, rgb, translate } from '@cantoo/pdf-lib';
+import type { ExportProblem } from './problems';
 import { drawOrder, vectorFrame, vectorTarget } from '../model/exportPlan';
 import { cropToUserBox, drawPlacement, FULL_PAGE } from '../model/pdfGeometry';
 import type { PdfPageLabel } from '../model/numbering';
@@ -51,7 +52,7 @@ export interface AssembleInput {
 
 export interface AssembleResult {
 	bytes: Uint8Array;
-	problems: string[];
+	problems: ExportProblem[];
 }
 
 class SourcePdfs {
@@ -238,9 +239,9 @@ function addPageLabels(doc: PDFDocument, labels: PdfPageLabel[]) {
 
 export async function assemble(input: AssembleInput): Promise<AssembleResult> {
 	const out = input.printed;
-	const problems: string[] = [];
+	const problems: ExportProblem[] = [];
 	if (out.getPageCount() !== input.pages.length) {
-		problems.push(`Expected ${input.pages.length} printed pages but got ${out.getPageCount()}; the layout may be off.`);
+		problems.push({ text: `Expected ${input.pages.length} printed pages but got ${out.getPageCount()}; the layout may be off.` });
 	}
 
 	const sources = new SourcePdfs(input.readSource);
@@ -258,7 +259,7 @@ export async function assemble(input: AssembleInput): Promise<AssembleResult> {
 				if (pm.page > src.getPageCount()) throw new Error(`it has only ${src.getPageCount()} pages`);
 				await drawVectorModule(out, target, page.h * PT_PER_MM, src, pm);
 			} catch (e) {
-				problems.push(`${pm.file} p. ${pm.page} on "${page.name ?? 'page ' + (i + 1)}": ${e instanceof Error ? e.message : String(e)}`);
+				problems.push({ text: `${pm.file} p. ${pm.page} on "${page.name ?? 'page ' + (i + 1)}": ${e instanceof Error ? e.message : String(e)}`, at: { pageId: page.id, moduleId: pm.id } });
 			}
 		}
 		if (bleed) target.pushOperators(popGraphicsState());

@@ -1865,3 +1865,24 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 .pw-use .pw-empty-hint {
 	display: none;
 }
+
+/* The export dialog's button stays in view while its sections are open. */
+.pw-export-footer {
+	position: sticky;
+	bottom: 0;
+	background: var(--modal-background, var(--background-primary));
+	border-top: 1px solid var(--background-modifier-border);
+	z-index: 1;
+}
+
+/* Problems after an export, each with a button to the item. */
+.pw-export-problems li {
+	display: flex;
+	gap: var(--size-4-2);
+	align-items: flex-start;
+	justify-content: space-between;
+	margin-bottom: var(--size-4-2);
+}
+.pw-export-problems li button {
+	flex: none;
+}

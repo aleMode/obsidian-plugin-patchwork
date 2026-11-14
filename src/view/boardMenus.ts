@@ -98,6 +98,7 @@ function pageItems(board: BoardViewport, menu: Menu, pageId: string) {
 	menu.addSeparator();
 	menu.addItem((i) => i.setTitle('Zoom to page').setIcon('scan').onClick(() => board.zoomToSelection()));
 	menu.addItem((i) => i.setTitle('Duplicate page').setIcon('copy').onClick(() => board.duplicateSelection()));
+	if (!board.boardStore.file.pages.find((p) => p.id === pageId)?.isMaster) menu.addItem((i) => i.setTitle('Export this page…').setIcon('file-output').onClick(() => board.showExport({ pages: 'selected' })));
 	menu.addItem((i) => i.setTitle('Swap orientation').setIcon('rotate-cw').onClick(() => board.boardStore.update((f) => mapPage(f, pageId, (p) => swapOrientation(p)))));
 	menu.addItem((i) => i.setTitle('Delete page').setIcon('trash-2').setWarning(true).onClick(() => board.deleteSelection()));
 }

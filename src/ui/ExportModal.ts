@@ -164,7 +164,8 @@ export class ExportModal extends Modal {
 				t.inputEl.type = 'number';
 				t.setValue(String(c.dpi)).onChange((v) => (c.dpi = Number(v)));
 			});
-		new Setting(el).addButton((b) =>
+		// Kept in view at the bottom of the dialog, also with both sections open.
+		new Setting(el.createDiv({ cls: 'pw-export-footer' })).addButton((b) =>
 			b
 				.setButtonText('Export')
 				.setCta()

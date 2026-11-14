@@ -1,4 +1,5 @@
 import { Component } from 'obsidian';
+import type { ExportProblem } from './problems';
 import { drawOrder } from '../model/exportPlan';
 import type { PageFurniture } from '../model/numbering';
 import type { NumberPosition } from '../model/schema';
@@ -68,7 +69,7 @@ export interface PrintedLink {
 
 export interface PrintResult {
 	bytes: Uint8Array;
-	problems: string[];
+	problems: ExportProblem[];
 	links: PrintedLink[];
 	embeds: PrintedEmbed[];
 }
@@ -173,13 +174,21 @@ function findEmbeds(host: HTMLElement): PrintedEmbed[] {
 }
 
 /** Things that would print wrongly, reported to the user instead of silently exported. */
-function findProblems(host: HTMLElement): string[] {
-	const problems: string[] = [];
-	host.querySelectorAll('.pw-module-placeholder').forEach((p) => problems.push((p as HTMLElement).innerText.trim()));
-	if (host.querySelector('.mermaid-wrapper.is-guarded')) {
-		problems.push('A Mermaid diagram was left blank: Obsidian asks once per vault before it draws diagrams. Open a note that has one in a normal tab, choose "Allow" on the diagram, then export again.');
+function findProblems(host: HTMLElement): ExportProblem[] {
+	const problems: ExportProblem[] = [];
+	host.querySelectorAll<HTMLElement>('.pw-module-placeholder').forEach((p) => problems.push({ text: p.innerText.trim(), ...placeOf(p) }));
+	const mermaid = host.querySelector<HTMLElement>('.mermaid-wrapper.is-guarded');
+	if (mermaid) {
+		problems.push({ text: 'A Mermaid diagram was left blank: Obsidian asks once per vault before it draws diagrams. Open a note that has one in a normal tab, choose "Allow" on the diagram, then export again.', ...placeOf(mermaid) });
 	}
 	return problems;
+}
+
+/** The module a print element belongs to (the print host tags each module with its IDs). */
+function placeOf(el: HTMLElement): Pick<ExportProblem, 'at'> {
+	const mod = el.closest<HTMLElement>('.pw-module');
+	const { pageId, moduleId } = mod?.dataset ?? {};
+	return pageId ? { at: { pageId, ...(moduleId ? { moduleId } : {}) } } : {};
 }
 
 export async function printPages(pages: readonly Page[], o: PrintOptions): Promise<PrintResult> {
@@ -206,7 +215,7 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 	}
 	doc.body.addClass('pw-printing');
 	const renderers: ModuleRenderer[] = [];
-	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule | TextModule; page: string }[] = [];
+	const notes: { el: HTMLElement; body: HTMLElement; m: NoteModule | TextModule; page: string; pageId: string }[] = [];
 	try {
 		pages.forEach((page, i) => {
 			const sheetEl = host.createDiv({ cls: o.appTheme ? 'pw-sheet' : 'pw-sheet pw-paper', attr: { 'data-sheet': String(i) } });
@@ -220,13 +229,13 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 			el.setCssProps({ '--pw-w': `${page.w}mm`, '--pw-h': `${page.h}mm`, '--pw-bleed': `${bleed}mm` });
 			renderFurniture(el, o.furniture.get(page.id), o.numberPosition);
 			drawOrder(page.modules).forEach((m, rank) => {
-				const mod = el.createDiv({ cls: 'pw-module' });
+				const mod = el.createDiv({ cls: 'pw-module', attr: { 'data-page-id': page.id, 'data-module-id': m.id } });
 				mod.setCssProps({ '--pw-x': `${m.x}mm`, '--pw-y': `${m.y}mm`, '--pw-w': `${m.w}mm`, '--pw-h': `${m.h}mm`, '--pw-z': String(rank + 1) });
 				applyModuleStyle(mod, m, ink);
 				const body = mod.createDiv({ cls: `pw-module-body pw-module-${m.type}` });
 				const r = createRenderer(m, body, ctx, o, page.id);
 				if (!r) return;
-				if ((m.type === 'note' || m.type === 'text') && !isFlow(m, o)) notes.push({ el: mod, body, m: m as NoteModule | TextModule, page: page.name ?? `page ${i + 1}` });
+				if ((m.type === 'note' || m.type === 'text') && !isFlow(m, o)) notes.push({ el: mod, body, m: m as NoteModule | TextModule, page: page.name ?? `page ${i + 1}`, pageId: page.id });
 				r.render(m);
 				renderers.push(r);
 			});
@@ -238,9 +247,9 @@ export async function printPages(pages: readonly Page[], o: PrintOptions): Promi
 			const note: Partial<NoteModule> = n.m.type === 'note' ? n.m : {};
 			const cut = applyOverflow(n.el, n.body, note.overflow ?? 'clip', note.scrollY);
 			// A scrolled note shows part of its text on purpose.
-			if (cut && !note.scrollY) problems.push(`"${moduleTitle(n.m)}" on "${n.page}": the text doesn't fit its box and is cut off.`);
+			if (cut && !note.scrollY) problems.push({ text: `"${moduleTitle(n.m)}" on "${n.page}": the text doesn't fit its box and is cut off.`, at: { pageId: n.pageId, moduleId: n.m.id } });
 		}
-		if (!settled) problems.push('Some content was still changing after 10 s and may be incomplete.');
+		if (!settled) problems.push({ text: 'Some content was still changing after 10 s and may be incomplete.' });
 		const links = findLinks(host);
 		const embeds = o.vectorEmbeds ? findEmbeds(host) : [];
 		return { bytes: await printWindowToPdf(), problems, links, embeds };

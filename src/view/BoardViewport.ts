@@ -64,6 +64,8 @@ export interface BoardUi {
 	setOutlinePos(pos: { x: number; y: number } | null): void;
 	minimap(): boolean;
 	setMinimap(show: boolean): void;
+	openAfterExport(): boolean;
+	setOpenAfterExport(open: boolean): void;
 }
 
 export type Selection = { pageId: string; moduleId?: string } | null;
@@ -676,8 +678,9 @@ export class BoardViewport implements BoardSurface {
 
 	// ---------- export ----------
 
-	showExport() {
-		showExportDialog(this);
+	/** The export dialog; `pages: 'selected'` starts it on the selected pages ("Export this page"). */
+	showExport(start?: { pages: 'selected' }) {
+		showExportDialog(this, start);
 	}
 
 	/** Auto-arrange pages in output order (SPEC 5.4), as one undo step. */

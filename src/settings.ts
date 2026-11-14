@@ -11,6 +11,8 @@ export interface PatchworkSettings {
 	outlinePos: { x: number; y: number } | null;
 	/** The minimap in the corner of the board. */
 	showMinimap: boolean;
+	/** The export dialog's "Open after export", as last chosen (a personal habit, not part of a patchwork). */
+	openAfterExport: boolean;
 }
 
 export const DEFAULT_SETTINGS: PatchworkSettings = {
@@ -19,6 +21,7 @@ export const DEFAULT_SETTINGS: PatchworkSettings = {
 	outlineOpen: false,
 	outlinePos: null,
 	showMinimap: true,
+	openAfterExport: true,
 };
 
 export class PatchworkSettingTab extends PluginSettingTab {
