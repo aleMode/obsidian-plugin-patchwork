@@ -48,16 +48,18 @@ try {
 			{ id: 'toc', type: 'toc', x: 10, y: 150, w: 80, h: 40 }] }] }));
 		s.zoomToFit(); await new Promise((r) => setTimeout(r, 1000));`);
 
-	// The collapsed bar: a small pill that opens on hover and closes when the pointer leaves
+	// A new selection opens the bar; it folds into a small pill when the pointer leaves, and opens again on hover
 	await ev(`s.select({ pageId: 'a', moduleId: 'n' }); ${wait(500)}`);
 	const state = () => ev(`const pill = document.querySelector('.pw-context-pill'); const bar = document.querySelector('.pw-context-bar'); return JSON.stringify({ pill: !pill.classList.contains('is-hidden'), bar: !bar.classList.contains('is-hidden') })`);
-	check('a new selection shows only the small pill', (await state()) === '{"pill":true,"bar":false}', await state());
-	await ev(`document.querySelector('.pw-context-pill').dispatchEvent(new PointerEvent('pointerenter')); ${wait(300)}`);
-	check('hovering the pill opens the bar in its place', (await state()) === '{"pill":false,"bar":true}', await state());
+	check('a new selection opens the bar', (await state()) === '{"pill":false,"bar":true}', await state());
 	await ev(`const b = document.querySelector('.pw-context-bar').getBoundingClientRect(); document.dispatchEvent(new PointerEvent('pointermove', { clientX: b.left + 5, clientY: b.top + 5 }));`);
 	check('it stays open while the pointer is on it', await until(async () => (await state()) === '{"pill":false,"bar":true}', 1500));
 	await ev(`document.dispatchEvent(new PointerEvent('pointermove', { clientX: 2, clientY: 2 }));`);
-	check('and closes again when the pointer moves away', await until(async () => (await state()) === '{"pill":true,"bar":false}', 30000), await state());
+	check('and folds into the pill when the pointer moves away', await until(async () => (await state()) === '{"pill":true,"bar":false}', 30000), await state());
+	await ev(`document.querySelector('.pw-context-pill').dispatchEvent(new PointerEvent('pointerenter')); ${wait(300)}`);
+	check('hovering the pill opens the bar again', (await state()) === '{"pill":false,"bar":true}', await state());
+	await ev(`document.dispatchEvent(new PointerEvent('pointermove', { clientX: 2, clientY: 2 }));`);
+	await until(async () => (await state()) === '{"pill":true,"bar":false}', 30000);
 	await ev(`document.querySelector('.pw-context-pill').click(); ${wait(300)}`);
 	await clickBar('More settings');
 	await ev(`document.dispatchEvent(new PointerEvent('pointermove', { clientX: 2, clientY: 2 })); ${wait(1500)}`);
@@ -69,7 +71,7 @@ try {
 	await select(null);
 	check('page: name, size, orientation, background, more', (await barText()).startsWith('A4') && (await ev(`return !!document.querySelector('.pw-cb-name') && !!document.querySelector('.pw-cb-color')`)));
 	await select('n');
-	check('note: section, overflow, freeze, edit, open', (await barText()).startsWith('Spell index▾|Clip▾|Freeze text|Edit|Open'), await barText());
+	check('note: section, overflow, freeze, edit, fit, open', (await barText()).startsWith('Spell index▾|Clip▾|Freeze text|Edit|Fit|Open'), await barText());
 	await select('p');
 	check('pdf: crop, page stepper, fit, invert', (await barText()).startsWith('Crop|') && (await barText()).includes('p. 1') && (await barText()).includes('Contain'), await barText());
 	await select('t');

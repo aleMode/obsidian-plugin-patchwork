@@ -45,7 +45,7 @@ const OVERFLOWS = [
  */
 export class ContextBar {
 	private el: HTMLElement;
-	/** The small "…" shown until the pointer comes near: the bar then opens in its place. */
+	/** The small "…" the bar folds into once the pointer has moved away; coming near opens it again. */
 	private pill: HTMLElement;
 	private expanded = false;
 	private selKey = '';
@@ -140,12 +140,14 @@ export class ContextBar {
 	refresh() {
 		// Typing in the name field is a model change too: keep the field (and the caret) as it is.
 		if (this.el.contains(this.el.doc.activeElement) && !!this.el.doc.activeElement?.instanceOf(HTMLInputElement)) return this.reposition();
-		this.hasControls = !this.board.boardStore.readOnly && this.selectionExists();
-		// A different selection starts collapsed again.
 		const key = this.board.selectedItems.map((it) => `${it.pageId}/${it.moduleId ?? ''}`).join('|');
+		// Hidden while dragging (CSS), and a drag changes the model on every frame: rebuild when it ends.
+		if (this.board.isDragging && key === this.selKey) return;
+		this.hasControls = !this.board.boardStore.readOnly && this.selectionExists();
+		// A new selection opens the bar, so its controls are seen; it folds into the pill once the pointer leaves.
 		if (key !== this.selKey) {
 			this.selKey = key;
-			this.expanded = false;
+			this.expanded = true;
 		}
 		this.build();
 		this.show();

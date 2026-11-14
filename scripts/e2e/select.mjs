@@ -52,9 +52,10 @@ try {
 	check('align left', m.a[0] === 10 && m.b[0] === 10, m);
 	await cdp.key('z', 'KeyZ', MOD.ctrl);
 
-	// Marquee: shift-drag from empty paper around all three modules.
+	// Marquee: shift-drag from empty paper around all three modules (from below them: the open context
+	// bar sits above the selection).
 	const page = await inView("const r = view.contentEl.querySelector('.pw-page-paper').getBoundingClientRect(); return { x: r.x, y: r.y };");
-	await cdp.drag({ x: page.x + 2 * k, y: page.y + 2 * k }, { x: page.x + 200 * k, y: page.y + 100 * k }, { modifiers: MOD.shift });
+	await cdp.drag({ x: page.x + 200 * k, y: page.y + 110 * k }, { x: page.x + 2 * k, y: page.y + 2 * k }, { modifiers: MOD.shift });
 	await sleep(100);
 	sel = await inView('return s.selectedItems.map((i) => i.moduleId).sort();');
 	check('shift-drag marquee selects the modules it touches', JSON.stringify(sel) === '["a","b","c"]', sel);

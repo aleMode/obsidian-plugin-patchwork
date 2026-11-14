@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newBoardFile } from '../../src/model/defaults';
 import type { AnyModule } from '../../src/model/schema';
 import { flowChains } from '../../src/model/flow';
-import { duplicateModules, duplicatePage, moveModuleToPage, removeModule, removePage } from '../../src/store/pageOps';
+import { duplicateModules, duplicatePage, moveModuleToPage, pasteModules, removeModule, removePage } from '../../src/store/pageOps';
 
 describe('removeModule and linked frames', () => {
 	const mod = (id: string, type: string, extra: Record<string, unknown> = {}) => ({ id, type, x: 0, y: 0, w: 10, h: 10, ...extra }) as AnyModule;
@@ -99,5 +99,44 @@ describe('moving and copying linked frames', () => {
 		const f = moveModuleToPage(board(), 'p', 'f2', 'q', 0, 0);
 		const next = duplicatePage(f, 'q', counter());
 		expect(chains(next)).toEqual({ chains: ['n>f1>f2>c1'], broken: [] });
+	});
+});
+
+describe('pasteModules', () => {
+	const mod = (id: string, type: string, extra: Record<string, unknown> = {}) => ({ id, type, x: 10, y: 10, w: 20, h: 20, ...extra }) as AnyModule;
+	const board = () => {
+		const f = newBoardFile();
+		f.pages = [
+			{ id: 'p', x: 0, y: 0, w: 100, h: 100, modules: [mod('t', 'text', { markdown: 'x' }), mod('f1', 'frame', { from: 't' })] },
+			{ id: 'q', x: 200, y: 0, w: 50, h: 50, modules: [] },
+		];
+		return f;
+	};
+	const counter = () => {
+		let n = 0;
+		return () => `n${++n}`;
+	};
+
+	it('pastes copies with new IDs: nudged where the originals are, in place on another page, kept on the page', () => {
+		const f = board();
+		const here = pasteModules(f, 'p', [mod('t', 'text', { markdown: 'x' })], counter());
+		expect(here.file.pages[0]!.modules[2]).toMatchObject({ id: 'n1', x: 15, y: 15 });
+		const there = pasteModules(f, 'q', [mod('big', 'text', { x: 40, y: 40, w: 30, h: 80 })], counter());
+		expect(there.file.pages[1]!.modules[0]).toMatchObject({ x: 20, y: 0, w: 30, h: 50 });
+		expect(there.pasted).toEqual(['n1']);
+	});
+
+	it('a pasted chain is a new chain; a lone frame from this file joins the end of its chain', () => {
+		const f = board();
+		const chain = pasteModules(f, 'q', [mod('t', 'text', { markdown: 'x' }), mod('f1', 'frame', { from: 't' })], counter());
+		expect(chain.file.pages[1]!.modules.map((m) => m.from)).toEqual([undefined, 'n1']);
+		const lone = pasteModules(f, 'q', [mod('f1', 'frame', { from: 't' })], counter());
+		expect(lone.file.pages[1]!.modules[0]!.from).toBe('f1');
+		expect(flowChains(lone.file).get('n1')?.ok).toBe(true);
+	});
+
+	it('a frame from another patchwork, without its text, stays unlinked', () => {
+		const out = pasteModules(board(), 'q', [mod('zz', 'frame', { from: 'elsewhere' })], counter());
+		expect(flowChains(out.file).get('n1')?.ok).toBe(false);
 	});
 });

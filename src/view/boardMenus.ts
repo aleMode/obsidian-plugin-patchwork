@@ -2,6 +2,7 @@ import { Menu } from 'obsidian';
 import { PAGE_PRESETS, swapOrientation } from '../model/presets';
 import type { NoteModule } from '../model/schema';
 import { findModule, mapModule, mapPage, restack } from '../store/pageOps';
+import { ShortcutsModal } from '../ui/ShortcutsModal';
 import { ALIGN_ACTIONS, type BoardViewport, type Item } from './BoardViewport';
 
 // The board's menus: right-click on an item, a page or a multi-selection, and the toolbar's Add,
@@ -130,6 +131,8 @@ export function showViewMenu(board: BoardViewport, e?: MouseEvent) {
 	menu.addItem((i) => i.setTitle('Outline and views').setIcon('list-tree').setChecked(board.outlineOpen).onClick(() => board.toggleOutline()));
 	if (openPanels) menu.addItem((i) => i.setTitle('Inspector and outline in the sidebar').setIcon('panel-right').onClick(() => openPanels()));
 	menu.addItem((i) => i.setTitle('Minimap').setIcon('map').setChecked(board.minimapShown).onClick(() => board.toggleMinimap()));
+	menu.addSeparator();
+	menu.addItem((i) => i.setTitle('Keyboard and mouse').setIcon('keyboard').onClick(() => new ShortcutsModal(board.app).open()));
 	board.showMenuAt(menu, e);
 }
 

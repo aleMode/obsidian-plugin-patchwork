@@ -39,6 +39,7 @@ import { LiveContent } from './liveContent';
 import { showAddMenu, showAddPageMenu, showGroupMenu, showItemMenu, showTrackerMenu, showViewMenu } from './boardMenus';
 import { addText, addToc, addTracker, continueInFrame, dropFiles, editCrop, fitBoxToText, freezeNote, markPdfChecked, pickImage, pickNote, pickPdf, replaceSource, unfreezeNote } from './boardContent';
 import { exportToCanvas, runBoardExport, showExportDialog } from './boardExport';
+import { copySelection, paste } from './boardClipboard';
 import { PageElement } from './pageElement';
 import type { BoardSurface, PatchworkView } from './PatchworkView';
 
@@ -204,11 +205,7 @@ export class BoardViewport implements BoardSurface {
 		this.cleanups.push(() => this.contextBar.destroy(), () => this.popover.destroy(), () => this.outlinePanel.destroy());
 		this.cleanups.push(store.subscribe(() => this.render()));
 		this.bindInput();
-		const dup = view.scope?.register(['Mod'], 'd', () => {
-			this.duplicateSelection();
-			return false;
-		});
-		this.cleanups.push(() => dup && view.scope?.unregister(dup));
+		this.bindScopeKeys();
 		const ro = new ResizeObserver(() => this.onResize());
 		ro.observe(this.root);
 		this.cleanups.push(() => ro.disconnect());
@@ -418,6 +415,18 @@ export class BoardViewport implements BoardSurface {
 		return { x: this.camera.tx + b.x * k + (root.left - host.left), y: this.camera.ty + b.y * k + (root.top - host.top), w: b.w * k, h: b.h * k };
 	}
 
+	/** Other items on the selection's pages, in the same pixels as `selectionScreenRect`: what a popover should not cover. */
+	neighbourScreenRects(): { x: number; y: number; w: number; h: number }[] {
+		const pageIds = new Set(this.items.map((it) => it.pageId));
+		const selected = new Set(this.items.flatMap((it) => (it.moduleId ? [it.moduleId] : [])));
+		const k = PX_PER_MM * this.camera.zoom;
+		const host = this.host.getBoundingClientRect();
+		const root = this.root.getBoundingClientRect();
+		return this.store.file.pages
+			.filter((p) => pageIds.has(p.id))
+			.flatMap((p) => p.modules.filter((m) => !selected.has(m.id)).map((m) => ({ x: this.camera.tx + (p.x + m.x) * k + (root.left - host.left), y: this.camera.ty + (p.y + m.y) * k + (root.top - host.top), w: m.w * k, h: m.h * k })));
+	}
+
 	contextBarRect(): { x: number; y: number; w: number; h: number } | null {
 		return this.contextBar.rect;
 	}
@@ -571,14 +580,14 @@ export class BoardViewport implements BoardSurface {
 	}
 
 	/** The page new modules go to: the selection's page, else the first visible page, else the first page. */
-	private targetPage(): Page | undefined {
+	pageForNewItems(): Page | undefined {
 		const pages = orderedPages(this.store.file);
 		return pages.find((p) => p.id === this.selection?.pageId) ?? pages.find((p) => this.visible.has(p.id)) ?? pages[0];
 	}
 
 	/** Adds a module to the page new modules go to (`targetPage`) and selects it. */
 	placeModule(build: (page: Page, id: string) => AnyModule): { pageId: string; id: string } | undefined {
-		const page = this.targetPage();
+		const page = this.pageForNewItems();
 		if (!page) return void new Notice('Add a page first.');
 		const id = newId(allIds(this.store.file));
 		this.store.update((f) => addModule(f, page.id, build(page, id)));
@@ -1288,9 +1297,38 @@ export class BoardViewport implements BoardSurface {
 		this.guideLayer.empty();
 		this.store.endCoalesce();
 		this.root.removeClass('is-dragging');
-		this.contextBar.reposition();
+		this.contextBar.refresh();
 		this.outlinePanel.refresh();
 		if (this.root.hasPointerCapture(e.pointerId)) this.root.releasePointerCapture(e.pointerId);
+	}
+
+	/**
+	 * Shortcuts that must win over Obsidian's own hotkeys while the patchwork is active (Mod+0 is Obsidian's
+	 * "reset zoom"). They stay out of the way of text fields (the in-place editor, the panels' inputs).
+	 */
+	private bindScopeKeys() {
+		const scope = this.view.scope;
+		if (!scope) return;
+		const typing = () => {
+			const a = this.root.doc.activeElement as HTMLElement | null;
+			return !!a && (a.isContentEditable || !!a.closest('input, textarea, select'));
+		};
+		const key = (k: string, run: () => boolean | void, inUse = false) => {
+			// A scope handler returns false for "handled": Obsidian's hotkey and the default then don't run.
+			// `run` returns false when it has nothing to do (copy with no item selected).
+			const handler = scope.register(['Mod'], k, () => {
+				if (typing() || (this.useMode && !inUse)) return true;
+				const handled = run() !== false;
+				return !handled;
+			});
+			this.cleanups.push(() => scope.unregister(handler));
+		};
+		key('d', () => this.duplicateSelection());
+		key('c', () => (this.items.some((it) => it.moduleId) ? void copySelection(this) : false));
+		key('x', () => (this.items.some((it) => it.moduleId) ? void copySelection(this, true) : false));
+		key('v', () => void paste(this));
+		key('0', () => this.zoomToFit(), true);
+		key('1', () => this.zoomToLevel(1), true);
 	}
 
 	private onKey(e: KeyboardEvent, down: boolean) {
@@ -1306,6 +1344,11 @@ export class BoardViewport implements BoardSurface {
 		if (!down) return;
 		if (e.key === 'Escape' && this.tool && !this.drag) {
 			this.setTool(null);
+			e.preventDefault();
+			return;
+		}
+		if (e.key === 'Escape' && this.items.length && !this.drag) {
+			this.setItems([]);
 			e.preventDefault();
 			return;
 		}

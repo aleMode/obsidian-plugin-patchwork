@@ -124,17 +124,43 @@ export function duplicatePage(file: PatchworkFile, pageId: string, ids: () => st
 }
 
 /**
- * Point copied frames somewhere valid (see duplicateModules). `before` is the file without the copies,
- * whose chains say where each original frame's chain ends; `idMap` maps original IDs to copies.
+ * Modules from the clipboard put on a page with new IDs, as one change. They keep their place on the
+ * page (nudged when pasted where their originals still are) and stay on it. Frames are re-linked as for
+ * duplicates; a frame whose text was neither pasted nor is in this file stays unlinked (and says so).
  */
-function relinkCopiedFrames(before: PatchworkFile, after: PatchworkFile, idMap: ReadonlyMap<string, string>): PatchworkFile {
+export function pasteModules(file: PatchworkFile, pageId: string, modules: readonly AnyModule[], ids: () => string, offset = 5): { file: PatchworkFile; pasted: string[] } {
+	const page = file.pages.find((p) => p.id === pageId);
+	if (!page || modules.length === 0) return { file, pasted: [] };
+	const onPage = new Set(page.modules.map((m) => m.id));
+	const nudge = modules.some((m) => onPage.has(m.id)) ? offset : 0;
+	const idMap = new Map<string, string>();
+	const originals = new Map<string, AnyModule>();
+	let next = file;
+	for (const m of modules) {
+		if (idMap.has(m.id)) continue;
+		const id = ids();
+		idMap.set(m.id, id);
+		originals.set(m.id, m);
+		const w = Math.min(m.w, page.w), h = Math.min(m.h, page.h);
+		const x = Math.min(Math.max(0, m.x + nudge), page.w - w), y = Math.min(Math.max(0, m.y + nudge), page.h - h);
+		next = addModule(next, pageId, { ...structuredClone(m), id, x, y, w, h });
+	}
+	return { file: relinkCopiedFrames(file, next, idMap, originals), pasted: [...idMap.values()] };
+}
+
+/**
+ * Point copied frames somewhere valid (see duplicateModules). `before` is the file without the copies,
+ * whose chains say where each original frame's chain ends; `idMap` maps original IDs to copies, and
+ * `originals` holds the copied modules when they are not (or no longer) in `before` (a paste).
+ */
+function relinkCopiedFrames(before: PatchworkFile, after: PatchworkFile, idMap: ReadonlyMap<string, string>, originals?: ReadonlyMap<string, AnyModule>): PatchworkFile {
 	const chains = flowChains(before);
 	/** Current end of each original chain, by head ID, as copies are appended to it. */
 	const tails = new Map<string, string>();
 	const from = new Map<string, string>();
 	for (const [original, copy] of idMap) {
 		const info = chains.get(original);
-		const m = before.pages.flatMap((p) => p.modules).find((x) => x.id === original);
+		const m = originals?.get(original) ?? before.pages.flatMap((p) => p.modules).find((x) => x.id === original);
 		if (m?.type !== 'frame' || typeof m.from !== 'string') continue;
 		if (idMap.has(m.from)) {
 			from.set(copy, idMap.get(m.from)!);

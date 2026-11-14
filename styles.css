@@ -1830,3 +1830,20 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	font-size: var(--font-ui-smaller);
 	white-space: nowrap;
 }
+
+/* Keyboard and mouse (View menu) */
+.pw-shortcuts table {
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: collapse;
+	margin-bottom: var(--size-4-3);
+}
+.pw-shortcuts td {
+	padding: var(--size-2-1) var(--size-4-2);
+	vertical-align: top;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+.pw-shortcuts .pw-shortcut-keys {
+	color: var(--text-muted);
+	width: 40%;
+}

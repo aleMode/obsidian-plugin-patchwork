@@ -166,8 +166,9 @@ export class PropertiesPopover {
 	}
 
 	/**
-	 * Beside the selection so the item stays visible (right, then left); below or above the context bar
-	 * when there is no room at the sides; always inside the board.
+	 * Beside the selection so the item stays visible: on the side that covers fewer of the page's other
+	 * items (right when equal); below or above the context bar when neither side has room; always inside
+	 * the board.
 	 */
 	private place() {
 		const sel = this.board.selectionScreenRect();
@@ -182,8 +183,10 @@ export class PropertiesPopover {
 		const clampY = (y: number) => Math.min(Math.max(top, y), Math.max(top, host.height - h - gap));
 		const fitsX = (x: number) => x >= gap && x + w <= host.width - gap;
 		let pos: { x: number; y: number };
-		if (fitsX(sel.x + sel.w + gap)) pos = { x: sel.x + sel.w + gap, y: clampY(sel.y) };
-		else if (fitsX(sel.x - w - gap)) pos = { x: sel.x - w - gap, y: clampY(sel.y) };
+		const sides = [sel.x + sel.w + gap, sel.x - w - gap].filter(fitsX).map((x) => ({ x, y: clampY(sel.y) }));
+		const others = sides.length > 1 ? this.board.neighbourScreenRects() : [];
+		const covered = (p: { x: number; y: number }) => others.reduce((sum, r) => sum + overlap(p.x, w, r.x, r.w) * overlap(p.y, h, r.y, r.h), 0);
+		if (sides.length) pos = sides.reduce((best, p) => (covered(p) < covered(best) ? p : best));
 		else {
 			// The bar sits on the side of the selection that has room: go to the opposite side of the item.
 			const barAbove = !!bar && bar.y < sel.y;
@@ -193,4 +196,9 @@ export class PropertiesPopover {
 		}
 		this.el.setCssProps({ '--pw-pop-x': `${Math.round(pos.x)}px`, '--pw-pop-y': `${Math.round(pos.y)}px` });
 	}
+}
+
+/** Length of the overlap of two spans [a, a + aw] and [b, b + bw]. */
+function overlap(a: number, aw: number, b: number, bw: number): number {
+	return Math.max(0, Math.min(a + aw, b + bw) - Math.max(a, b));
 }
