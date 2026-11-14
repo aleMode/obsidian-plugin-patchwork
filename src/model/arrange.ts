@@ -1,15 +1,16 @@
 import { PAGE_GAP_MM } from './defaults';
 import type { Point } from './geometry';
-import { orderedPages } from './ordering';
+import { outputPages } from './masters';
 import type { PatchworkFile } from './schema';
 
 /**
  * Auto-arrange (SPEC 5.4): lay pages out in their output order, as one row or a grid that wraps
  * after `columns` pages. Rows align at the top; each row starts below the tallest page above.
+ * Master pages aren't output pages: they go in a row of their own below the rest.
  * Returns new positions by page ID; the first page stays where it is.
  */
 export function arrangePages(file: PatchworkFile, layout: 'row' | 'grid', gap = PAGE_GAP_MM, columns?: number): Map<string, Point> {
-	const pages = orderedPages(file);
+	const pages = outputPages(file);
 	const out = new Map<string, Point>();
 	if (pages.length === 0) return out;
 	const cols = layout === 'row' ? pages.length : Math.max(1, columns ?? Math.ceil(Math.sqrt(pages.length)));
@@ -25,5 +26,11 @@ export function arrangePages(file: PatchworkFile, layout: 'row' | 'grid', gap = 
 		x += p.w + gap;
 		rowHeight = Math.max(rowHeight, p.h);
 	});
+	x = origin.x;
+	y += rowHeight + gap;
+	for (const m of file.pages.filter((p) => p.isMaster)) {
+		out.set(m.id, { x, y });
+		x += m.w + gap;
+	}
 	return out;
 }

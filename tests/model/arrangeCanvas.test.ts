@@ -50,3 +50,24 @@ describe('toJsonCanvas', () => {
 		expect(dropped.sort()).toEqual(['PDF crops', 'module styles']);
 	});
 });
+
+describe('master pages in arrange and canvas export', () => {
+	const file = () => {
+		const f = newBoardFile();
+		f.pages = [page('a', 0, 0), page('m', 230, 0, 210, 297, { isMaster: true, modules: [{ id: 't', type: 'text', markdown: 'Header', x: 0, y: 0, w: 10, h: 10 }] }), page('b', 460, 0)];
+		return f;
+	};
+
+	it('arrange lays out output pages only, then masters in a row below', () => {
+		const pos = arrangePages(file(), 'row', 20);
+		expect(pos.get('a')).toEqual({ x: 0, y: 0 });
+		expect(pos.get('b')).toEqual({ x: 230, y: 0 });
+		expect(pos.get('m')).toEqual({ x: 0, y: 317 });
+	});
+
+	it('canvas export leaves masters out and says so', () => {
+		const { canvas, dropped } = toJsonCanvas(file());
+		expect(canvas.nodes.map((n) => n.id)).toEqual(['page-a', 'page-b']);
+		expect(dropped).toContain('master pages');
+	});
+});

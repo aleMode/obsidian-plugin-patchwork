@@ -29,7 +29,9 @@ export function toJsonCanvas(file: PatchworkFile, k = CANVAS_PX_PER_MM): CanvasE
 	const px = (mm: number) => Math.round(mm * k);
 	const nodes: CanvasNode[] = [];
 	const dropped = new Set<string>();
-	for (const page of orderedPages(file)) {
+	// Master pages are templates, never output; no other export shows them either.
+	if (file.pages.some((p) => p.isMaster)) dropped.add('master pages');
+	for (const page of orderedPages(file).filter((p) => !p.isMaster)) {
 		// JSON Canvas groups contain whatever lies inside them, so pages come first.
 		nodes.push({ id: `page-${page.id}`, type: 'group', x: px(page.x), y: px(page.y), width: px(page.w), height: px(page.h), label: page.name ?? 'Page' });
 		for (const m of page.modules) {
