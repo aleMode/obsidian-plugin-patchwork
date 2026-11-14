@@ -34,8 +34,6 @@ export type SheetPreset = 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'Tabloid';
 export interface BoardSettings {
 	grid: { size: number; snap: boolean; visible: boolean; [extra: string]: unknown };
 	displayUnit: DisplayUnit;
-	order: 'reading' | 'manual';
-	pageOrder?: string[];
 	numbering: {
 		enabled: boolean;
 		start: number;
@@ -113,7 +111,6 @@ export interface PdfModule extends BaseModule {
 	invert?: boolean;
 	/** M4: fingerprint of the PDF when the crop was made, to warn when the file is replaced. */
 	sourceId?: string;
-	renderDpi?: number;
 	render?: 'auto' | 'vector' | 'raster';
 }
 

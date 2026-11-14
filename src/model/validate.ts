@@ -58,8 +58,6 @@ function checkBoard(board: Json, is: Issues) {
 		is.optional(grid, 'visible', `${p}.grid`, isBool, 'true/false');
 	}
 	is.optional(board, 'displayUnit', p, oneOf('mm', 'cm', 'in'), '"mm", "cm" or "in"');
-	is.optional(board, 'order', p, oneOf('reading', 'manual'), '"reading" or "manual"');
-	is.optional(board, 'pageOrder', p, (v) => Array.isArray(v) && v.every(isStr), 'a list of page IDs');
 	is.optional(board, 'useAppTheme', p, isBool, 'true/false');
 	is.optional(board, 'pdfDarkMode', p, isBool, 'true/false');
 	is.optional(board, 'defaultSafeArea', p, isInsets, 'insets {top,right,bottom,left} ≥ 0');
@@ -117,7 +115,6 @@ function checkModule(m: Json, path: string, is: Issues) {
 			is.optional(m, 'crop', path, isCrop, '[x0, y0, x1, y1] between 0 and 1 with x0 < x1, y0 < y1');
 			is.optional(m, 'fit', path, isFit, '"contain", "cover" or "stretch"');
 			is.optional(m, 'rotation', path, oneOf(0, 90, 180, 270), '0, 90, 180 or 270');
-			is.optional(m, 'renderDpi', path, positive, 'a positive number');
 			is.optional(m, 'render', path, oneOf('auto', 'vector', 'raster'), '"auto", "vector" or "raster"');
 			is.optional(m, 'invert', path, isBool, 'true/false');
 			is.optional(m, 'sourceId', path, isStr, 'text');

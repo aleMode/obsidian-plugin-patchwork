@@ -1,6 +1,6 @@
 # Patchwork — Product & Technical Spec
 
-Status: draft v0.18 · 2026-11-14 · Target: Obsidian desktop plugin (TypeScript)
+Status: draft v0.19 · 2026-11-14 · Target: Obsidian desktop plugin (TypeScript)
 
 ## 1. Summary
 
@@ -25,13 +25,14 @@ It is a new plugin, not a fork of Multi-Column Markdown (MCM). MCM carves up the
 
 ## 3. Primary use case
 
-The author plays D&D and keeps rules as `.md` notes (previously exported to PDF one long page at a time) plus PDF rulebooks.
+Patchwork is a general utility: a builder for pages, images, PDFs and dashboards made of what is already in the vault. It is not tied to any one hobby or domain. (It started from tabletop rules kept as `.md` notes plus PDF rulebooks, which is where several examples in this spec come from; features specific to one game are out of scope.)
 
-- As a player, I want to put a spell list, a monster stat block, and a rules note on one sheet, side by side, without copy-pasting text.
-- As a player, I want to crop a region of a rulebook PDF page and place it next to other content.
-- As a player, I want several pages visible side by side on screen instead of one endless scroll.
-- As a player, I want edits to my source notes to show up on the board automatically.
-- As a player, I want to export A4/Letter PDFs (or PNGs) with page numbers, and print a very large board as multiple regular sheets.
+- As a user, I want to put parts of several notes (a list, a reference table, a section of a longer note) on one sheet, side by side, without copy-pasting text.
+- As a user, I want to crop a region of a PDF page and place it next to other content.
+- As a user, I want several pages visible side by side on screen instead of one endless scroll.
+- As a user, I want edits to my source notes to show up on the board automatically.
+- As a user, I want to export A4/Letter PDFs (or PNGs) with page numbers, and print a very large board as multiple regular sheets.
+- As a user, I want to keep a board open as a dashboard, with live links, checkboxes and counters.
 
 ## 4. Scope and priority
 
@@ -83,7 +84,7 @@ Common: position/size (mm, relative to page), `z`, `locked`, `label`, `style` (p
 
 | Type | Purpose | Key options |
 |---|---|---|
-| `pdf` | A page (or crop) of a vault PDF | `file`, `page`, `crop` (normalized), `fit`, `rotation`, `invert` (M4), `renderDpi`, `render` (vector/raster/auto) |
+| `pdf` | A page (or crop) of a vault PDF | `file`, `page`, `crop` (normalized), `fit`, `rotation`, `invert` (M4), `render` (vector/raster/auto) |
 | `note` | Live view of a `.md` file or part of it | `file`, `subpath`, `lines`, `includeHeading`, `overflow`, `scale` |
 | `text` | Free markdown written in the board | `markdown` |
 | `image` | A vault image | `file`, `fit` |
@@ -102,7 +103,7 @@ PDF module rules:
 - `fit`: `contain` (default), `cover`, or `stretch`.
 
 ### 5.4 Page order and numbering
-- Default order is reading order (rows top to bottom by y-band, then left to right). Manual override via `board.pageOrder` (a list of page IDs, used when `order` is `"manual"`). Pages missing from the list follow in reading order; IDs with no matching page are ignored and removed on save. Auto-arrange can rewrite positions.
+- Page order is reading order (rows top to bottom by y-band, then left to right): move pages on the board to reorder them. Auto-arrange can rewrite positions. (A manual order list was planned and dropped in v0.19; files that have `order`/`pageOrder` keep them untouched.)
 - Board-level numbering: enabled, start offset, format (`arabic`, `roman`, `alpha`), position (6 presets), skip-first-page. Per-page override via `page.numberLabel`: a custom string printed instead of the number (also when board numbering is off), or `false` to hide it. Pages with a custom or hidden number (including the first page under skip-first-page) still count: numbering continues normally on the next page and they are included in `{pages}`.
 - Header/footer text per page and board default, with tokens `{page}`, `{pages}`, `{name}`, `{title}`, `{date}`.
 - `{page}` and `{pages}` count **board pages**, not output sheets. A page split into tiles keeps one page number; individual tiles are identified by their row/col label (section 9.2).
@@ -157,8 +158,6 @@ export interface PatchworkFile {
 export interface BoardSettings {
   grid: { size: number; snap: boolean; visible: boolean };      // mm, default 5
   displayUnit: "mm" | "cm" | "in";
-  order: "reading" | "manual";
-  pageOrder?: string[];                  // page IDs; used when order = "manual"
   numbering: {
     enabled: boolean; start: number;
     format: "arabic" | "roman" | "alpha";
@@ -203,7 +202,6 @@ export interface PdfModule extends BaseModule {
   rotation?: 0 | 90 | 180 | 270;
   invert?: boolean;                              // M4: invert colours on screen and in exports (forces raster)
   sourceId?: string;                             // M4: PDF fingerprint when the crop was made; warns if the file is replaced
-  renderDpi?: number;
   render?: "auto" | "vector" | "raster";        // export rendering, default "auto" (section 9.1)
 }
 
@@ -555,3 +553,7 @@ Known costs of vector modules (spike S8), stated in the export dialog's help: th
   - One export at a time. Nudges and wheel scrolls more than a second apart are separate undo steps.
   - Shape modules are serialized with a fixed key order and tidy numbers like other modules; saved views always get unique IDs; editing a checklist line keeps its item's tick and unknown keys.
   - Repo: `.gitattributes` checks out LF on every platform.
+- **v0.19 · 2026-11-14 (decisions on the review checklist, `docs/review-checklist.md` section 2)**
+  - Product framing (section 3): a general page, PDF, image and dashboard builder, not a tool for one game. Game-specific features (dice, encounter trackers, character sheets) are not planned.
+  - Manual page order dropped (section 5.4): output order is reading order. `board.order` and `board.pageOrder` are no longer read or validated, and are kept as they are in older files.
+  - `PdfModule.renderDpi` removed: it was never read. Raster PDF regions use the export DPI. Older files keep the key.

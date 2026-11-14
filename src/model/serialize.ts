@@ -1,4 +1,3 @@
-import { cleanPageOrder } from './ordering';
 import type { PatchworkFile } from './schema';
 
 // Pretty JSON with a stable key order so boards diff well in git (SPEC 6). Known keys come first in
@@ -28,6 +27,8 @@ const MODULE_KEYS: Record<string, readonly string[]> = {
 const STROKE: Shape = { keys: ['color', 'width', 'dash'] };
 const MODULE_BASE = ['id', 'type', 'x', 'y', 'w', 'h', 'z', 'locked', 'label'];
 
+// `order` and `pageOrder` (manual page order, dropped in SPEC v0.19) and `renderDpi` are no longer
+// read, but keep their place so older files don't reorder on their next save.
 const BOARD: Shape = {
 	keys: ['grid', 'displayUnit', 'order', 'pageOrder', 'numbering', 'defaultSafeArea', 'header', 'footer', 'useAppTheme', 'pdfDarkMode', 'fontFamily', 'mode', 'export'],
 	children: {
@@ -91,8 +92,7 @@ function pageOut(p: Json): Json {
 }
 
 export function serializeBoard(file: PatchworkFile): string {
-	const cleaned = cleanPageOrder(file);
-	const out = ordered(cleaned, FILE_KEYS, (k, v) => {
+	const out = ordered(file, FILE_KEYS, (k, v) => {
 		if (k === 'meta') return shaped(v, { keys: ['title', 'created'] });
 		if (k === 'board') return shaped(v, BOARD);
 		if (k === 'pages') return (v as Json[]).map(pageOut);

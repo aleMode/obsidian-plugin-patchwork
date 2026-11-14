@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newBoardFile } from '../../src/model/defaults';
-import { cleanPageOrder, orderedPages, readingOrder } from '../../src/model/ordering';
+import { orderedPages, readingOrder } from '../../src/model/ordering';
 import type { Page } from '../../src/model/schema';
 
 const page = (id: string, x: number, y: number, h = 297): Page => ({ id, x, y, w: 210, h, modules: [] });
@@ -31,27 +31,10 @@ describe('readingOrder', () => {
 });
 
 describe('orderedPages', () => {
-	const file = newBoardFile();
-	file.pages = [page('a', 0, 0), page('b', 230, 0), page('c', 460, 0)];
-
-	it('uses reading order unless the board is manual', () => {
-		expect(ids(orderedPages({ ...file, board: { ...file.board, pageOrder: ['c', 'a'] } }))).toEqual(['a', 'b', 'c']);
-	});
-
-	it('puts listed pages first, then the rest in reading order, skipping unknown IDs', () => {
-		const manual = { ...file, board: { ...file.board, order: 'manual' as const, pageOrder: ['c', 'gone', 'a'] } };
-		expect(ids(orderedPages(manual))).toEqual(['c', 'a', 'b']);
-	});
-});
-
-describe('cleanPageOrder', () => {
-	it('drops unknown and duplicate IDs, and leaves a clean file untouched', () => {
+	it('is reading order, whatever an older file says about manual order', () => {
 		const file = newBoardFile();
-		file.pages = [page('a', 0, 0), page('b', 230, 0)];
-		file.board.pageOrder = ['b', 'x', 'b', 'a'];
-		expect(cleanPageOrder(file).board.pageOrder).toEqual(['b', 'a']);
-		expect(file.board.pageOrder).toEqual(['b', 'x', 'b', 'a']);
-		file.board.pageOrder = ['a'];
-		expect(cleanPageOrder(file)).toBe(file);
+		file.pages = [page('a', 0, 0), page('b', 230, 0), page('c', 460, 0)];
+		const old = { ...file, board: { ...file.board, order: 'manual', pageOrder: ['c', 'a'] } };
+		expect(ids(orderedPages(old))).toEqual(['a', 'b', 'c']);
 	});
 });

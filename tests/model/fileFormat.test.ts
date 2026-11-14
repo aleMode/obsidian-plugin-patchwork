@@ -101,10 +101,12 @@ describe('round trip', () => {
 		expect(out.pages[0].pageExtra).toBe(0.1 + 0.2);
 	});
 
-	it('drops stale pageOrder IDs on save', () => {
+	it('keeps manual order keys from older files as they are', () => {
 		const file = parse(FULL).file;
 		file.board.pageOrder = ['p2', 'deleted', 'p1'];
-		expect(JSON.parse(serializeBoard(file)).board.pageOrder).toEqual(['p2', 'p1']);
+		const out = JSON.parse(serializeBoard(file)).board;
+		expect(out.order).toBe('manual');
+		expect(out.pageOrder).toEqual(['p2', 'deleted', 'p1']);
 	});
 });
 

@@ -7,7 +7,6 @@ export function defaultBoardSettings(): BoardSettings {
 	return {
 		grid: { size: 5, snap: true, visible: true },
 		displayUnit: 'mm',
-		order: 'reading',
 		numbering: { enabled: false, start: 1, format: 'arabic', position: 'bottom-center', skipFirst: false },
 		useAppTheme: false,
 		export: { format: 'pdf', sheet: 'native', orientation: 'auto', tileOverlap: 0, cropMarks: false, dpi: 200, quality: 'best' },

@@ -20,22 +20,7 @@ export function readingOrder<T extends Pick<Page, 'id' | 'x' | 'y' | 'h'>>(pages
 	return rows.flatMap((row) => row.sort((a, b) => a.x - b.x || a.id.localeCompare(b.id)));
 }
 
-/** Pages in output order: the manual list first (when manual), then everything else in reading order. */
-export function orderedPages(file: Pick<PatchworkFile, 'pages' | 'board'>): Page[] {
-	const reading = readingOrder(file.pages);
-	if (file.board.order !== 'manual' || !file.board.pageOrder) return reading;
-	const byId = new Map(file.pages.map((p) => [p.id, p]));
-	const listed = file.board.pageOrder.map((id) => byId.get(id)).filter((p): p is Page => !!p);
-	const listedIds = new Set(listed.map((p) => p.id));
-	return [...listed, ...reading.filter((p) => !listedIds.has(p.id))];
-}
-
-/** Drop pageOrder IDs that no longer match a page (SPEC 5.4: removed on save). Returns a new object only if needed. */
-export function cleanPageOrder(file: PatchworkFile): PatchworkFile {
-	const order = file.board.pageOrder;
-	if (!order) return file;
-	const ids = new Set(file.pages.map((p) => p.id));
-	const kept = order.filter((id, i) => ids.has(id) && order.indexOf(id) === i);
-	if (kept.length === order.length) return file;
-	return { ...file, board: { ...file.board, pageOrder: kept } };
+/** Pages in output order: reading order (SPEC 5.4). */
+export function orderedPages(file: Pick<PatchworkFile, 'pages'>): Page[] {
+	return readingOrder(file.pages);
 }
