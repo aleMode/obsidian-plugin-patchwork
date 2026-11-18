@@ -1,4 +1,4 @@
-import { type App, Notice, setIcon, Setting, TFile } from 'obsidian';
+import { type App, Notice, setIcon, Setting, setTooltip, TFile } from 'obsidian';
 import { pagesUsing } from '../model/masters';
 import { flowChains, linkedModules, NO_FRAMES_ON_MASTERS } from '../model/flow';
 import { DEFAULT_TOC_HEADING } from '../model/toc';
@@ -26,6 +26,18 @@ const DEFAULT_CUSTOM_TINT = '#4a90d9';
 export type PropertiesSection = 'content' | 'layout' | 'style' | 'furniture' | 'advanced';
 
 /** Small form builder on top of Obsidian's Setting, in the board's display unit. */
+const HINT_DELAY_MS = 600;
+
+/**
+ * What a row is for, as a tooltip after a pause on hover rather than text under it: those lines made
+ * the popover long and read as part of the next row. Status and warnings stay as visible text.
+ */
+function explain(row: HTMLElement | undefined, text: string) {
+	if (!row) return;
+	row.addClass('pw-has-hint');
+	setTooltip(row, text, { delay: HINT_DELAY_MS });
+}
+
 class Form {
 	/** `settle` closes the undo group after a discrete choice, so two picks of the same field are two undo steps. */
 	constructor(private host: () => HTMLElement, private unit: DisplayUnit, private settle: () => void = () => {}) {}
@@ -85,7 +97,7 @@ class Form {
 
 	toggle(name: string, value: boolean, set: (v: boolean) => void, desc?: string) {
 		const s = new Setting(this.host()).setName(name).addToggle((t) => t.setValue(value).onChange((v) => this.choose(set, v)));
-		if (desc) s.setDesc(desc);
+		if (desc) explain(s.settingEl, desc);
 	}
 
 	dropdown(name: string, options: Record<string, string>, value: string, set: (v: string) => void) {
@@ -110,7 +122,7 @@ class Form {
 
 	button(name: string, label: string, onClick: () => void, desc?: string) {
 		const s = new Setting(this.host()).setName(name).addButton((b) => b.setButtonText(label).onClick(onClick));
-		if (desc) s.setDesc(desc);
+		if (desc) explain(s.settingEl, desc);
 	}
 }
 
@@ -140,6 +152,11 @@ export class PropertiesForm {
 	/** Controls are appended here; it is the current section's container. */
 	private get el(): HTMLElement {
 		return this.current;
+	}
+
+	/** Explain the last `count` rows of the current section (see `explain`). */
+	private explainLast(text: string, count = 1) {
+		for (const row of Array.from(this.el.querySelectorAll<HTMLElement>(':scope > .setting-item')).slice(-count)) explain(row, text);
 	}
 
 	/** Send the controls that follow to a section. Every section exists up front, so the dock shows them grouped in this order. */
@@ -181,11 +198,13 @@ export class PropertiesForm {
 			setIcon(b, icon);
 			b.addEventListener('click', () => board.align(mode));
 		}
-		new Setting(this.el)
+		const distribute = new Setting(this.el)
 			.setName('Distribute')
-			.setDesc(items.length < 3 ? 'Needs three or more.' : 'Equal gaps, keeping the outermost in place.')
 			.addButton((b) => b.setButtonText('Horizontally').setDisabled(items.length < 3).onClick(() => board.distribute('h')))
 			.addButton((b) => b.setButtonText('Vertically').setDisabled(items.length < 3).onClick(() => board.distribute('v')));
+		// Why the buttons are disabled stays in view; what they do is a tooltip.
+		if (items.length < 3) distribute.setDesc('Needs three or more.');
+		else explain(distribute.settingEl, 'Equal gaps, keeping the outermost in place.');
 		if (kind === 'pages') {
 			const pages = board.boardStore.file.pages.filter((p) => items.some((it) => it.pageId === p.id));
 			const first = pages[0]?.master;
@@ -228,7 +247,7 @@ export class PropertiesForm {
 		form.length('Width', page.w, (mm) => setPage('w', (p) => ({ ...p, w: mm })), { min: 5 });
 		form.length('Height', page.h, (mm) => setPage('h', (p) => ({ ...p, h: mm })), { min: 5 });
 		form.length('Safe area', uniformInset(page.safeArea), (mm) => setPage('safe', (p) => withField(p, 'safeArea', mm > 0 ? insets(mm) : undefined)), { min: 0 });
-		this.el.createDiv({ cls: 'pw-panel-hint', text: 'A dashed margin guide on the board; never printed.' });
+		this.explainLast('A dashed margin guide on the board; never printed.');
 		if (Math.max(page.w, page.h) > MAX_PAGE_SIDE_MM) {
 			this.el.createDiv({ cls: 'pw-panel-hint mod-warning', text: `Larger than a PDF page can be (${formatLength(MAX_PAGE_SIDE_MM, board.boardStore.file.board.displayUnit)} per side): export it on a sheet size, which splits it into tiles.` });
 		}
@@ -256,7 +275,7 @@ export class PropertiesForm {
 		const inherit = page.master ? 'From master' : 'Patchwork default';
 		this.overrideRow('Header', page.header === '' ? 'none' : page.header, (v) => setPage('header', (p) => withField(p, 'header', v === 'none' ? '' : v)), inherit);
 		this.overrideRow('Footer', page.footer === '' ? 'none' : page.footer, (v) => setPage('footer', (p) => withField(p, 'footer', v === 'none' ? '' : v)), inherit);
-		this.el.createDiv({ cls: 'pw-panel-hint', text: 'Tokens: {page}, {pages}, {name} (the page name), {title}, {date}.' });
+		this.explainLast('Tokens: {page}, {pages}, {name} (the page name), {title}, {date}.', 2);
 	}
 
 	/** Master pages (M4): flag this page as one, or pick the master it uses. */
@@ -364,7 +383,7 @@ export class PropertiesForm {
 			case 'toc':
 				form.heading('Table of contents');
 				this.overrideRow('Heading', (m).heading === '' ? 'none' : (m).heading, (v) => set('heading', (x) => withField(x, 'heading', v === 'none' ? '' : v)), DEFAULT_TOC_HEADING);
-				this.el.createDiv({ cls: 'pw-panel-hint', text: 'Lists every named page in output order with its number. Entries are links in exported PDFs.' });
+				this.explainLast('Lists every named page in output order with its number. Entries are links in exported PDFs.');
 				break;
 			default:
 				unhandledType(m);
@@ -426,7 +445,7 @@ export class PropertiesForm {
 			num('Filled', 'value', '0', 0);
 		} else {
 			form.textarea('Items', (m.items ?? []).map((it) => it.text).join('\n'), (v) => set('items', (x) => ({ ...x, items: itemsFromText(v, (x as TrackerModule).items) })));
-			this.el.createDiv({ cls: 'pw-panel-hint', text: 'One item per line. Ticks stay with their line.' });
+			this.explainLast('One item per line. Ticks stay with their line.');
 		}
 		form.toggle('Print blank', !!m.printBlank, (v) => set('printBlank', (x) => withField(x, 'printBlank', v ? true : undefined)), 'Exports show it empty, to fill in by hand.');
 		this.el.createDiv({ cls: 'pw-panel-hint', text: 'The label (above) is its title. Click the tracker on its page to change it; each click can be undone.' });
@@ -436,7 +455,7 @@ export class PropertiesForm {
 	private renderFrame(form: Form, board: BoardViewport, page: Page, m: AnyModule) {
 		form.heading('Text frame (continues a note)');
 		const info = flowChains(board.boardStore.file).get(m.id);
-		const text = !info ? 'Not linked.' : !info.ok ? info.reason : `Frame ${info.index + 1} of ${info.chain.length}, continuing “${moduleTitle(info.chain[0]!.module)}”. Text that doesn't fit in one frame flows into the next, a block at a time.`;
+		const text = !info ? 'Not linked.' : !info.ok ? info.reason : `Frame ${info.index + 1} of ${info.chain.length}, continuing “${moduleTitle(info.chain[0]!.module)}”. Text that doesn't fit in one frame flows into the next, cut between lines.`;
 		this.el.createDiv({ cls: 'pw-panel-hint', text });
 		form.button('Continue', 'Add another frame', () => board.continueInFrame(page.id, m.id), 'Placed on this page, in free space next to this frame. Move it wherever the text should go.');
 	}
@@ -468,16 +487,16 @@ export class PropertiesForm {
 		this.in('advanced');
 		form.number('From line', lines?.[0], (v) => set('lines', (x) => withField(x, 'lines', v === undefined ? undefined : [v, Math.max(v, (x as NoteModule).lines?.[1] ?? v)])), { min: 1, placeholder: 'start' });
 		form.number('To line', lines?.[1], (v) => set('lines', (x) => withField(x, 'lines', v === undefined ? undefined : [Math.min(v, (x as NoteModule).lines?.[0] ?? 1), v])), { min: 1, placeholder: 'end' });
-		this.el.createDiv({ cls: 'pw-panel-hint', text: 'Lines count from the start of the section (or of the note), 1-based.' });
+		this.explainLast('Lines count from the start of the section (or of the note), 1-based.', 2);
 		this.in('content');
 		form.dropdown('Overflow', { clip: 'Clip', fit: 'Shrink to fit', grow: 'Grow' }, m.overflow ?? 'clip', (v) => {
 			set('overflow', (x) => withField(x, 'overflow', v === 'clip' ? undefined : v));
 			this.rerender();
 		});
-		if (m.overflow === 'grow') this.el.createDiv({ cls: 'pw-panel-hint', text: 'The box gets taller to fit the text, and may cover items below it. Its stored height does not change.' });
+		if (m.overflow === 'grow') this.explainLast('The box gets taller to fit the text, and may cover items below it. Its stored height does not change.');
 		if ((m.overflow ?? 'clip') === 'clip') {
 			form.length('Scroll', m.scrollY ?? 0, (mm) => set('scrollY', (x) => withField(x, 'scrollY', mm > 0 ? mm : undefined)), { min: 0 });
-			this.el.createDiv({ cls: 'pw-panel-hint', text: 'Shows a later part of a note that is too long for its box. Scroll the mouse wheel over the selected note to do it by hand.' });
+			this.explainLast('Shows a later part of a note that is too long for its box. Scroll the mouse wheel over the selected note to do it by hand.');
 		}
 		this.in('advanced');
 		form.number('Scale', m.scale, (v) => set('scale', (x) => withField(x, 'scale', v === 1 ? undefined : v)), { min: 0.1, max: 5, placeholder: '1' });
@@ -488,7 +507,7 @@ export class PropertiesForm {
 			freeze.addButton((b) => b.setButtonText('Update snapshot').onClick(() => void board.freezeNote(page.id, m.id)));
 			freeze.addButton((b) => b.setButtonText('Unfreeze').onClick(() => board.unfreezeNote(page.id, m.id)));
 		} else {
-			freeze.setDesc('Keep showing the note as it is now, even if it changes later (the snapshot is stored in the patchwork).');
+			explain(freeze.settingEl, 'Keep showing the note as it is now, even if it changes later (the snapshot is stored in the patchwork).');
 			freeze.addButton((b) => b.setButtonText('Freeze text').onClick(() => void board.freezeNote(page.id, m.id)));
 		}
 	}

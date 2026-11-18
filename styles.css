@@ -1139,6 +1139,19 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	padding: var(--size-2-3) 0;
 }
 
+/* A row with an explanation shows it as a tooltip after a pause; the dotted label says there is one. */
+.pw-has-hint .setting-item-name {
+	text-decoration: underline dotted var(--text-faint);
+	text-underline-offset: 3px;
+	cursor: help;
+}
+
+/* Obsidian top-aligns a row's label and control; next to a 32px field the label sat high. */
+.pw-inspector .setting-item,
+.pw-popover-form .setting-item {
+	align-items: center;
+}
+
 /* The dock and the properties popover share one row layout. Obsidian lets a row's control take whatever
    width it wants, which squeezed labels to a few pixels in the 320px popover; the label now keeps a
    minimum width and the control only takes what it needs. */
