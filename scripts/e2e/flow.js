@@ -91,6 +91,37 @@ try {
 
 	await vault.modify(note, text(3));
 	check('editing the note re-flows the chain', await until(() => [...paras('head'), ...paras(frame.id)].length === 3), [paras('head'), paras(frame.id)]);
+
+	// Cuts inside blocks: a paragraph of single-newline lines, an ordered list and a table move line by line.
+	const n2 = (i) => String(i).padStart(2, '0');
+	const lines = Array.from({ length: 12 }, (_, i) => `LN-${n2(i + 1)} a short line`).join('\n');
+	const items = Array.from({ length: 8 }, (_, i) => `${i + 1}. IT-${n2(i + 1)} item`).join('\n');
+	const rows = Array.from({ length: 10 }, (_, i) => `| RW-${n2(i + 1)} | x |`).join('\n');
+	const md = `## TOP\n${lines}\n\n${items}\n\n| COLA | COLB |\n|---|---|\n${rows}`;
+	const box = (id, from, y, h) => ({ id, ...(from ? { type: 'frame', from } : { type: 'text', markdown: md }), x: 10, y, w: 100, h });
+	const fine = [box('head', null, 10, 40), box('f2', 'head', 55, 60), box('f3', 'f2', 120, 85)];
+	view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: fine }, { ...f.pages[0], id: 'p2', modules: [box('f4', 'f3', 10, 150)] }] }));
+	await sleep(200);
+	view.surface.zoomToFit();
+	const tokens = (id) => mod(id)?.innerText.match(/(LN|IT|RW)-\d\d/g) ?? [];
+	const fineIds = ['head', 'f2', 'f3', 'f4'];
+	const all = () => fineIds.flatMap(tokens);
+	const want = [...lines.match(/LN-\d\d/g), ...items.match(/IT-\d\d/g), ...rows.match(/RW-\d\d/g)];
+	await until(() => JSON.stringify(all()) === JSON.stringify(want));
+	check('lines, items and rows each show once, in order, across the frames', JSON.stringify(all()) === JSON.stringify(want), fineIds.map(tokens));
+	const headLast = tokens('head').pop();
+	check('the head frame stops inside the paragraph', headLast?.startsWith('LN-') && headLast !== 'LN-12', tokens('head'));
+	const numbered = fineIds.every((id) => [...mod(id).querySelectorAll('ol')].every((ol) => Number(/IT-(\d\d)/.exec(ol.innerText)?.[1]) === ol.start));
+	check('a list carried into the next frame keeps its numbering', numbered, fineIds.map((id) => [...mod(id).querySelectorAll('ol')].map((ol) => ol.start)));
+	check('the list and the table are each cut between two frames', ['IT-', 'RW-'].every((t) => fineIds.filter((id) => tokens(id).some((x) => x.startsWith(t))).length >= 2), fineIds.map(tokens));
+	const headers = fineIds.every((id) => !/RW-/.test(mod(id).innerText) || mod(id).querySelector('th')?.innerText.includes('COLA'));
+	check('a table carried into the next frame repeats its header', headers, fineIds.map((id) => mod(id).querySelector('th')?.innerText));
+	check('every block shown fits inside its frame (fine cuts)', fineIds.every(inside));
+	const before = tokens('head').length;
+	view.store.update((f) => ({ ...f, pages: f.pages.map((p) => ({ ...p, modules: p.modules.map((m) => (m.id === 'head' ? { ...m, h: 34 } : m)) })) }));
+	await until(() => tokens('head').length !== before);
+	const after = tokens('head').length;
+	check('shrinking a frame a little moves a line or two, not the whole paragraph', after >= 1 && after < before && before - after <= 2 && JSON.stringify(all()) === JSON.stringify(want), [before, after, tokens('head')]);
 } catch (e) {
 	check('no exception', false, String(e?.stack ?? e));
 } finally {
