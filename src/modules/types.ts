@@ -23,6 +23,8 @@ export interface ModuleContext {
 	pdfEmbedsAsVector?: boolean;
 	/** Offer to pick another file for a module whose source is missing (board only, not export). */
 	replaceSource?: (moduleId: string) => void;
+	/** Attach a frame that another frame beat to the same text to the end of that chain (board only). */
+	relinkFrame?: (moduleId: string) => void;
 }
 
 /** Draws one module's content into its element. Created when the page becomes visible. */
@@ -50,6 +52,9 @@ export function placeholder(el: HTMLElement, message: string, kind: 'missing' | 
 	if (!action) return;
 	// Module content ignores the pointer on the board; `pw-interactive` lets this one button through.
 	const button = box.createEl('button', { cls: 'pw-interactive pw-placeholder-action', text: action.label });
+	// Focus stays on the board: the button goes with the re-render, and focus on a removed element would
+	// leave the board deaf to its shortcuts (Ctrl/Cmd+Z right after the click did nothing).
+	button.addEventListener('mousedown', (e) => e.preventDefault());
 	button.addEventListener('click', (e) => {
 		e.stopPropagation();
 		action.run();

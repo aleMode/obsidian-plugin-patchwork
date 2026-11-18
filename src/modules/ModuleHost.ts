@@ -100,6 +100,7 @@ export class ModuleHost {
 			component: this.component,
 			flow: { info: (id) => this.flowInfo().get(id), layout },
 			...(replace ? { replaceSource: (id: string) => this.mounted.has(id) && replace(this.mounted.get(id)!.pageId, id) } : {}),
+			relinkFrame: (id) => this.relinkFrame(id),
 		};
 		o.parent.addChild(this.component);
 		const { app } = o.ctx;
@@ -127,6 +128,16 @@ export class ModuleHost {
 				});
 			}));
 		}
+	}
+
+	/** Point a frame that lost to another frame on the same text at the end of that text's chain (one undo step). */
+	private relinkFrame(id: string) {
+		const m = this.mounted.get(id);
+		const source = m?.module.from;
+		const info = typeof source === 'string' ? this.flowInfo().get(source) : undefined;
+		if (!m || !info?.ok || this.o.store.readOnly) return;
+		const tail = info.chain[info.chain.length - 1]!.module.id;
+		if (tail !== id) this.o.store.update((f) => mapModule(f, m.pageId, id, (x) => ({ ...x, from: tail })));
 	}
 
 	private flowInfo(): Map<string, FlowInfo> {

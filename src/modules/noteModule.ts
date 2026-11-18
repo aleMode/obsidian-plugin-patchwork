@@ -169,7 +169,10 @@ export class FlowRenderer extends MarkdownModule {
 		const flow = this.ctx.flow;
 		const info = flow?.info(m.id);
 		if (!flow || !info) return placeholder(this.el, 'This frame isn’t linked to any text.', 'info');
-		if (!info.ok) return placeholder(this.el, info.reason, 'info');
+		if (!info.ok) {
+			const relink = info.conflict ? this.ctx.relinkFrame : undefined;
+			return placeholder(this.el, info.reason, 'info', relink && { label: 'Attach to end of chain', run: () => relink(m.id) });
+		}
 		const head = info.chain[0]!.module;
 		this.deps = head.type === 'note' ? noteDependencies(this.ctx.app, head.file as string) : new Set();
 		const last = info.index === info.chain.length - 1;
