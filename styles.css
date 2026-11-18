@@ -1426,6 +1426,8 @@ body.theme-dark .pw-board.pw-pdf-dark .pw-skeleton-pdf .pw-skeleton-thumb.is-inv
 	border-radius: var(--radius-m);
 	box-shadow: var(--shadow-s);
 	max-width: calc(100% - 16px);
+	/* In a narrow pane the buttons take a second row instead of spilling out of the bar. */
+	flex-wrap: wrap;
 }
 
 .pw-context-bar.is-hidden,

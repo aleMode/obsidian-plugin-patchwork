@@ -67,6 +67,23 @@ try {
 	await ev(`document.querySelector('.pw-board').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); ${wait(400)}`);
 	check('Escape closes the popover even with the focus on the board', (await tabs()) === 'closed', await tabs());
 
+	// Near the top of the board the pill fits above the selection but the bar doesn't: the pill must sit
+	// where the bar opens, or the bar opens away from the pointer and folds up before it can be clicked.
+	await ev(`s.select({ pageId: 'a', moduleId: 't' }); ${wait(300)}
+		const r = s.selectionScreenRect(); s.setCamera({ ...s.camera, ty: s.camera.ty + s.topInset + 30 - r.y }); ${wait(300)}
+		document.dispatchEvent(new PointerEvent('pointermove', { clientX: 2, clientY: 2 }));`);
+	await until(async () => (await state()) === '{"pill":true,"bar":false}', 30000);
+	const pillAt = JSON.parse(await ev(`const p = document.querySelector('.pw-context-pill').getBoundingClientRect(); return JSON.stringify({ x: p.left + p.width / 2, y: p.top + p.height / 2 });`));
+	const near = (p) => `document.dispatchEvent(new PointerEvent('pointermove', { clientX: ${p.x}, clientY: ${p.y} }));`;
+	await ev(`document.querySelector('.pw-context-pill').dispatchEvent(new PointerEvent('pointerenter')); ${near(pillAt)} ${wait(800)} ${near(pillAt)} ${wait(200)}`);
+	const reach = JSON.parse(
+		await ev(`const bar = document.querySelector('.pw-context-bar'); const b = bar.getBoundingClientRect(); const more = bar.querySelector('[aria-label^="More settings"]'); const m = more?.getBoundingClientRect();
+		return JSON.stringify({ open: !bar.classList.contains('is-hidden'), covers: ${pillAt.x} >= b.left && ${pillAt.x} <= b.right && ${pillAt.y} >= b.top && ${pillAt.y} <= b.bottom, clickable: !!m && document.elementFromPoint(m.left + m.width / 2, m.top + m.height / 2)?.closest('button') === more });`),
+	);
+	check('near the top, the bar opens over the pill and stays open under the pointer', reach.open && reach.covers, reach);
+	check('and its buttons can be clicked there', reach.clickable, reach);
+	await ev(`s.zoomToFit(); ${wait(300)}`);
+
 	// What each kind of selection gets
 	await select(null);
 	check('page: name, size, orientation, background, more', (await barText()).startsWith('A4') && (await ev(`return !!document.querySelector('.pw-cb-name') && !!document.querySelector('.pw-cb-color')`)));

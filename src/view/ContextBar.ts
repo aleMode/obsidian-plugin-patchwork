@@ -1,5 +1,6 @@
 import { Menu, setIcon, TFile } from 'obsidian';
 import { flowChains } from '../model/flow';
+import { placeFloating } from '../model/floatPlacement';
 import { PAGE_PRESETS, presetFor, swapOrientation } from '../model/presets';
 import { type AnyModule, type ImageModule, isKnownModule, type NoteModule, type Page, type PdfModule, type ShapeModule, type TrackerModule, unhandledType } from '../model/schema';
 import { DASH_LABELS, isLine, SHAPE_COLORS, STROKE_WIDTHS, strokeOf } from '../model/shapes';
@@ -17,6 +18,9 @@ type Rect = { x: number; y: number; w: number; h: number };
 /** How close the pointer must stay for the bar to stay open, and how long it may be away before it closes. */
 const NEAR_PX = 56;
 const COLLAPSE_MS = 350;
+/** The open bar's height before it has been measured (one row of buttons). */
+const BAR_H_ESTIMATE = 36;
+const GAP_PX = 10;
 
 /** One control on the bar. `menu` controls open a drop-down under themselves. */
 interface Ctl {
@@ -52,6 +56,8 @@ export class ContextBar {
 	private hasControls = false;
 	private collapseTimer: number | null = null;
 	private offMove: () => void;
+	/** Last measured height of the open bar: the pill is placed where a bar this tall fits. */
+	private barH = BAR_H_ESTIMATE;
 
 	constructor(
 		private board: BoardViewport,
@@ -96,9 +102,27 @@ export class ContextBar {
 			this.collapseTimer = null;
 		}
 		if (this.expanded || this.pill.hasClass('is-hidden')) return;
+		const pill = this.pill.getBoundingClientRect();
 		this.expanded = true;
 		this.build();
 		this.show();
+		this.coverPill(pill);
+	}
+
+	/**
+	 * The bar must open under the pointer that hovered the pill, or it folds up before it is reached.
+	 * Placement already reserves the bar's height for the pill; this covers a bar taller than measured
+	 * before (another selection's controls wrapping onto two rows).
+	 */
+	private coverPill(pill: DOMRect) {
+		if (this.el.hasClass('is-hidden') || pill.height === 0) return;
+		const bar = this.el.getBoundingClientRect();
+		const cy = pill.top + pill.height / 2;
+		if (cy >= bar.top && cy <= bar.bottom) return;
+		const host = this.host.getBoundingClientRect();
+		const top = cy < bar.top ? pill.top : pill.bottom - bar.height;
+		const y = Math.min(Math.max(this.board.topInset, top - host.top), host.height - bar.height);
+		this.el.setCssProps({ '--pw-cb-y': `${Math.round(y)}px` });
 	}
 
 	private collapse() {
@@ -171,30 +195,20 @@ export class ContextBar {
 		if (this.expanded && this.hasControls) for (const c of this.controls()) this.render(c);
 	}
 
-	/** Above the selection, or below it when there is no room; inside the visible board. */
+	/** Above the selection, or below it when there is no room; inside the visible board (see placeFloating). */
 	reposition() {
 		const shown = this.expanded ? this.el : this.pill;
 		if (shown.hasClass('is-hidden')) return;
 		const sel = this.board.selectionScreenRect();
 		const host = this.host.getBoundingClientRect();
 		if (!sel) return shown.addClass('is-hidden');
-		const w = shown.offsetWidth;
-		const h = shown.offsetHeight;
-		const gap = 10;
-		const top = this.board.topInset;
-		// Work with the part of the selection that is on screen, so the bar stays reachable for big pages.
-		const vx0 = Math.max(sel.x, 0);
-		const vx1 = Math.min(sel.x + sel.w, host.width);
-		const vy0 = Math.max(sel.y, top);
-		const vy1 = Math.min(sel.y + sel.h, host.height);
-		if (vx1 <= vx0 || vy1 <= vy0) return shown.addClass('pw-offscreen');
+		// Measured while displayed: off screen it is `display: none` and would measure 0.
 		shown.removeClass('pw-offscreen');
-		let y = vy0 - h - gap;
-		if (y < top) y = vy1 + gap;
-		if (y + h > host.height - gap) y = Math.max(top, vy0 + gap);
-		let x = (vx0 + vx1) / 2 - w / 2;
-		x = Math.min(Math.max(gap, x), Math.max(gap, host.width - w - gap));
-		shown.setCssProps({ '--pw-cb-x': `${Math.round(x)}px`, '--pw-cb-y': `${Math.round(y)}px` });
+		const size = { w: shown.offsetWidth, h: shown.offsetHeight };
+		if (shown === this.el && size.h > 0) this.barH = size.h;
+		const at = placeFloating(sel, { width: host.width, height: host.height, top: this.board.topInset }, size, this.barH, GAP_PX);
+		if (!at) return shown.addClass('pw-offscreen');
+		shown.setCssProps({ '--pw-cb-x': `${Math.round(at.x)}px`, '--pw-cb-y': `${Math.round(at.y)}px` });
 	}
 
 	private render(c: Ctl) {
