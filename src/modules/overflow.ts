@@ -39,6 +39,30 @@ export function fittedHeight(moduleEl: HTMLElement, body: HTMLElement): number |
 	return content ? neededHeight(moduleEl, body, content) : null;
 }
 
+/** Elements whose bottom edge is a clean place to cut a box's text: nothing shows half-cut below them. */
+const BLOCK_ENDS = ':scope > *, p, li, tr, h1, h2, h3, h4, h5, h6, pre, blockquote, .callout, table, hr';
+
+/**
+ * Box heights (mm) that end just under each block of a module's text (see model/geometry snapToTextEnd).
+ * Measured on screen and scaled by the module's own height in mm, which is exact: layout sizes
+ * (offsetHeight) are rounded to whole pixels, an error a snapped edge would show.
+ */
+export function blockEnds(moduleEl: HTMLElement, body: HTMLElement, heightMm: number): number[] {
+	const content = body.querySelector<HTMLElement>(':scope > .pw-markdown');
+	const box = moduleEl.getBoundingClientRect();
+	if (!content || box.height <= 0 || heightMm <= 0) return [];
+	const pxPerMm = box.height / heightMm;
+	const top = body.getBoundingClientRect();
+	// Border and padding, top and bottom: a box ending under a block keeps them around it.
+	const chrome = (box.height - top.height) / pxPerMm;
+	const ends = new Set<number>();
+	for (const el of Array.from(content.querySelectorAll<HTMLElement>(BLOCK_ENDS))) {
+		const bottom = (el.getBoundingClientRect().bottom - top.top) / pxPerMm;
+		if (bottom > 0.3) ends.add(Math.round((bottom + chrome) * 100) / 100);
+	}
+	return [...ends].sort((a, b) => a - b);
+}
+
 function neededHeight(moduleEl: HTMLElement, body: HTMLElement, content: HTMLElement): number {
 	// Border and padding sit around the body; the box keeps them around the content.
 	const chrome = Math.max(0, moduleEl.offsetHeight - body.clientHeight);

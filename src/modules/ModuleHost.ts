@@ -8,7 +8,8 @@ import { drawShape, ShapeRenderer } from './shapeModule';
 import { FlowRenderer, NoteModuleRenderer, TextModuleRenderer } from './noteModule';
 import { FlowLayout } from './flowLayout';
 import { chainSignature, type FlowInfo, flowChains } from '../model/flow';
-import { applyOverflow, fittedHeight } from './overflow';
+import type { TextEnds } from '../model/geometry';
+import { applyOverflow, blockEnds, fittedHeight } from './overflow';
 import { applyModuleStyle } from './style';
 import { PdfModuleRenderer } from './pdfModule';
 import { TocModuleRenderer } from './tocModule';
@@ -397,14 +398,15 @@ export class ModuleHost {
 	}
 
 	/**
-	 * The height (mm) that fits a mounted note's or text box's text as laid out now, for snapping a resize
-	 * to it; null for other modules, and for notes that shrink or grow to their text anyway.
+	 * Where a mounted note's or text box's text ends as laid out now, all of it or block by block, for
+	 * snapping a resize there; null for other modules, and for notes that shrink or grow to their text anyway.
 	 */
-	textEndHeight(id: string): number | null {
+	textEnds(id: string): TextEnds | null {
 		const m = this.mounted.get(id);
 		if (!m || !measuresOverflow(m.kind)) return null;
 		if (m.module.type === 'note' && ((m.module as NoteModule).overflow ?? 'clip') !== 'clip') return null;
-		return fittedHeight(m.el, m.body);
+		const fit = fittedHeight(m.el, m.body);
+		return fit === null ? null : { fit, blocks: blockEnds(m.el, m.body, m.module.h) };
 	}
 
 	/** The markdown a mounted module shows (see ModuleRenderer.shownMarkdown). */

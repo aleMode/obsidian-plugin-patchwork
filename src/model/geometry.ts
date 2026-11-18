@@ -117,15 +117,29 @@ export function resizeRect(start: Rect, handle: Handle, dx: number, dy: number, 
 	return r;
 }
 
+/** Box heights (mm) at which a text box ends cleanly: all its text, or the end of one of its blocks. */
+export interface TextEnds {
+	/** The height that shows all of the text. */
+	fit: number;
+	/** Heights that end just under a block (paragraph, list item, table row, heading): the rest is cut off whole. */
+	blocks: readonly number[];
+}
+
 /**
- * Snap a resized box's dragged top or bottom edge to where its text ends (a height of `fitH`), when the
- * edge as dragged (`free`, before grid snapping) is within `tol` of it. Without this the grid, which
- * every neighbour also sits on, kept the edge from stopping right under the text. Null when it doesn't snap.
+ * Snap a resized box's dragged edge to where its text ends, when the edge as dragged (`free`, before
+ * grid snapping) is within `tol`: the bottom edge to the end of the text or of any block in it (a box
+ * showing part of a long note then stops right under its last visible line), the top edge to the end
+ * of the text only (the text moves with the top). Without this the grid, which every neighbour also
+ * sits on, kept the edge from stopping right under the text. Null when it doesn't snap.
  */
-export function snapToTextEnd(r: Rect, free: Rect, handle: Handle, fitH: number, tol: number): Rect | null {
+export function snapToTextEnd(r: Rect, free: Rect, handle: Handle, ends: TextEnds, tol: number): Rect | null {
 	const vertical = handle.includes('s') ? 's' : handle.includes('n') ? 'n' : null;
-	if (!vertical || Math.abs(free.h - fitH) > tol) return null;
-	return vertical === 's' ? { ...r, h: fitH } : { ...r, y: bottom(r) - fitH, h: fitH };
+	if (!vertical) return null;
+	const candidates = vertical === 's' ? [...ends.blocks, ends.fit] : [ends.fit];
+	let best: number | null = null;
+	for (const h of candidates) if (Math.abs(free.h - h) <= tol && (best === null || Math.abs(free.h - h) < Math.abs(free.h - best))) best = h;
+	if (best === null) return null;
+	return vertical === 's' ? { ...r, h: best } : { ...r, y: bottom(r) - best, h: best };
 }
 
 /** Grow the dragged rect to the start's aspect ratio, anchored at the corner opposite the handle. */

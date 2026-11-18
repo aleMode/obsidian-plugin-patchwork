@@ -1281,9 +1281,9 @@ export class BoardViewport implements BoardSurface {
 		const dx = p.x - d.startPointer.x, dy = p.y - d.startPointer.y;
 		let r = resizeRect(d.start, d.handle, dx, dy, { min: MIN_SIZE_MM, keepAspect, snap: (v) => snapValue(v, grid) });
 		const { pageId, moduleId } = d.target;
-		// A text's end wins over the grid, like a guide (Alt places freely).
-		const fitH = moduleId && !free && !keepAspect ? this.modules.textEndHeight(moduleId) : null;
-		const atText = fitH === null ? null : snapToTextEnd(r, resizeRect(d.start, d.handle, dx, dy, { min: MIN_SIZE_MM }), d.handle, fitH, GUIDE_SNAP_PX / (PX_PER_MM * this.camera.zoom));
+		// The end of the text, or of a block of it, wins over the grid, like a guide (Alt places freely).
+		const ends = moduleId && !free && !keepAspect ? this.modules.textEnds(moduleId) : null;
+		const atText = ends && snapToTextEnd(r, resizeRect(d.start, d.handle, dx, dy, { min: MIN_SIZE_MM }), d.handle, ends, GUIDE_SNAP_PX / (PX_PER_MM * this.camera.zoom));
 		if (atText) r = atText;
 		const page = moduleId ? this.store.file.pages.find((x) => x.id === pageId) : undefined;
 		if (page) this.drawGuides([], atText ? [d.handle.includes('s') ? atText.y + atText.h : atText.y] : [], page);

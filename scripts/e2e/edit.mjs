@@ -40,13 +40,26 @@ try {
 	// Dragging the bottom edge near where the text ends stops it there, not on the grid.
 	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: [...f.pages[0].modules, { id: 'long', type: 'text', markdown: 'One line of text.\\n\\nAnother line.\\n\\nA third one.', x: 100, y: 20, w: 50, h: 60 }] }] }));
 		await new Promise((r) => setTimeout(r, 400)); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'long' }); await new Promise((r) => setTimeout(r, 100));`);
-	const fitH = await inView("return s.modules.textEndHeight('long');");
+	const fitH = await inView("return s.modules.textEnds('long')?.fit;");
 	const south = center(await rectOf('.pw-handle-s'));
 	await cdp.drag(south, { x: south.x, y: south.y - (60 - fitH - 0.8) * pxPerMm });
 	await sleep(100);
 	m = await inView("return view.store.file.pages[0].modules.find((x) => x.id === 'long');");
 	check('the bottom edge snaps to the end of the text', typeof fitH === 'number' && Math.abs(m.h - fitH) < 0.01 && fitH % 5 !== 0 && m.y === 20, [m, fitH]);
 	await cdp.key('z', 'KeyZ', MOD.ctrl);
+
+	// Text cut off below (a section whose next heading falls under the box): the edge stops right under
+	// the last list item, not on the grid and not after the heading's top margin.
+	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: f.pages[0].modules.map((x) => (x.id === 'long' ? { ...x, h: 40, markdown: 'Intro line.\\n- First item of the list.\\n- Second item, the last one shown.\\n\\n## Next section\\nMore text that the box cuts off.\\n\\nAnd more.' } : x)) }] }));
+		await new Promise((r) => setTimeout(r, 400)); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'long' }); await new Promise((r) => setTimeout(r, 100));`);
+	const listEnd = await inView(`const el = view.contentEl.querySelector('.pw-module[data-module-id="long"]'); const body = el.querySelector('.pw-module-body'); const b = body.getBoundingClientRect();
+		const box = el.getBoundingClientRect(); const pxPerMm = box.height / 40;
+		return (el.querySelector('ul').getBoundingClientRect().bottom - b.top + box.height - b.height) / pxPerMm;`);
+	const south2 = center(await rectOf('.pw-handle-s'));
+	await cdp.drag(south2, { x: south2.x, y: south2.y - (40 - listEnd - 0.8) * pxPerMm });
+	await sleep(100);
+	m = await inView("return view.store.file.pages[0].modules.find((x) => x.id === 'long');");
+	check('with text cut off below, the bottom edge snaps under the last item that shows', Math.abs(m.h - listEnd) < 0.05 && m.h < 40, [m.h, listEnd]);
 	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: f.pages[0].modules.filter((x) => x.id !== 'long') }] })); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'txt' }); await new Promise((r) => setTimeout(r, 100));`);
 
 	// Arrow nudge: 1 mm, Shift 10 mm.

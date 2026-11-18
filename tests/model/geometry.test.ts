@@ -100,6 +100,7 @@ describe('containsRect', () => {
 describe('snapToTextEnd', () => {
 	const start = { x: 10, y: 20, w: 50, h: 40 };
 	const snap5 = (v: number) => Math.round(v / 5) * 5;
+	const ends = (fit: number, blocks: number[] = []) => ({ fit, blocks });
 	const drag = (handle: 's' | 'n' | 'se' | 'e', dy: number) => ({
 		snapped: resizeRect(start, handle, 0, dy, { min: 5, snap: snap5 }),
 		free: resizeRect(start, handle, 0, dy, { min: 5 }),
@@ -108,23 +109,38 @@ describe('snapToTextEnd', () => {
 	it('stops the bottom edge right under the text instead of on the grid', () => {
 		const { snapped, free } = drag('s', -7.2);
 		expect(snapped.h).toBe(35);
-		expect(snapToTextEnd(snapped, free, 's', 32.6, 1)).toEqual({ x: 10, y: 20, w: 50, h: 32.6 });
+		expect(snapToTextEnd(snapped, free, 's', ends(32.6), 1)).toEqual({ x: 10, y: 20, w: 50, h: 32.6 });
 	});
 
 	it('moves the top edge when dragging it, keeping the bottom', () => {
 		const { snapped, free } = drag('n', 7.2);
-		expect(snapToTextEnd(snapped, free, 'n', 32.6, 1)).toEqual({ x: 10, y: 27.4, w: 50, h: 32.6 });
+		expect(snapToTextEnd(snapped, free, 'n', ends(32.6), 1)).toEqual({ x: 10, y: 27.4, w: 50, h: 32.6 });
 	});
 
 	it('leaves the grid alone away from the text end, and for side handles', () => {
 		const far = drag('s', -2);
-		expect(snapToTextEnd(far.snapped, far.free, 's', 32.6, 1)).toBeNull();
+		expect(snapToTextEnd(far.snapped, far.free, 's', ends(32.6), 1)).toBeNull();
 		const side = drag('e', 0);
-		expect(snapToTextEnd(side.snapped, side.free, 'e', 40, 1)).toBeNull();
+		expect(snapToTextEnd(side.snapped, side.free, 'e', ends(40), 1)).toBeNull();
 	});
 
 	it('works from a corner handle too', () => {
 		const { snapped, free } = drag('se', -7.2);
-		expect(snapToTextEnd(snapped, free, 'se', 32.6, 1)?.h).toBe(32.6);
+		expect(snapToTextEnd(snapped, free, 'se', ends(32.6), 1)?.h).toBe(32.6);
+	});
+
+	it('stops the bottom edge under the last block that shows, for text cut off below', () => {
+		// A section whose next heading starts at 40 mm: the last list item ends at 31.2 mm.
+		const { snapped, free } = drag('s', -8.2);
+		const r = snapToTextEnd(snapped, free, 's', ends(120, [12.4, 31.2, 40]), 1);
+		expect(r?.h).toBe(31.2);
+		// The top edge keeps to the end of the whole text.
+		const top = drag('n', 8.6);
+		expect(snapToTextEnd(top.snapped, top.free, 'n', ends(120, [31.2]), 1)).toBeNull();
+	});
+
+	it('picks the nearest end when two are within reach', () => {
+		const { snapped, free } = drag('s', -8.2);
+		expect(snapToTextEnd(snapped, free, 's', ends(120, [31, 32.4]), 1)?.h).toBe(32.4);
 	});
 });
