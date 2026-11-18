@@ -396,6 +396,17 @@ export class ModuleHost {
 		return this.mounted.get(id) === m ? fittedHeight(m.el, m.body) : null;
 	}
 
+	/**
+	 * The height (mm) that fits a mounted note's or text box's text as laid out now, for snapping a resize
+	 * to it; null for other modules, and for notes that shrink or grow to their text anyway.
+	 */
+	textEndHeight(id: string): number | null {
+		const m = this.mounted.get(id);
+		if (!m || !measuresOverflow(m.kind)) return null;
+		if (m.module.type === 'note' && ((m.module as NoteModule).overflow ?? 'clip') !== 'clip') return null;
+		return fittedHeight(m.el, m.body);
+	}
+
 	/** The markdown a mounted module shows (see ModuleRenderer.shownMarkdown). */
 	shownMarkdown(id: string): string | undefined {
 		return this.mounted.get(id)?.renderer?.shownMarkdown?.();

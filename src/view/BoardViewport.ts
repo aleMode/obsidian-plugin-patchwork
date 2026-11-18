@@ -3,7 +3,7 @@ import { ensurePaperScope, themeInk } from './paperScope';
 import { type App, Menu, Notice, setIcon, TFile } from 'obsidian';
 import { arrangePages } from '../model/arrange';
 import { allIds } from '../model/defaults';
-import { bounds, containsPoint, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect, revealShift } from '../model/geometry';
+import { bounds, containsPoint, type Handle, inset, intersects, keepGrabbable, type Point, type Rect, resizeRect, revealShift, snapToTextEnd } from '../model/geometry';
 import { newId } from '../model/ids';
 import { orderedPages } from '../model/ordering';
 import type { AnyModule, NoteModule, Page, ShapeModule, TrackerModule } from '../model/schema';
@@ -1147,7 +1147,7 @@ export class BoardViewport implements BoardSurface {
 		}
 		const p = screenToBoard(this.camera, this.local(e));
 		const grid = this.store.file.board.grid;
-		if (d.kind === 'resize') return this.resizeTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
+		if (d.kind === 'resize') return this.resizeTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey, e.altKey);
 		if (d.kind === 'endpoint') return this.moveEndpoint(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
 		if (d.kind === 'draw') return this.drawTo(d, p, grid.snap && !e.altKey ? grid.size : 0, e.shiftKey);
 		if (d.kind === 'marquee') return this.drawMarquee(d.start, p);
@@ -1277,13 +1277,16 @@ export class BoardViewport implements BoardSurface {
 		this.store.update((f) => moveModule(f, page.id, m.id, r.x, r.y), { coalesce: `move-module:${m.id}` });
 	}
 
-	private resizeTo(d: Extract<Drag, { kind: 'resize' }>, p: Point, grid: number, keepAspect: boolean) {
-		const r = resizeRect(d.start, d.handle, p.x - d.startPointer.x, p.y - d.startPointer.y, {
-			min: MIN_SIZE_MM,
-			keepAspect,
-			snap: (v) => snapValue(v, grid),
-		});
+	private resizeTo(d: Extract<Drag, { kind: 'resize' }>, p: Point, grid: number, keepAspect: boolean, free: boolean) {
+		const dx = p.x - d.startPointer.x, dy = p.y - d.startPointer.y;
+		let r = resizeRect(d.start, d.handle, dx, dy, { min: MIN_SIZE_MM, keepAspect, snap: (v) => snapValue(v, grid) });
 		const { pageId, moduleId } = d.target;
+		// A text's end wins over the grid, like a guide (Alt places freely).
+		const fitH = moduleId && !free && !keepAspect ? this.modules.textEndHeight(moduleId) : null;
+		const atText = fitH === null ? null : snapToTextEnd(r, resizeRect(d.start, d.handle, dx, dy, { min: MIN_SIZE_MM }), d.handle, fitH, GUIDE_SNAP_PX / (PX_PER_MM * this.camera.zoom));
+		if (atText) r = atText;
+		const page = moduleId ? this.store.file.pages.find((x) => x.id === pageId) : undefined;
+		if (page) this.drawGuides([], atText ? [d.handle.includes('s') ? atText.y + atText.h : atText.y] : [], page);
 		const apply = <T extends Rect>(o: T): T => (o.x === r.x && o.y === r.y && o.w === r.w && o.h === r.h ? o : { ...o, ...r });
 		this.store.update(
 			(f) => (moduleId ? mapModule(f, pageId, moduleId, apply) : mapPage(f, pageId, apply)),

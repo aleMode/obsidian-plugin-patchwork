@@ -117,6 +117,17 @@ export function resizeRect(start: Rect, handle: Handle, dx: number, dy: number, 
 	return r;
 }
 
+/**
+ * Snap a resized box's dragged top or bottom edge to where its text ends (a height of `fitH`), when the
+ * edge as dragged (`free`, before grid snapping) is within `tol` of it. Without this the grid, which
+ * every neighbour also sits on, kept the edge from stopping right under the text. Null when it doesn't snap.
+ */
+export function snapToTextEnd(r: Rect, free: Rect, handle: Handle, fitH: number, tol: number): Rect | null {
+	const vertical = handle.includes('s') ? 's' : handle.includes('n') ? 'n' : null;
+	if (!vertical || Math.abs(free.h - fitH) > tol) return null;
+	return vertical === 's' ? { ...r, h: fitH } : { ...r, y: bottom(r) - fitH, h: fitH };
+}
+
 /** Grow the dragged rect to the start's aspect ratio, anchored at the corner opposite the handle. */
 function keepAspect(start: Rect, r: Rect, handle: Handle): Rect {
 	const aspect = start.w / start.h;

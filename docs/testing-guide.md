@@ -178,6 +178,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 
 ### 1. Resize handles
 - Click a module: 8 square handles appear. Drag a corner or an edge. Sizes snap to the 5 mm grid; **Alt** places freely; **Shift** on a corner keeps proportions.
+- On a note or text box, drag the bottom (or top) edge towards the end of the text: near it the edge stops right under the last line, with a pink guide, instead of jumping to the grid.
 - Click a page (on empty paper): same handles resize the page. Modules keep their position relative to the page's top-left.
 - One **Ctrl+Z** undoes a whole resize drag.
 - Look for: handles readable at every zoom, never clipped at page edges, cursor shapes right.

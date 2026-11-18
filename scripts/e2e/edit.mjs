@@ -37,6 +37,18 @@ try {
 	m = await inView("return view.store.file.pages[0].modules.find((x) => x.id === 'txt');");
 	check('one undo reverts the resize', m.w === 50 && m.h === 30, m);
 
+	// Dragging the bottom edge near where the text ends stops it there, not on the grid.
+	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: [...f.pages[0].modules, { id: 'long', type: 'text', markdown: 'One line of text.\\n\\nAnother line.\\n\\nA third one.', x: 100, y: 20, w: 50, h: 60 }] }] }));
+		await new Promise((r) => setTimeout(r, 400)); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'long' }); await new Promise((r) => setTimeout(r, 100));`);
+	const fitH = await inView("return s.modules.textEndHeight('long');");
+	const south = center(await rectOf('.pw-handle-s'));
+	await cdp.drag(south, { x: south.x, y: south.y - (60 - fitH - 0.8) * pxPerMm });
+	await sleep(100);
+	m = await inView("return view.store.file.pages[0].modules.find((x) => x.id === 'long');");
+	check('the bottom edge snaps to the end of the text', typeof fitH === 'number' && Math.abs(m.h - fitH) < 0.01 && fitH % 5 !== 0 && m.y === 20, [m, fitH]);
+	await cdp.key('z', 'KeyZ', MOD.ctrl);
+	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: f.pages[0].modules.filter((x) => x.id !== 'long') }] })); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'txt' }); await new Promise((r) => setTimeout(r, 100));`);
+
 	// Arrow nudge: 1 mm, Shift 10 mm.
 	await cdp.key('ArrowRight', 'ArrowRight');
 	await cdp.key('ArrowDown', 'ArrowDown', MOD.shift);

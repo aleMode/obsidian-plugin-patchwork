@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bounds, containsPoint, containsRect, fitRect, intersects, keepGrabbable, revealShift, toBoard } from '../../src/model/geometry';
+import { bounds, containsPoint, containsRect, fitRect, intersects, keepGrabbable, resizeRect, revealShift, snapToTextEnd, toBoard } from '../../src/model/geometry';
 
 describe('revealShift', () => {
 	const region = { x: 100, y: 100, w: 400, h: 300 };
@@ -94,5 +94,37 @@ describe('containsRect', () => {
 		expect(containsRect(outer, { x: -1, y: 10, w: 20, h: 20 })).toBe(false);
 		expect(containsRect(outer, { x: 90, y: 10, w: 20, h: 20 })).toBe(false);
 		expect(containsRect(outer, { x: 10, y: 95, w: 20, h: 20 })).toBe(false);
+	});
+});
+
+describe('snapToTextEnd', () => {
+	const start = { x: 10, y: 20, w: 50, h: 40 };
+	const snap5 = (v: number) => Math.round(v / 5) * 5;
+	const drag = (handle: 's' | 'n' | 'se' | 'e', dy: number) => ({
+		snapped: resizeRect(start, handle, 0, dy, { min: 5, snap: snap5 }),
+		free: resizeRect(start, handle, 0, dy, { min: 5 }),
+	});
+
+	it('stops the bottom edge right under the text instead of on the grid', () => {
+		const { snapped, free } = drag('s', -7.2);
+		expect(snapped.h).toBe(35);
+		expect(snapToTextEnd(snapped, free, 's', 32.6, 1)).toEqual({ x: 10, y: 20, w: 50, h: 32.6 });
+	});
+
+	it('moves the top edge when dragging it, keeping the bottom', () => {
+		const { snapped, free } = drag('n', 7.2);
+		expect(snapToTextEnd(snapped, free, 'n', 32.6, 1)).toEqual({ x: 10, y: 27.4, w: 50, h: 32.6 });
+	});
+
+	it('leaves the grid alone away from the text end, and for side handles', () => {
+		const far = drag('s', -2);
+		expect(snapToTextEnd(far.snapped, far.free, 's', 32.6, 1)).toBeNull();
+		const side = drag('e', 0);
+		expect(snapToTextEnd(side.snapped, side.free, 'e', 40, 1)).toBeNull();
+	});
+
+	it('works from a corner handle too', () => {
+		const { snapped, free } = drag('se', -7.2);
+		expect(snapToTextEnd(snapped, free, 'se', 32.6, 1)?.h).toBe(32.6);
 	});
 });
