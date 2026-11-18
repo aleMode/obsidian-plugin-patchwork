@@ -53,6 +53,7 @@ Questions raised while building, each with the recommended answer we are proceed
 
 ### Q11. PNG sheets larger than the raster tile cap
 - **Decided in M2 (SPEC v0.7):** option (a), several files named `-r1c1`, `-r1c2`, …
+- **Changed 2026-11-18 (SPEC v0.20):** option (b). Users exporting "each page at its size" got several images per page; Patchwork now writes the PNG itself (`src/model/png.ts`, ~100 lines), strip by strip, compressed with `CompressionStream('deflate')`.
 - A sheet over 8192 px per side at the chosen DPI (e.g. 1 m wide at 300 dpi = 11 811 px) can't be one canvas tile.
 - Options: (a) write such sheets as multiple PNG files named by row/column (same labels as print tiling); (b) stream one large PNG ourselves, rendering one strip of rows at a time and compressing with Node's `zlib` (available in the renderer), so no giant canvas is ever needed; (c) cap DPI for oversized sheets.
 - **Recommendation:** (b) if it stays small (a PNG writer is ~100 lines), else (a). Decide in M2.

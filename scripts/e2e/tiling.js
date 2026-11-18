@@ -67,7 +67,30 @@ try {
 
 	await view.surface.runExport({ ...EXPORT, format: 'png', base: `${DIR}/poster`, dpi: 300, pages: 'range', range: '3' });
 	const posterPngs = vault.getFiles().filter((f) => f.path.startsWith(`${DIR}/poster`)).map((f) => f.path).sort();
-	check('PNG beyond the 8192 px cap is split into tiles', posterPngs.length === 4 && posterPngs[0].endsWith('poster-r1c1.png'), posterPngs);
+	check('PNG beyond the 8192 px canvas cap is still one image', JSON.stringify(posterPngs) === JSON.stringify([`${DIR}/poster.png`]), posterPngs);
+	// Drawn in strips and tiles under the cap, then written as one file: the size is the page's at 300 dpi
+	// (1000 x 700 mm), and each corner's text is where it belongs (the bottom-right one is in the second
+	// column of tiles, so a misplaced tile would show).
+	const blob = new Blob([await vault.readBinary(vault.getAbstractFileByPath(`${DIR}/poster.png`))], { type: 'image/png' });
+	const full = await createImageBitmap(blob);
+	check('poster PNG is the page at 300 dpi (≈ 11811 x 8268)', Math.abs(full.width - 11811) <= 2 && Math.abs(full.height - 8268) <= 2, [full.width, full.height]);
+	full.close();
+	const px = (mmv) => Math.round((mmv * 300) / 25.4);
+	const ink = async (x, y, w, h) => {
+		const bmp = await createImageBitmap(blob, px(x), px(y), px(w), px(h));
+		const c = document.createElement('canvas');
+		c.width = bmp.width;
+		c.height = bmp.height;
+		const g = c.getContext('2d');
+		g.drawImage(bmp, 0, 0);
+		bmp.close();
+		const d = g.getImageData(0, 0, c.width, c.height).data;
+		let dark = 0;
+		for (let i = 0; i < d.length; i += 4) if (d[i] < 128) dark++;
+		return dark;
+	};
+	const corners = [await ink(10, 10, 60, 15), await ink(920, 670, 60, 15), await ink(500, 300, 60, 15)];
+	check('poster PNG: text in both corners, blank paper elsewhere', corners[0] > 100 && corners[1] > 100 && corners[2] === 0, corners);
 } catch (e) {
 	check('no exception', false, String(e?.stack ?? e));
 } finally {

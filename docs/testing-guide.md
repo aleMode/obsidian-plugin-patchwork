@@ -167,7 +167,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 ### Export dialog: sheets, tiling, ranges, PNG
 - **Patchwork: Export…** now offers: Format (PDF / PNG), Pages (all / selected / range like `1-3, 5`), Sheet size (each page at its own size, A4/A3/A5/Letter/Legal/Tabloid, or custom), Orientation (automatic picks the fewest sheets), Smaller pages (actual size / scale to fit), Tile overlap, Tile labels.
 - Try a big page (e.g. set a page to 1000 × 700 mm in the inspector) and export to A4: it becomes a grid of A4 tiles, all vector (zoom in: text stays sharp), with "A1… C5" labels if enabled. Bookmarks jump to each page's first sheet.
-- PNG: each sheet becomes an image (`name-01.png`, …). Very large sheets at high DPI are split into `-r1c1`, `-r1c2`, … tiles (8192 px cap).
+- PNG: each sheet becomes one image (`name-01.png`, …), however large: a 450 mm page at 500 dpi is one 8858 px wide file, not tiles. In an image viewer's properties the resolution is the export DPI, so the image prints at the page's size.
 - Your choices are remembered in the board.
 
 ### Auto-arrange and canvas export
