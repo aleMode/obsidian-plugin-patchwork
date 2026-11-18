@@ -15,6 +15,13 @@ const sheets = new Map<Document, CSSStyleSheet>();
 /** Windows whose rule found no variables (styles not loaded yet when it was built); tried again on ensure. */
 const empty = new Set<Document>();
 
+/**
+ * The user's own Appearance settings (text font, accent…): Obsidian sets them inline on `body`, over the
+ * stylesheet defaults. Copying a default (`--font-text-override: "??"`) onto paper would undo the
+ * setting there, and text measured on paper (linked frames) wrapped in another font than it showed in.
+ */
+const userSetting = (prop: string, body: HTMLElement) => prop.endsWith('-override') || body.style.getPropertyValue(prop) !== '';
+
 function collectBodyVariables(doc: Document, own: CSSStyleSheet | undefined): string[] {
 	const decls: string[] = [];
 	// That window's own class: rules in a popout window are not instances of the main window's CSSStyleRule.
@@ -30,7 +37,7 @@ function collectBodyVariables(doc: Document, own: CSSStyleSheet | undefined): st
 		for (const rule of Array.from(rules)) {
 			if (!(rule instanceof StyleRule) || rule.selectorText !== 'body') continue;
 			for (const prop of Array.from(rule.style)) {
-				if (prop.startsWith('--')) decls.push(`${prop}: ${rule.style.getPropertyValue(prop)};`);
+				if (prop.startsWith('--') && !userSetting(prop, doc.body)) decls.push(`${prop}: ${rule.style.getPropertyValue(prop)};`);
 			}
 		}
 	}
@@ -43,7 +50,10 @@ export function refreshPaperScope(doc: Document = activeDocument): void {
 	if (!sheet) {
 		sheet = new (doc.defaultView ?? window).CSSStyleSheet();
 		sheets.set(doc, sheet);
-		doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
+		// A rule left by an earlier load of the plugin (one that never unloaded cleanly) would keep winning
+		// over this one wherever it declares something this one now leaves out.
+		const stale = (s: CSSStyleSheet) => (s.cssRules[0] as CSSStyleRule | undefined)?.selectorText === '.pw-paper';
+		doc.adoptedStyleSheets = [...doc.adoptedStyleSheets.filter((s) => !stale(s)), sheet];
 	}
 	const decls = collectBodyVariables(doc, sheet);
 	if (decls.length) empty.delete(doc);

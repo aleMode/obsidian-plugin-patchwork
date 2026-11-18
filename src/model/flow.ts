@@ -263,7 +263,7 @@ export function chainSignature(chain: readonly FlowMember[]): string {
 	const content = [h.type, h.file, h.subpath, h.lines, h.includeHeading, h.markdown, h.frozen];
 	const box = (m: AnyModule) => {
 		const c = contentBox(m);
-		return [c.w, c.h, textScale(m)];
+		return [c.w, c.h, textScale(m), m.style?.fontFamily];
 	};
 	return JSON.stringify([content, box(h), ...frames.map((f) => box(f.module))]);
 }

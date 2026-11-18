@@ -450,6 +450,12 @@ body.pw-hide-overflow-marker .pw-board .pw-module.is-overflowing::before {
 	font-size: calc(1em * var(--pw-text-scale, 1));
 }
 
+/* A frame's own font (style.fontFamily), as .pw-module.has-font-family gives it on the page. */
+.pw-flow-measure-body.has-font-family {
+	--font-text: var(--pw-font-family);
+	font-family: var(--pw-font-family);
+}
+
 .pw-pdf-canvas {
 	position: absolute;
 	left: var(--pw-x);

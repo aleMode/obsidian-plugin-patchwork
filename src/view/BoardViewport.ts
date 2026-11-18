@@ -842,6 +842,8 @@ export class BoardViewport implements BoardSurface {
 		this.colors.reset();
 		// Light or dark mode changes the ink of app-theme pages.
 		this.render();
+		// A font or theme change rewraps text, so linked frames split it elsewhere.
+		this.modules.restyled();
 		this.renderRulers();
 		this.renderMinimap();
 	}

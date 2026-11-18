@@ -16,6 +16,7 @@ const until = async (fn, ms = 5000) => {
 };
 const para = (i) => `PARA-${String(i).padStart(2, '0')} lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.`;
 const text = (n, heading) => Array.from({ length: n }, (_, i) => (i + 1 === heading ? `## HEADING-${i + 1}\n\n${para(i + 1)}` : para(i + 1))).join('\n\n');
+const FONT_BEFORE = vault.getConfig('textFontFamily') ?? '';
 const d = vault.getAbstractFileByPath(DIR);
 if (d) await vault.delete(d, true);
 await vault.createFolder(DIR);
@@ -122,9 +123,34 @@ try {
 	await until(() => tokens('head').length !== before);
 	const after = tokens('head').length;
 	check('shrinking a frame a little moves a line or two, not the whole paragraph', after >= 1 && after < before && before - after <= 2 && JSON.stringify(all()) === JSON.stringify(want), [before, after, tokens('head')]);
+
+	// Obsidian's own text font (Settings → Appearance) is set inline on body. Paper used to re-declare the
+	// default over it, so frames were measured in one font and shown in another: a wider font overflowed
+	// them, a narrower one left gaps. Lines of about 50 characters take one line in the default font and
+	// two in a monospaced one, so the split must change with the font.
+	const wide = Array.from({ length: 24 }, (_, i) => `WL-${n2(i + 1)} lorem ipsum dolor sit amet, consectetur adip`).join('\n');
+	const wl = (id) => mod(id)?.innerText.match(/WL-\d\d/g) ?? [];
+	const wantWl = wide.match(/WL-\d\d/g);
+	const allWl = () => fineIds.flatMap(wl);
+	vault.setConfig('textFontFamily', '');
+	view.store.update((f) => ({ ...f, pages: f.pages.map((p) => ({ ...p, modules: p.modules.map((m) => (m.id === 'head' ? { ...m, markdown: wide } : m)) })) }));
+	await sleep(500);
+	await until(() => JSON.stringify(allWl()) === JSON.stringify(wantWl));
+	const showing = () => fineIds.map(wl).join(' ');
+	const split = showing();
+	vault.setConfig('textFontFamily', 'DejaVu Sans Mono');
+	const font = () => getComputedStyle(mod('head').querySelector('.pw-markdown')).fontFamily;
+	await until(() => font().includes('DejaVu Sans Mono') && showing() !== split && JSON.stringify(allWl()) === JSON.stringify(wantWl));
+	check('frames on paper use the app’s text font, and re-flow when it changes', font().includes('DejaVu Sans Mono') && showing() !== split, [font(), split, showing()]);
+	check('in the app’s text font every block fits its frame, all text shown once', fineIds.every(inside) && JSON.stringify(allWl()) === JSON.stringify(wantWl), fineIds.map(wl));
+	view.store.update((f) => ({ ...f, board: { ...f.board, useAppTheme: true } }));
+	await sleep(1000);
+	await until(() => JSON.stringify(allWl()) === JSON.stringify(wantWl));
+	check('pages in the app theme: every block fits its frame in the app’s text font', font().includes('DejaVu Sans Mono') && fineIds.every(inside) && JSON.stringify(allWl()) === JSON.stringify(wantWl), fineIds.map(wl));
 } catch (e) {
 	check('no exception', false, String(e?.stack ?? e));
 } finally {
+	vault.setConfig('textFontFamily', FONT_BEFORE);
 	document.querySelectorAll('.notice').forEach((n) => n.remove());
 	app.workspace.getLeavesOfType('patchwork-board').forEach((l) => l.detach());
 	await new Promise((r) => setTimeout(r, 400)); // let pending saves finish before deleting their files

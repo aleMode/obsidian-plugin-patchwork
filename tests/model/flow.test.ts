@@ -224,6 +224,8 @@ describe('chainSignature', () => {
 		const base = chainSignature([head, frame]);
 		expect(chainSignature([head, { ...frame, module: { ...frame.module, x: 99 } }])).toBe(base);
 		expect(chainSignature([head, { ...frame, module: { ...frame.module, h: 60 } }])).not.toBe(base);
+		// A frame's own font changes how its lines wrap.
+		expect(chainSignature([head, { ...frame, module: { ...frame.module, style: { fontFamily: 'Georgia' } } }])).not.toBe(base);
 		expect(chainSignature([{ ...head, module: { ...head.module, markdown: 'b' } }, frame])).not.toBe(base);
 	});
 });

@@ -93,7 +93,7 @@ export class ModuleHost {
 	private unmounting = new Set<string>();
 
 	constructor(private o: ModuleHostOptions) {
-		const layout = new FlowLayout(o.ctx.app, o.boardPath, () => o.store.file.board.fontFamily, o.ctx.pdfDocs);
+		const layout = new FlowLayout(o.ctx.app, o.boardPath, () => o.store.file.board.fontFamily, o.ctx.pdfDocs, () => o.store.file.board.useAppTheme);
 		const replace = o.replaceSource;
 		this.flowLayout = layout;
 		this.ctx = {
@@ -155,6 +155,12 @@ export class ModuleHost {
 			return { kind: 'flow', key: contentKey(m) + chain };
 		}
 		return { kind: m.type, key: m.type === 'toc' ? contentKey(m) + toc : contentKey(m) };
+	}
+
+	/** Theme, snippets or Obsidian's text font changed: linked frames measure their text again. */
+	restyled() {
+		this.flowLayout.clear();
+		for (const m of this.mounted.values()) if (m.kind === 'flow') this.renderContent(m);
 	}
 
 	setVisible(visible: readonly string[]) {

@@ -51,22 +51,30 @@ export class FlowLayout {
 		private font: () => string | undefined = () => undefined,
 		/** For PDF embeds in the text, measured at the page's real shape. */
 		private pdfDocs?: PdfDocCache,
+		/** Pages in the app theme aren't paper: text is measured in the same theme it shows in. */
+		private appTheme: () => boolean = () => false,
 	) {}
 
 	async layout(chain: readonly FlowMember[]): Promise<FlowOutcome> {
 		const content = await this.content(chain[0]!);
 		if ('error' in content) return content;
 		const font = this.font();
-		const key = chainSignature(chain) + '\n' + (font ?? '') + '\n' + content.markdown;
+		const appTheme = this.appTheme();
+		const key = chainSignature(chain) + '\n' + (font ?? '') + '\n' + String(appTheme) + '\n' + content.markdown;
 		const head = chain[0]!.module.id;
 		this.latest.set(head, key);
 		let result = this.cache.get(key);
 		if (!result) {
-			result = this.afterQuiet(key, head, () => this.measure(content.markdown, chain, content.sourcePath, font));
+			result = this.afterQuiet(key, head, () => this.measure(content.markdown, chain, content.sourcePath, font, appTheme));
 			this.cache.set(key, result);
 			if (this.cache.size > CACHE_SIZE) this.cache.delete(this.cache.keys().next().value!);
 		}
 		return result;
+	}
+
+	/** Forget every layout: the theme, a snippet or the app's text font changed how text wraps, and none of that is in the keys. */
+	clear() {
+		this.cache.clear();
 	}
 
 	/** The stretch of the head's markdown that chain member `index` shows, for editing just that frame's text; null when the chain can't be laid out. */
@@ -95,9 +103,10 @@ export class FlowLayout {
 		return c.ok ? { markdown: c.markdown, sourcePath: c.file.path } : { error: c.reason };
 	}
 
-	private async measure(markdown: string, chain: readonly FlowMember[], sourcePath: string, font: string | undefined): Promise<FlowResult> {
+	private async measure(markdown: string, chain: readonly FlowMember[], sourcePath: string, font: string | undefined, appTheme: boolean): Promise<FlowResult> {
 		const blocks = splitBlocks(markdown);
-		const root = activeDocument.body.createDiv({ cls: 'pw-flow-measure pw-paper theme-light' });
+		// The frames' own scope: paper is the light theme re-declared (view/paperScope), the app theme is body's.
+		const root = activeDocument.body.createDiv({ cls: appTheme ? 'pw-flow-measure' : 'pw-flow-measure pw-paper theme-light' });
 		if (font) {
 			root.addClass('has-board-font');
 			root.setCssProps({ '--pw-font': font });
@@ -114,7 +123,9 @@ export class FlowLayout {
 				}
 				const box = contentBox(member.module);
 				const body = root.createDiv({ cls: 'pw-flow-measure-body' });
-				body.setCssProps({ '--pw-w': `${box.w}mm`, '--pw-text-scale': String(textScale(member.module)) });
+				const family = member.module.style?.fontFamily;
+				body.toggleClass('has-font-family', !!family);
+				body.setCssProps({ '--pw-w': `${box.w}mm`, '--pw-text-scale': String(textScale(member.module)), '--pw-font-family': family ?? '' });
 				const md = body.createDiv({ cls: 'markdown-rendered markdown-preview-view pw-markdown' });
 				const fit = await fitFrame(markdown, blocks, cur, box.h, this.measurer(md, sourcePath, component));
 				ranges.push([cur.at, fit.to]);

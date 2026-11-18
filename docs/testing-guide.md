@@ -179,6 +179,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 ### 1. Resize handles
 - Click a module: 8 square handles appear. Drag a corner or an edge. Sizes snap to the 5 mm grid; **Alt** places freely; **Shift** on a corner keeps proportions.
 - On a note or text box, drag the bottom (or top) edge towards the end of the text: near it the edge stops right under the last line, with a pink guide, instead of jumping to the grid. With a note that shows more than fits (a section with a sub-heading below), the bottom edge also stops right under each paragraph or list item, so the box can end under its last visible line with no gap. The same for a note or text box whose text continues in linked frames: the edge stops under its last line, and that line stays in the box.
+- Settings → Appearance → Text font: pick a font clearly wider or narrower than the default (e.g. a monospaced one). Notes and frames on paper pages use it; linked frames re-flow at once, each filled to the last line that fits (no gap a line would fit in, nothing cut at the bottom), on paper and on app-theme pages alike.
 - Click a page (on empty paper): same handles resize the page. Modules keep their position relative to the page's top-left.
 - One **Ctrl+Z** undoes a whole resize drag.
 - Look for: handles readable at every zoom, never clipped at page edges, cursor shapes right.
