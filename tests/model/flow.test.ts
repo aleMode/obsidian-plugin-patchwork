@@ -192,6 +192,16 @@ describe('flowChains', () => {
 		expect(linkedModules(f, f.pages[1]!).map((m) => m.id)).toEqual(['f', 'b']);
 	});
 
+	it('when two frames continue the same text, the same one keeps it wherever they sit', () => {
+		const m = (id: string, type: string, from?: string) => ({ id, type, x: 0, y: 0, w: 10, h: 10, ...(from ? { from } : {}) }) as AnyModule;
+		const pages = (order: string[][]) => ({ pages: order.map((ids, i) => ({ id: `p${i}`, x: 0, y: 0, w: 100, h: 100, modules: ids.map((id) => (id === 't' ? m('t', 'text') : m(id, 'frame', 't'))) })) });
+		for (const layout of [[['t', 'a', 'b']], [['t', 'b', 'a']], [['t', 'b'], ['a']], [['b'], ['t', 'a']]]) {
+			const chains = flowChains(pages(layout));
+			expect(chains.get('a')?.ok).toBe(true);
+			expect(chains.get('b')).toMatchObject({ ok: false, conflict: true });
+		}
+	});
+
 	it('a loop of frames is not a chain', () => {
 		const chains = flowChains(file([[mod('x', 'frame', { from: 'y' }), mod('y', 'frame', { from: 'x' })]]));
 		expect(chains.get('x')?.ok).toBe(false);

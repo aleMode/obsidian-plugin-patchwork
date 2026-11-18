@@ -195,7 +195,8 @@ export interface FlowMember {
 
 export type FlowInfo =
 	| { ok: true; chain: FlowMember[]; index: number }
-	| { ok: false; reason: string };
+	/** `conflict`: another frame continues the same text, so this one can be attached to the chain's end instead. */
+	| { ok: false; reason: string; conflict?: true };
 
 /**
  * Chains of linked frames, keyed by module ID: a note or text module followed by the frames that
@@ -206,13 +207,15 @@ export function flowChains(file: Pick<PatchworkFile, 'pages'>): Map<string, Flow
 	for (const page of file.pages) for (const m of page.modules) byId.set(m.id, { pageId: page.id, module: m });
 	const next = new Map<string, FlowMember>();
 	const out = new Map<string, FlowInfo>();
-	for (const member of byId.values()) {
+	// In ID order, not file order: when two frames continue the same text, the same one keeps it
+	// wherever either is moved (moving to another page changes file order).
+	const frames = [...byId.values()].filter((f) => f.module.type === 'frame').sort((a, b) => (a.module.id < b.module.id ? -1 : a.module.id > b.module.id ? 1 : 0));
+	for (const member of frames) {
 		const m = member.module;
-		if (m.type !== 'frame') continue;
 		const from = typeof m.from === 'string' ? byId.get(m.from) : undefined;
 		if (!from) out.set(m.id, { ok: false, reason: 'The text this frame continues was deleted.' });
 		else if (!['note', 'text', 'frame'].includes(from.module.type)) out.set(m.id, { ok: false, reason: `A frame can only continue a note or text module, not ${from.module.type}.` });
-		else if (next.has(from.module.id)) out.set(m.id, { ok: false, reason: 'Another frame already continues the same text.' });
+		else if (next.has(from.module.id)) out.set(m.id, { ok: false, reason: 'Another frame already continues the same text.', conflict: true });
 		else next.set(from.module.id, member);
 	}
 	for (const member of byId.values()) {

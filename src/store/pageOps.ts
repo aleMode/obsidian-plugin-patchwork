@@ -1,5 +1,5 @@
 import { newPage } from '../model/defaults';
-import { flowChains } from '../model/flow';
+import { flowChains, type FlowInfo } from '../model/flow';
 import type { AnyModule, Page, PatchworkFile } from '../model/schema';
 
 // Immutable edits used with BoardStore.update. Each returns the same object when nothing changes,
@@ -126,7 +126,8 @@ export function duplicatePage(file: PatchworkFile, pageId: string, ids: () => st
 /**
  * Modules from the clipboard put on a page with new IDs, as one change. They keep their place on the
  * page (nudged when pasted where their originals still are) and stay on it. Frames are re-linked as for
- * duplicates; a frame whose text was neither pasted nor is in this file stays unlinked (and says so).
+ * duplicates; a cut frame joins the end of the chain its text is in; a frame whose text was neither
+ * pasted nor is in this file stays unlinked (and says so).
  */
 export function pasteModules(file: PatchworkFile, pageId: string, modules: readonly AnyModule[], ids: () => string, offset = 5): { file: PatchworkFile; pasted: string[] } {
 	const page = file.pages.find((p) => p.id === pageId);
@@ -155,27 +156,40 @@ export function pasteModules(file: PatchworkFile, pageId: string, modules: reado
  */
 function relinkCopiedFrames(before: PatchworkFile, after: PatchworkFile, idMap: ReadonlyMap<string, string>, originals?: ReadonlyMap<string, AnyModule>): PatchworkFile {
 	const chains = flowChains(before);
+	const present = new Set(before.pages.flatMap((p) => p.modules.map((m) => m.id)));
 	/** Current end of each original chain, by head ID, as copies are appended to it. */
 	const tails = new Map<string, string>();
 	const from = new Map<string, string>();
 	for (const [original, copy] of idMap) {
-		const info = chains.get(original);
 		const m = originals?.get(original) ?? before.pages.flatMap((p) => p.modules).find((x) => x.id === original);
 		if (m?.type !== 'frame' || typeof m.from !== 'string') continue;
 		if (idMap.has(m.from)) {
 			from.set(copy, idMap.get(m.from)!);
 			continue;
 		}
-		if (!info?.ok) continue;
-		const head = info.chain[0]!.module.id;
-		from.set(copy, tails.get(head) ?? info.chain[info.chain.length - 1]!.module.id);
-		tails.set(head, copy);
+		const chain = chainToJoin(chains, original, m.from, present);
+		if (!chain) continue;
+		from.set(copy, tails.get(chain.head) ?? chain.tail);
+		tails.set(chain.head, copy);
 	}
 	if (from.size === 0) return after;
 	return {
 		...after,
 		pages: after.pages.map((p) => (p.modules.some((m) => from.has(m.id)) ? { ...p, modules: p.modules.map((m) => (from.has(m.id) ? { ...m, from: from.get(m.id) } : m)) } : p)),
 	};
+}
+
+/**
+ * The chain a copied frame joins: its original's chain, or, when the original is gone (cut, or deleted
+ * before pasting), the chain its text is in. Keeping the cloned `from` there would make two frames
+ * continue the same text, since removing the original already linked its neighbours.
+ */
+function chainToJoin(chains: ReadonlyMap<string, FlowInfo>, original: string, source: string, present: ReadonlySet<string>): { head: string; tail: string } | null {
+	const of = (info: FlowInfo | undefined) => (info?.ok ? { head: info.chain[0]!.module.id, tail: info.chain[info.chain.length - 1]!.module.id } : null);
+	if (present.has(original)) return of(chains.get(original));
+	if (!present.has(source)) return null;
+	// Text nothing continues yet isn't in the map: the copy simply continues it.
+	return chains.has(source) ? of(chains.get(source)) : { head: source, tail: source };
 }
 
 /** Where a new module goes: inside a 10 mm margin, cascading so new modules don't hide each other. */

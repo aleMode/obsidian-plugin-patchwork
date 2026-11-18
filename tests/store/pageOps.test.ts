@@ -135,6 +135,20 @@ describe('pasteModules', () => {
 		expect(flowChains(lone.file).get('n1')?.ok).toBe(true);
 	});
 
+	it('a cut frame pasted back joins the end of its chain, so no two frames continue the same text', () => {
+		const f = board();
+		f.pages[0]!.modules.push(mod('f2', 'frame', { from: 'f1' }), mod('f3', 'frame', { from: 'f2' }));
+		// Cutting f1 and f2 links f3 to the text; the pasted copies go after f3, in their order.
+		const cut = removeModule(removeModule(f, 'p', 'f1'), 'p', 'f2');
+		const out = pasteModules(cut, 'q', [mod('f1', 'frame', { from: 't' }), mod('f2', 'frame', { from: 'f1' })], counter());
+		const info = flowChains(out.file).get('t');
+		expect(info?.ok && info.chain.map((c) => c.module.id)).toEqual(['t', 'f3', 'n1', 'n2']);
+		// The only frame cut: the copy continues the text again.
+		const alone = pasteModules(removeModule(board(), 'p', 'f1'), 'q', [mod('f1', 'frame', { from: 't' })], counter());
+		expect(alone.file.pages[1]!.modules[0]!.from).toBe('t');
+		expect(flowChains(alone.file).get('n1')?.ok).toBe(true);
+	});
+
 	it('a frame from another patchwork, without its text, stays unlinked', () => {
 		const out = pasteModules(board(), 'q', [mod('zz', 'frame', { from: 'elsewhere' })], counter());
 		expect(flowChains(out.file).get('n1')?.ok).toBe(false);
