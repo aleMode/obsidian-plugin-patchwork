@@ -114,6 +114,7 @@ Everything here is also described in `docs/ui-reorganisation.md`.
 - The cut falls between source lines: lines of a paragraph written with single line breaks, list items (an ordered list keeps counting: the next frame starts at 4.), table rows (the next frame repeats the table's header) and lines of a quote or callout (the callout's title repeats). Code blocks, math and headings move whole. Shrink a frame a few mm: only the last line or two should move on, not the whole section.
 - Resize either box, edit the text or the note: the split updates. A heading is never stranded at the bottom of a frame.
 - Add more frames from a frame's right-click menu or the inspector (*Add another frame*). Delete a middle frame: the chain closes up. Export: each page prints its share.
+- Cut a frame (Ctrl/Cmd+X) and paste it on another page: it joins the end of its chain, and no frame says "Another frame already continues the same text". On an older board where two frames do continue one text, the extra frame shows *Attach to end of chain*; dragging either frame around doesn't swap which one shows the text.
 - Worth checking with your real notes: callouts, tables, embeds and images, and how the split looks.
 
 ## New in M4 (M4 complete)
