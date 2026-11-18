@@ -429,6 +429,13 @@ body.pw-hide-overflow-marker .pw-board .pw-module.is-overflowing::before {
 	margin-top: 0;
 }
 
+/* Obsidian sets an inline `overflow-x: auto` on what it renders a table into. On a block wrapper that
+   traps the table's margins inside it: the gap above a table doubles and its bottom margin uses up a
+   frame's height, so linked frames ended early. The module clips anyway; paper never scrolls. */
+.pw-markdown > .pw-flow-block {
+	overflow: visible !important;
+}
+
 /* Offscreen measuring for linked frames: same font size and markdown styles as a page. */
 .pw-flow-measure {
 	position: fixed;
