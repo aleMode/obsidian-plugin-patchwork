@@ -403,8 +403,10 @@ export class ModuleHost {
 	 */
 	textEnds(id: string): TextEnds | null {
 		const m = this.mounted.get(id);
-		if (!m || !measuresOverflow(m.kind)) return null;
-		if (m.module.type === 'note' && ((m.module as NoteModule).overflow ?? 'clip') !== 'clip') return null;
+		// Members of a linked-frame chain ('flow') too: a box there ends under its last line, the rest
+		// moving on to the next frame. Their notes' overflow policy doesn't apply.
+		if (!m || !(measuresOverflow(m.kind) || m.kind === 'flow')) return null;
+		if (m.kind === 'note' && ((m.module as NoteModule).overflow ?? 'clip') !== 'clip') return null;
 		const fit = fittedHeight(m.el, m.body);
 		return fit === null ? null : { fit, blocks: blockEnds(m.el, m.body, m.module.h) };
 	}

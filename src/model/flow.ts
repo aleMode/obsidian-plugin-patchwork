@@ -143,6 +143,8 @@ export function splicePart(source: string, part: { from: number; to: number }, v
 	return (before ? `${before}\n\n` : '') + value + source.slice(part.to);
 }
 
+const FIT_SLACK_MM = 0.25;
+
 /** Renders text the way a frame will and reports its bottom edge, in mm from the frame's top. */
 export interface FlowMeasurer {
 	/** Add a block below the ones already there. */
@@ -163,7 +165,10 @@ export interface FrameFit {
  * so the text always moves on. A heading isn't left last in a frame when none of its section fits.
  */
 export async function fitFrame(markdown: string, blocks: readonly Block[], start: FlowCursor, height: number, measure: FlowMeasurer): Promise<FrameFit> {
-	const fits = (bottom: number) => bottom <= height + 0.01;
+	// A quarter millimetre of slack: a frame resized to end right under a line (snapped to it on screen)
+	// must keep that line, though on-screen and offscreen layout differ by a fraction of a pixel. Half
+	// the line spacing sits under the glyphs, so nothing visible is clipped.
+	const fits = (bottom: number) => bottom <= height + FIT_SLACK_MM;
 	const cursor = (block: number): FlowCursor => ({ block, at: blocks[block]?.from ?? markdown.length });
 	let to = start.at;
 	for (let i = start.block, at = start.at, taken = 0; i < blocks.length; i++, at = blocks[i]?.from ?? 0, taken++) {

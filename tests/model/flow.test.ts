@@ -112,6 +112,11 @@ describe('fitFrame', () => {
 		return { shown: segments(src, blocks, [start?.at ?? 0, r.to]), next: r.next, rest: src.slice(r.next.at) };
 	};
 
+	it('keeps a line that overshoots the frame by a fraction of a pixel', async () => {
+		expect((await fill('a\n\nb', 19.8)).shown).toEqual(['a', 'b']);
+		expect((await fill('a\n\nb', 19.5)).shown).toEqual(['a']);
+	});
+
 	it('takes whole blocks while they fit', async () => {
 		const r = await fill('a\n\nb\n\nc', 20);
 		expect(r.shown).toEqual(['a', 'b']);

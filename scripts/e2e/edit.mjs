@@ -60,7 +60,25 @@ try {
 	await sleep(100);
 	m = await inView("return view.store.file.pages[0].modules.find((x) => x.id === 'long');");
 	check('with text cut off below, the bottom edge snaps under the last item that shows', Math.abs(m.h - listEnd) < 0.05 && m.h < 40, [m.h, listEnd]);
-	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: f.pages[0].modules.filter((x) => x.id !== 'long') }] })); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'txt' }); await new Promise((r) => setTimeout(r, 100));`);
+
+	// The start of a chain of linked frames: its bottom edge snaps under its last line too, and that
+	// line stays in it (the rest of the text keeps flowing into the next frame).
+	const lines = Array.from({ length: 14 }, (_, i) => `LN-${String(i + 1).padStart(2, '0')} a line`).join('\\n');
+	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: [...f.pages[0].modules.filter((x) => x.id !== 'long'),
+			{ id: 'chain', type: 'text', markdown: '## Heading\\n${lines}', x: 100, y: 20, w: 50, h: 50 }, { id: 'cf', type: 'frame', from: 'chain', x: 100, y: 80, w: 50, h: 80 }] }] }));
+		await new Promise((r) => setTimeout(r, 900)); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'chain' }); await new Promise((r) => setTimeout(r, 100));`);
+	const shown = (id) => inView(`return view.contentEl.querySelector('.pw-module[data-module-id="${id}"]').innerText.match(/LN-\\d\\d/g) ?? [];`);
+	const before = [await shown('chain'), await shown('cf')];
+	const chainEnd = await inView(`const el = view.contentEl.querySelector('.pw-module[data-module-id="chain"]'); const body = el.querySelector('.pw-module-body'); const b = body.getBoundingClientRect();
+		const box = el.getBoundingClientRect(); const pxPerMm = box.height / 50;
+		return (el.querySelector('.pw-markdown').getBoundingClientRect().bottom - b.top + box.height - b.height) / pxPerMm;`);
+	const south3 = center(await rectOf('.pw-handle-s'));
+	await cdp.drag(south3, { x: south3.x, y: south3.y - (50 - chainEnd - 0.8) * pxPerMm });
+	await sleep(900);
+	m = await inView("return view.store.file.pages[0].modules.find((x) => x.id === 'chain');");
+	const after = [await shown('chain'), await shown('cf')];
+	check('a frame chain’s first box snaps under its last line and keeps it', Math.abs(m.h - chainEnd) < 0.05 && m.h < 50 && JSON.stringify(after) === JSON.stringify(before), [m.h, chainEnd, before, after]);
+	await inView(`view.store.update((f) => ({ ...f, pages: [{ ...f.pages[0], modules: f.pages[0].modules.filter((x) => x.id !== 'chain' && x.id !== 'cf') }] })); s.select({ pageId: view.store.file.pages[0].id, moduleId: 'txt' }); await new Promise((r) => setTimeout(r, 100));`);
 
 	// Arrow nudge: 1 mm, Shift 10 mm.
 	await cdp.key('ArrowRight', 'ArrowRight');
