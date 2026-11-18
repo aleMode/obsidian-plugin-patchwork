@@ -1,5 +1,5 @@
 import { type App, Component, MarkdownRenderer } from 'obsidian';
-import { type Block, chainSignature, fitCount, type FlowInfo, type FlowMember, partOf, splitBlocks } from '../model/flow';
+import { type Block, chainSignature, type FlowCursor, type FlowInfo, type FlowMeasurer, type FlowMember, fitFrame, splitBlocks } from '../model/flow';
 import type { NoteModule, TextModule } from '../model/schema';
 import { contentBox, textScale } from '../model/style';
 import { loadNoteContent } from '../sources/markdownSource';
@@ -8,13 +8,14 @@ import { extractPdfEmbeds } from '../model/pdfEmbeds';
 import { renderPdfEmbeds } from './pdfEmbed';
 
 // Measures how a linked-frame chain's text splits across its frames (SPEC 4 M5): each block is
-// rendered offscreen at the frame's width, exactly as the frame will show it, until one overflows.
+// rendered offscreen at the frame's width, exactly as the frame will show it, until one overflows;
+// that one is then cut at the last line start that fits (model/flow fitFrame).
 
 export interface FlowResult {
 	/** The head's markdown that `blocks` were cut from. */
 	markdown: string;
 	blocks: Block[];
-	/** Per chain member: the blocks [start, end) it shows. */
+	/** Per chain member: the stretch [from, to) of `markdown` it shows (see model/flow segments). */
 	ranges: [number, number][];
 	/** Text left over after the last frame. */
 	leftover: boolean;
@@ -72,7 +73,8 @@ export class FlowLayout {
 	async part(chain: readonly FlowMember[], index: number): Promise<{ from: number; to: number; source: string } | null> {
 		const r = await this.layout(chain);
 		if ('error' in r) return null;
-		return { ...partOf(r.blocks, r.ranges[index]!, r.markdown.length), source: r.markdown };
+		const [from, to] = r.ranges[index]!;
+		return { from, to, source: r.markdown };
 	}
 
 	/** Measure unless a newer layout of the same chain was asked for meanwhile; then that one answers. */
@@ -104,38 +106,46 @@ export class FlowLayout {
 		component.load();
 		const ranges: [number, number][] = [];
 		try {
-			let start = 0;
+			let cur: FlowCursor = { block: 0, at: blocks[0]?.from ?? markdown.length };
 			for (const member of chain) {
-				if (start >= blocks.length) {
-					ranges.push([start, start]);
+				if (cur.block >= blocks.length) {
+					ranges.push([markdown.length, markdown.length]);
 					continue;
 				}
 				const box = contentBox(member.module);
 				const body = root.createDiv({ cls: 'pw-flow-measure-body' });
 				body.setCssProps({ '--pw-w': `${box.w}mm`, '--pw-text-scale': String(textScale(member.module)) });
 				const md = body.createDiv({ cls: 'markdown-rendered markdown-preview-view pw-markdown' });
-				const top = md.getBoundingClientRect().top;
-				const bottoms: number[] = [];
-				for (let i = start; i < blocks.length; i++) {
-					const wrap = md.createDiv({ cls: 'pw-flow-block' });
-					// Same markup the frame will show: PDF embeds as Patchwork's own boxes, sized to their page.
-					const { markdown, embeds } = extractPdfEmbeds(blocks[i]!.text);
-					await MarkdownRenderer.render(this.app, markdown, wrap, sourcePath, component);
-					if (embeds.length && this.pdfDocs) await renderPdfEmbeds(wrap, embeds, { app: this.app, pdfDocs: this.pdfDocs, sizeOnly: true }, sourcePath, () => true);
-					const bottom = (wrap.getBoundingClientRect().bottom - top) / PX_PER_MM_CSS;
-					bottoms.push(bottom);
-					// One block past the edge is all fitCount needs.
-					if (bottom > box.h) break;
-				}
-				const n = fitCount(bottoms, box.h, blocks.slice(start));
-				ranges.push([start, start + n]);
-				start += n;
+				const fit = await fitFrame(markdown, blocks, cur, box.h, this.measurer(md, sourcePath, component));
+				ranges.push([cur.at, fit.to]);
+				cur = fit.next;
 				body.remove();
 			}
-			return { markdown, blocks, ranges, leftover: start < blocks.length, sourcePath };
+			return { markdown, blocks, ranges, leftover: cur.block < blocks.length, sourcePath };
 		} finally {
 			component.unload();
 			root.remove();
 		}
+	}
+
+	/** Renders blocks into `md` as a frame would, one wrapper each, and reports their bottom edge in mm. */
+	private measurer(md: HTMLElement, sourcePath: string, component: Component): FlowMeasurer {
+		const top = md.getBoundingClientRect().top;
+		let last: HTMLElement | null = null;
+		const render = async (wrap: HTMLElement, text: string) => {
+			// Same markup the frame will show: PDF embeds as Patchwork's own boxes, sized to their page.
+			const { markdown, embeds } = extractPdfEmbeds(text);
+			await MarkdownRenderer.render(this.app, markdown, wrap, sourcePath, component);
+			if (embeds.length && this.pdfDocs) await renderPdfEmbeds(wrap, embeds, { app: this.app, pdfDocs: this.pdfDocs, sizeOnly: true }, sourcePath, () => true);
+			return (wrap.getBoundingClientRect().bottom - top) / PX_PER_MM_CSS;
+		};
+		return {
+			push: (text) => render((last = md.createDiv({ cls: 'pw-flow-block' })), text),
+			replaceLast: (text) => {
+				last ??= md.createDiv({ cls: 'pw-flow-block' });
+				last.empty();
+				return render(last, text);
+			},
+		};
 	}
 }

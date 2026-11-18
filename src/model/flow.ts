@@ -2,8 +2,9 @@ import { bottom, clamp, intersects, right, type Rect } from './geometry';
 import type { AnyModule, Page, PatchworkFile } from './schema';
 import { contentBox, textScale } from './style';
 
-// Linked text frames (SPEC 4 M5). Not a reflow engine (hard rule 7): markdown is cut into whole
-// blocks, and each frame takes as many blocks as fit; lines are never split. Pure.
+// Linked text frames (SPEC 4 M5). Not a reflow engine (hard rule 7): markdown is cut into blocks,
+// and a block may be cut again only where its source starts a new line (paragraph lines, list items,
+// table rows, quote lines). Lines that wrap on screen are never split. Pure.
 
 export interface Block {
 	text: string;
@@ -11,10 +12,18 @@ export interface Block {
 	/** Where the block sits in the markdown it was cut from: `markdown.slice(from, to)`. */
 	from: number;
 	to: number;
+	/** Offsets (line starts) where a frame may stop inside the block and the next one carry on. */
+	cuts: number[];
+	/** Repeated at the top of a continuation so it still renders as the same thing (a table's header, a callout's title). */
+	prefix?: string;
 }
 
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const HEADING = /^ {0,3}#{1,6}(\s|$)/;
+const QUOTE = /^ {0,3}>/;
+const CALLOUT = /^ {0,3}>\s*\[![^\]]+\]/;
+const TABLE_DELIMITER = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
+const SETEXT = /^ {0,3}(=+|-+)\s*$/;
 
 interface Line {
 	text: string;
@@ -32,6 +41,33 @@ function splitLines(markdown: string): Line[] {
 	}
 }
 
+const indent = (text: string) => /^[ \t]*/.exec(text)![0].replace(/\t/g, '    ').length;
+const starts = (lines: readonly Line[]) => lines.map((l) => l.from);
+
+/**
+ * Where a block may be cut. Anything whose pieces wouldn't render as the same thing (code, math,
+ * HTML, a table not at the top, a quote holding code) stays whole.
+ */
+function cutsOf(lines: readonly Line[]): Pick<Block, 'cuts' | 'prefix'> {
+	const first = lines[0]!.text;
+	if (lines.length < 2 || HEADING.test(first) || FENCE.test(first) || first.trim() === '$$' || first.trimStart().startsWith('<')) return { cuts: [] };
+	if (first.includes('|') && TABLE_DELIMITER.test(lines[1]!.text) && lines[1]!.text.includes('-')) {
+		// The first part keeps the header and at least one row.
+		return { cuts: starts(lines.slice(3)), prefix: `${first}\n${lines[1]!.text}` };
+	}
+	if (QUOTE.test(first)) {
+		if (lines.some((l) => FENCE.test(l.text.replace(/^(\s*>)+\s?/, '')))) return { cuts: [] };
+		// Lines without `>` continue the quote lazily; cut before one and it would leave the quote.
+		const quoted = (from: number) => starts(lines.slice(from).filter((l) => QUOTE.test(l.text)));
+		return CALLOUT.test(first) ? { cuts: quoted(2), prefix: first } : { cuts: quoted(1) };
+	}
+	if (lines.some((l) => TABLE_DELIMITER.test(l.text) && l.text.includes('|'))) return { cuts: [] };
+	// Paragraphs and lists: before any line not indented past the first (nested items and an item's
+	// own lines stay with it), and not before a setext underline, which belongs to the line above.
+	const base = indent(first);
+	return { cuts: starts(lines.slice(1).filter((l) => indent(l.text) <= base && !SETEXT.test(l.text))) };
+}
+
 /**
  * Top-level markdown blocks: runs of lines separated by blank lines, with headings on their own and
  * fenced code and $$ math kept whole (blank lines inside them don't split).
@@ -42,7 +78,7 @@ export function splitBlocks(markdown: string): Block[] {
 	const flush = () => {
 		if (cur.length) {
 			const last = cur[cur.length - 1]!;
-			blocks.push({ text: cur.map((l) => l.text).join('\n'), heading: cur.length === 1 && HEADING.test(cur[0]!.text), from: cur[0]!.from, to: last.from + last.text.length });
+			blocks.push({ text: cur.map((l) => l.text).join('\n'), heading: cur.length === 1 && HEADING.test(cur[0]!.text), from: cur[0]!.from, to: last.from + last.text.length, ...cutsOf(cur) });
 		}
 		cur = [];
 	};
@@ -73,14 +109,27 @@ export function splitBlocks(markdown: string): Block[] {
 	return blocks;
 }
 
-/** The stretch of the markdown a frame shows, given the blocks [start, end) it was assigned; empty (at the end) for a frame with no text. */
-export function partOf(blocks: readonly Pick<Block, 'from' | 'to'>[], range: readonly [number, number], length: number): { from: number; to: number } {
-	const [start, end] = range;
-	if (start >= end) {
-		const at = blocks[start]?.from ?? length;
-		return { from: at, to: at };
-	}
-	return { from: blocks[start]!.from, to: blocks[end - 1]!.to };
+/** Where a frame starts: a block, at its start or at one of its cuts. */
+export interface FlowCursor {
+	block: number;
+	at: number;
+}
+
+/** The end of the line before line start `cut` (its line end not included). */
+function lineEnd(markdown: string, cut: number): number {
+	return markdown[cut - 2] === '\r' ? cut - 2 : cut - 1;
+}
+
+/** Markdown for the stretch [from, to) of a block, with its prefix when it starts mid-way. */
+function textOf(markdown: string, block: Block, from: number, to: number): string {
+	const body = markdown.slice(from, to).replace(/\r\n/g, '\n');
+	return from > block.from && block.prefix ? `${block.prefix}\n${body}` : body;
+}
+
+/** The markdown a frame showing [from, to) renders, one string per block it touches. */
+export function segments(markdown: string, blocks: readonly Block[], range: readonly [number, number]): string[] {
+	const [from, to] = range;
+	return blocks.filter((b) => b.to > from && b.from < to).map((b) => textOf(markdown, b, Math.max(from, b.from), Math.min(to, b.to)));
 }
 
 /**
@@ -94,16 +143,49 @@ export function splicePart(source: string, part: { from: number; to: number }, v
 	return (before ? `${before}\n\n` : '') + value + source.slice(part.to);
 }
 
+/** Renders text the way a frame will and reports its bottom edge, in mm from the frame's top. */
+export interface FlowMeasurer {
+	/** Add a block below the ones already there. */
+	push(text: string): Promise<number>;
+	/** Render the last block again with other text. */
+	replaceLast(text: string): Promise<number>;
+}
+
+/** What a frame shows: up to `to`, with the next frame starting at `next`. */
+export interface FrameFit {
+	to: number;
+	next: FlowCursor;
+}
+
 /**
- * How many blocks fit, given each block's bottom edge (mm from the frame's top). At least one, so
- * a block taller than every frame still moves on (clipped). A heading isn't left last in a frame
- * when its section follows.
+ * Fill one frame of `height` mm from `start`: whole blocks while they fit, then as much of the next
+ * block as fits, cut at a line start. The first thing in a frame is taken even when too tall (clipped),
+ * so the text always moves on. A heading isn't left last in a frame when none of its section fits.
  */
-export function fitCount(bottoms: readonly number[], height: number, blocks: readonly Pick<Block, 'heading'>[]): number {
-	let n = 0;
-	while (n < bottoms.length && bottoms[n]! <= height + 0.01) n++;
-	while (n > 1 && n < blocks.length && blocks[n - 1]!.heading) n--;
-	return Math.max(1, Math.min(n, bottoms.length));
+export async function fitFrame(markdown: string, blocks: readonly Block[], start: FlowCursor, height: number, measure: FlowMeasurer): Promise<FrameFit> {
+	const fits = (bottom: number) => bottom <= height + 0.01;
+	const cursor = (block: number): FlowCursor => ({ block, at: blocks[block]?.from ?? markdown.length });
+	let to = start.at;
+	for (let i = start.block, at = start.at, taken = 0; i < blocks.length; i++, at = blocks[i]?.from ?? 0, taken++) {
+		const b = blocks[i]!;
+		if (fits(await measure.push(textOf(markdown, b, at, b.to)))) {
+			to = b.to;
+			continue;
+		}
+		// The most pieces that fit; each piece ends just before the cut that starts the next one.
+		const cuts = b.cuts.filter((c) => c > at);
+		let lo = 0, hi = cuts.length;
+		while (lo < hi) {
+			const mid = Math.ceil((lo + hi) / 2);
+			if (fits(await measure.replaceLast(textOf(markdown, b, at, lineEnd(markdown, cuts[mid - 1]!))))) lo = mid;
+			else hi = mid - 1;
+		}
+		if (lo > 0) return { to: lineEnd(markdown, cuts[lo - 1]!), next: { block: i, at: cuts[lo - 1]! } };
+		if (taken === 0) return cuts.length ? { to: lineEnd(markdown, cuts[0]!), next: { block: i, at: cuts[0]! } } : { to: b.to, next: cursor(i + 1) };
+		if (taken > 1 && blocks[i - 1]!.heading) return { to: blocks[i - 2]!.to, next: cursor(i - 1) };
+		return { to, next: cursor(i) };
+	}
+	return { to, next: cursor(blocks.length) };
 }
 
 export interface FlowMember {

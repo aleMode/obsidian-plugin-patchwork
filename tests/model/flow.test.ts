@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chainSignature, fitCount, flowChains, linkedModules, partOf, placeNextFrame, splicePart, splitBlocks } from '../../src/model/flow';
+import { type Block, chainSignature, type FlowCursor, type FlowMeasurer, fitFrame, flowChains, linkedModules, placeNextFrame, segments, splicePart, splitBlocks } from '../../src/model/flow';
 import type { AnyModule } from '../../src/model/schema';
 
 describe('splitBlocks', () => {
@@ -26,51 +26,141 @@ describe('splitBlocks', () => {
 	});
 });
 
-describe('partOf and splicePart', () => {
+describe('cuts inside a block', () => {
+	const cutLines = (src: string) => splitBlocks(src).map((b) => b.cuts.map((c) => src.slice(c, src.indexOf('\n', c) < 0 ? undefined : src.indexOf('\n', c))));
+
+	it('cuts a paragraph before each of its lines', () => {
+		expect(cutLines('one\ntwo\nthree')).toEqual([['two', 'three']]);
+	});
+
+	it('cuts a list between top-level items, keeping nested items and an item’s own lines with it', () => {
+		expect(cutLines('1. a\n   more a\n2. b\n   - b1\n   - b2\n3. c')).toEqual([['2. b', '3. c']]);
+		expect(cutLines('Items:\n- a\n- b')).toEqual([['- a', '- b']]);
+	});
+
+	it('never cuts a setext heading from its underline', () => {
+		expect(cutLines('intro\nTitle\n===\nafter')).toEqual([['Title', 'after']]);
+	});
+
+	it('cuts a table between rows and repeats its header in the continuation', () => {
+		const src = '| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |\n| 5 | 6 |';
+		const [b] = splitBlocks(src);
+		expect(cutLines(src)).toEqual([['| 3 | 4 |', '| 5 | 6 |']]);
+		expect(b!.prefix).toBe('| a | b |\n|---|---|');
+	});
+
+	it('cuts quotes and callouts between quoted lines; a callout repeats its title', () => {
+		const callout = '> [!note] Title\n> one\n> two\nlazy\n> three';
+		expect(cutLines(callout)).toEqual([['> two', '> three']]);
+		expect(splitBlocks(callout)[0]!.prefix).toBe('> [!note] Title');
+		expect(cutLines('> a\n> b')).toEqual([['> b']]);
+		expect(cutLines('> a\n> ```\n> code\n> ```')).toEqual([[]]);
+	});
+
+	it('keeps code, math, headings and HTML whole', () => {
+		expect(cutLines('```\na\nb\n```\n\n$$\nx\ny\n$$\n\n# H\n\n<div>\nx\n</div>')).toEqual([[], [], [], []]);
+	});
+});
+
+describe('segments and splicePart', () => {
 	const src = 'one\n\ntwo\nlines\n\nthree';
 	const blocks = splitBlocks(src);
 
-	it('cuts out the blocks a frame shows', () => {
-		const part = partOf(blocks, [1, 3], src.length);
-		expect(src.slice(part.from, part.to)).toBe('two\nlines\n\nthree');
-		expect(src.slice(partOf(blocks, [0, 1], src.length).from, partOf(blocks, [0, 1], src.length).to)).toBe('one');
+	it('gives the text of each block a frame shows, cut where the frame starts or stops', () => {
+		expect(segments(src, blocks, [blocks[1]!.from, src.length])).toEqual(['two\nlines', 'three']);
+		expect(segments(src, blocks, [0, src.indexOf('\nlines')])).toEqual(['one', 'two']);
+		expect(segments(src, blocks, [src.indexOf('lines'), src.length])).toEqual(['lines', 'three']);
+		expect(segments(src, blocks, [src.length, src.length])).toEqual([]);
+	});
+
+	it('repeats a table’s header in a continuation, with Windows line ends too', () => {
+		const t = '| a |\r\n|---|\r\n| 1 |\r\n| 2 |';
+		const b = splitBlocks(t);
+		expect(segments(t, b, [b[0]!.cuts[0]!, t.length])).toEqual(['| a |\n|---|\n| 2 |']);
 	});
 
 	it('puts an edited part back without touching the rest', () => {
-		const part = partOf(blocks, [1, 2], src.length);
-		expect(splicePart(src, part, 'TWO')).toBe('one\n\nTWO\n\nthree');
+		const from = src.indexOf('lines');
+		expect(splicePart(src, { from, to: from + 5 }, 'LINES')).toBe('one\n\ntwo\nLINES\n\nthree');
 	});
 
 	it('leaves the text alone when an empty frame stays empty', () => {
-		const part = partOf(blocks, [3, 3], src.length);
-		expect(part).toEqual({ from: src.length, to: src.length });
-		expect(splicePart(src, part, '  ')).toBe(src);
+		expect(splicePart(src, { from: src.length, to: src.length }, '  ')).toBe(src);
 	});
 
 	it('adds text typed into an empty frame as a block of its own', () => {
-		const part = partOf(blocks, [3, 3], src.length);
 		expect(splicePart(`${src}\n`, { from: src.length + 1, to: src.length + 1 }, 'more')).toBe(`${src}\n\nmore`);
-		expect(splicePart(src, part, 'more')).toBe(`${src}\n\nmore`);
+		expect(splicePart(src, { from: src.length, to: src.length }, 'more')).toBe(`${src}\n\nmore`);
 		expect(splicePart('', { from: 0, to: 0 }, 'first')).toBe('first');
 	});
 });
 
-describe('fitCount', () => {
-	const plain = (n: number) => Array.from({ length: n }, () => ({ heading: false }));
-	it('takes the blocks whose bottom fits', () => {
-		expect(fitCount([10, 20, 30], 25, plain(3))).toBe(2);
-		expect(fitCount([10, 20, 30], 30, plain(3))).toBe(3);
+describe('fitFrame', () => {
+	/** Every rendered source line is 10 mm tall, headings too; blocks stack with no gaps. */
+	const fake = (): FlowMeasurer => {
+		const heights: number[] = [];
+		const h = (text: string) => text.split('\n').length * 10;
+		const sum = () => heights.reduce((a, b) => a + b, 0);
+		return {
+			push: (t) => (heights.push(h(t)), Promise.resolve(sum())),
+			replaceLast: (t) => ((heights[heights.length - 1] = h(t)), Promise.resolve(sum())),
+		};
+	};
+	const fill = async (src: string, height: number, start?: FlowCursor) => {
+		const blocks: Block[] = splitBlocks(src);
+		const r = await fitFrame(src, blocks, start ?? { block: 0, at: blocks[0]!.from }, height, fake());
+		return { shown: segments(src, blocks, [start?.at ?? 0, r.to]), next: r.next, rest: src.slice(r.next.at) };
+	};
+
+	it('takes whole blocks while they fit', async () => {
+		const r = await fill('a\n\nb\n\nc', 20);
+		expect(r.shown).toEqual(['a', 'b']);
+		expect(r.rest).toBe('c');
 	});
 
-	it('always takes at least one block', () => {
-		expect(fitCount([50, 60], 25, plain(2))).toBe(1);
+	it('takes as many lines of the next block as fit', async () => {
+		const r = await fill('a\n\nb1\nb2\nb3\nb4', 30);
+		expect(r.shown).toEqual(['a', 'b1\nb2']);
+		expect(r.next.block).toBe(1);
+		expect(r.rest).toBe('b3\nb4');
 	});
 
-	it('keeps a heading with the block after it', () => {
-		const blocks = [{ heading: false }, { heading: true }, { heading: false }];
-		expect(fitCount([10, 15, 40], 20, blocks)).toBe(1);
-		// The heading is last in the text: nothing to keep it with.
-		expect(fitCount([10, 15], 20, blocks.slice(0, 2))).toBe(2);
+	it('carries on from a cut, with the table header repeated', async () => {
+		const src = '| a |\n|---|\n| 1 |\n| 2 |\n| 3 |';
+		const first = await fill(src, 30);
+		expect(first.shown).toEqual(['| a |\n|---|\n| 1 |']);
+		const second = await fill(src, 100, first.next);
+		expect(second.shown).toEqual(['| a |\n|---|\n| 2 |\n| 3 |']);
+		expect(second.next.block).toBe(1);
+	});
+
+	it('keeps a heading with part of its section', async () => {
+		const r = await fill('a\n\n## H\n\nb1\nb2\nb3', 35);
+		expect(r.shown).toEqual(['a', '## H', 'b1']);
+	});
+
+	it('moves a heading on when none of its section fits', async () => {
+		const r = await fill('a\n\n## H\n\n```\nx\ny\n```', 35);
+		expect(r.shown).toEqual(['a']);
+		expect(r.rest.startsWith('## H')).toBe(true);
+	});
+
+	it('splits a block too tall for the frame instead of clipping it', async () => {
+		const r = await fill('l1\nl2\nl3\nl4\nl5', 25);
+		expect(r.shown).toEqual(['l1\nl2']);
+	});
+
+	it('takes something even when nothing fits, so the text moves on', async () => {
+		expect((await fill('l1\nl2', 5)).shown).toEqual(['l1']);
+		const code = await fill('```\nx\n```\n\nafter', 5);
+		expect(code.shown).toEqual(['```\nx\n```']);
+		expect(code.rest).toBe('after');
+	});
+
+	it('moves a block that can’t be cut whole to the next frame', async () => {
+		const r = await fill('a\n\n```\nx\ny\n```', 30);
+		expect(r.shown).toEqual(['a']);
+		expect(r.next).toEqual({ block: 1, at: 3 });
 	});
 });
 

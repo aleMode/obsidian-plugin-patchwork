@@ -2,6 +2,7 @@ import { Component, MarkdownRenderer } from 'obsidian';
 import type { AnyModule, NoteModule, TextModule } from '../model/schema';
 import { loadNoteContent, noteCssClasses, noteDependencies } from '../sources/markdownSource';
 import { snapshotChanged } from '../model/freshness';
+import { segments } from '../model/flow';
 import { extractPdfEmbeds, type PdfEmbed } from '../model/pdfEmbeds';
 import { releasePdfEmbeds, renderPdfEmbeds } from './pdfEmbed';
 import { type ModuleContext, type ModuleRenderer, pickAnother, placeholder, setBadge } from './types';
@@ -160,7 +161,7 @@ export class TextModuleRenderer extends MarkdownModule {
 
 /**
  * A member of a linked-frame chain (M5): the head note or text, or a frame continuing it. Shows its
- * share of the chain's blocks; the last frame is marked when text is left over.
+ * share of the chain's text; the last frame is marked when text is left over.
  */
 export class FlowRenderer extends MarkdownModule {
 	render(m: AnyModule) {
@@ -177,8 +178,7 @@ export class FlowRenderer extends MarkdownModule {
 			.then(async (r) => {
 				if (!this.isCurrent(gen)) return;
 				if ('error' in r) return placeholder(this.el, r.error, 'missing');
-				const [start, end] = r.ranges[info.index]!;
-				await this.showBlocks(r.blocks.slice(start, end).map((b) => b.text), r.sourcePath, gen, head.type === 'note' ? noteCssClasses(this.ctx.app, head.file as string) : []);
+				await this.showBlocks(segments(r.markdown, r.blocks, r.ranges[info.index]!), r.sourcePath, gen, head.type === 'note' ? noteCssClasses(this.ctx.app, head.file as string) : []);
 				// Every frame of a frozen note's chain carries the tag, so it shows wherever the text lands.
 				if (head.type === 'note' && head.frozen) await this.flagFrozen(head as NoteModule, gen);
 				if (this.isCurrent(gen)) this.el.parentElement?.toggleClass('is-overflowing', last && r.leftover);
